@@ -67,6 +67,17 @@ describe("chooseBotMove", () => {
 
     expect(next).toEqual({ x: 3, y: 2 });
   });
+
+  it("holds position when already safe while a bomb is active", () => {
+    const next = chooseBotMove({
+      arena: makeArena(),
+      from: { x: 1, y: 1 },
+      target: { x: 3, y: 1 },
+      bombs: [{ tile: { x: 3, y: 3 }, range: 1 }]
+    });
+
+    expect(next).toEqual({ x: 1, y: 1 });
+  });
 });
 
 describe("findSafeEscapeMove", () => {

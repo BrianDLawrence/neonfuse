@@ -55,6 +55,10 @@ export function chooseBotMove({
     }) ?? from;
   }
 
+  if (bombs.length > 0) {
+    return from;
+  }
+
   const safeCandidates = candidates.filter((tile) => !isDangerTile(arena, bombs, tile));
   const movePool = safeCandidates.length > 0 ? safeCandidates : candidates;
 
