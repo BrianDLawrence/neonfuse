@@ -35,3 +35,7 @@ Game rules should live under `src/game/simulation`. Phaser scenes should transla
 simulation state into sprites, camera movement, particles, and effects.
 
 React owns text-heavy UI. Phaser owns the playfield.
+
+## License
+
+MIT License. Copyright (c) 2026 Spero Autem LLC.
