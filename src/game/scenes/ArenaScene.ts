@@ -9,7 +9,12 @@ import {
   isWalkable
 } from "../simulation/arena";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
-import { chooseBotMove, isDangerTile, manhattanDistance } from "../simulation/danger";
+import {
+  chooseBotMove,
+  findSafeEscapeMove,
+  isDangerTile,
+  manhattanDistance
+} from "../simulation/danger";
 
 const PLAYER_BLAST_RANGE = 2;
 const BOT_BLAST_RANGE = 2;
@@ -583,6 +588,23 @@ export class ArenaScene extends Phaser.Scene {
     const shouldBomb = nearPlayer || (nearSoftBlock && Phaser.Math.Between(0, 100) < 42);
 
     if (!shouldBomb) {
+      return;
+    }
+
+    const escapeMove = findSafeEscapeMove({
+      arena: this.arena,
+      from: this.bot.tile,
+      bombs: [
+        ...bombThreats,
+        {
+          tile: this.bot.tile,
+          range: BOT_BLAST_RANGE
+        }
+      ],
+      blockedTiles: [...this.activeBombs.map((bomb) => bomb.tile), this.bot.tile]
+    });
+
+    if (!escapeMove) {
       return;
     }
 

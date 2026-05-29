@@ -44,20 +44,79 @@ export function chooseBotMove({
     return from;
   }
 
-  const safeCandidates = candidates.filter((tile) => !isDangerTile(arena, bombs, tile));
   const currentIsDangerous = isDangerTile(arena, bombs, from);
+
+  if (currentIsDangerous) {
+    return findSafeEscapeMove({
+      arena,
+      from,
+      bombs,
+      blockedTiles
+    }) ?? from;
+  }
+
+  const safeCandidates = candidates.filter((tile) => !isDangerTile(arena, bombs, tile));
   const movePool = safeCandidates.length > 0 ? safeCandidates : candidates;
 
   return [...movePool].sort((a, b) => {
     const aDistance = manhattanDistance(a, target);
     const bDistance = manhattanDistance(b, target);
 
-    if (currentIsDangerous) {
-      return bDistance - aDistance;
-    }
-
     return aDistance - bDistance;
   })[0];
+}
+
+export function findSafeEscapeMove({
+  arena,
+  from,
+  bombs,
+  blockedTiles = [],
+  maxDepth = 6
+}: {
+  arena: ArenaGrid;
+  from: GridPoint;
+  bombs: BombThreat[];
+  blockedTiles?: GridPoint[];
+  maxDepth?: number;
+}) {
+  const queue: Array<{ tile: GridPoint; path: GridPoint[] }> = [{ tile: from, path: [] }];
+  const visited = new Set([tileKey(from)]);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    if (current.path.length > 0 && !isDangerTile(arena, bombs, current.tile)) {
+      return current.path[0];
+    }
+
+    if (current.path.length >= maxDepth) {
+      continue;
+    }
+
+    getAdjacentTiles(current.tile).forEach((neighbor) => {
+      const key = tileKey(neighbor);
+
+      if (visited.has(key)) {
+        return;
+      }
+
+      if (!isWalkable(arena, neighbor)) {
+        return;
+      }
+
+      if (blockedTiles.some((blocked) => sameTile(blocked, neighbor))) {
+        return;
+      }
+
+      visited.add(key);
+      queue.push({
+        tile: neighbor,
+        path: [...current.path, neighbor]
+      });
+    });
+  }
+
+  return null;
 }
 
 export function getAdjacentTiles(tile: GridPoint) {

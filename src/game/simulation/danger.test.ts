@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArenaGrid } from "./arena";
-import { chooseBotMove, getDangerTiles, isDangerTile } from "./danger";
+import { chooseBotMove, findSafeEscapeMove, getDangerTiles, isDangerTile } from "./danger";
 
 function makeArena(): ArenaGrid {
   return [
@@ -54,5 +54,47 @@ describe("chooseBotMove", () => {
     });
 
     expect(next).toEqual({ x: 1, y: 2 });
+  });
+
+  it("moves along an escape path when adjacent tiles are still dangerous", () => {
+    const next = chooseBotMove({
+      arena: makeArena(),
+      from: { x: 2, y: 2 },
+      target: { x: 2, y: 1 },
+      bombs: [{ tile: { x: 2, y: 2 }, range: 2 }],
+      blockedTiles: [{ x: 2, y: 2 }]
+    });
+
+    expect(next).toEqual({ x: 3, y: 2 });
+  });
+});
+
+describe("findSafeEscapeMove", () => {
+  it("finds a first step toward a safe tile after planting a bomb", () => {
+    const next = findSafeEscapeMove({
+      arena: makeArena(),
+      from: { x: 2, y: 2 },
+      bombs: [{ tile: { x: 2, y: 2 }, range: 2 }],
+      blockedTiles: [{ x: 2, y: 2 }]
+    });
+
+    expect(next).toEqual({ x: 3, y: 2 });
+  });
+
+  it("returns null when no escape route exists", () => {
+    const boxedInArena: ArenaGrid = [
+      ["hard", "hard", "hard"],
+      ["hard", "floor", "hard"],
+      ["hard", "hard", "hard"]
+    ];
+
+    const next = findSafeEscapeMove({
+      arena: boxedInArena,
+      from: { x: 1, y: 1 },
+      bombs: [{ tile: { x: 1, y: 1 }, range: 2 }],
+      blockedTiles: [{ x: 1, y: 1 }]
+    });
+
+    expect(next).toBeNull();
   });
 });
