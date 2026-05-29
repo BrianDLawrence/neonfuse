@@ -7,10 +7,19 @@ export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
   const [blast, setBlast] = useState(2);
+  const [wins, setWins] = useState(0);
+  const [losses, setLosses] = useState(0);
   const handleLoadoutChange = useCallback(
     ({ bombs: nextBombs, blast: nextBlast }: { bombs: number; blast: number }) => {
       setBombs(nextBombs);
       setBlast(nextBlast);
+    },
+    []
+  );
+  const handleMatchStatsChange = useCallback(
+    ({ wins: nextWins, losses: nextLosses }: { wins: number; losses: number }) => {
+      setWins(nextWins);
+      setLosses(nextLosses);
     },
     []
   );
@@ -21,6 +30,7 @@ export function GameShell() {
         <PhaserGame
           onRoundStatusChange={setRoundStatus}
           onLoadoutChange={handleLoadoutChange}
+          onMatchStatsChange={handleMatchStatsChange}
         />
       </section>
 
@@ -47,14 +57,20 @@ export function GameShell() {
               <span>Blast</span>
               <strong>{blast}</strong>
             </div>
+            <div className="hud-chip">
+              <span>Record</span>
+              <strong>
+                {wins}-{losses}
+              </strong>
+            </div>
           </div>
         </div>
 
         <aside className="start-panel">
           <h2>Prototype Zero</h2>
           <p>
-            This repo starts with the architecture: Next for UI and deployment,
-            Phaser for the playfield, and MongoDB wiring ready for match data.
+            Hunt the red bot, avoid your own blast, and clear soft blocks to open
+            attack lanes. Round results are ready to save to MongoDB.
           </p>
           <div className="command-row">
             <button className="command-button" type="button">
@@ -70,6 +86,7 @@ export function GameShell() {
           <span className="key-chip">Arrow Keys / WASD: Move</span>
           <span className="key-chip">Space: Bomb</span>
           <span className="key-chip">R: Reset</span>
+          <span className="key-chip">Goal: Blast the red bot</span>
         </div>
       </div>
     </main>

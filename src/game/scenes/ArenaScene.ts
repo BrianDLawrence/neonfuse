@@ -20,12 +20,23 @@ type BlastResult = {
   clearedBlocks: GridPoint[];
 };
 
+type BotOpponent = {
+  tile: GridPoint;
+  sprite: Phaser.GameObjects.Image;
+  alive: boolean;
+};
+
+type RoundWinner = "player" | "bot" | "draw";
+
 export class ArenaScene extends Phaser.Scene {
   private arena = createInitialArena();
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd?: Record<string, Phaser.Input.Keyboard.Key>;
   private player?: Phaser.GameObjects.Image;
   private playerTile: GridPoint = { x: 1, y: 1 };
+  private playerAlive = true;
+  private bot?: BotOpponent;
+  private botMoveEvent?: Phaser.Time.TimerEvent;
   private activeBomb?: ActiveBomb;
   private shellEvents?: GameEvents;
   private boardOrigin = { x: 0, y: 0 };
@@ -33,6 +44,11 @@ export class ArenaScene extends Phaser.Scene {
   private blockLayer?: Phaser.GameObjects.Container;
   private fxLayer?: Phaser.GameObjects.Container;
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
+  private roundOver = false;
+  private matchStartedAt = 0;
+  private wins = 0;
+  private losses = 0;
+  private blocksCleared = 0;
 
   constructor() {
     super("ArenaScene");
@@ -52,8 +68,12 @@ export class ArenaScene extends Phaser.Scene {
 
     this.drawArena();
     this.spawnPlayer();
+    this.spawnBot();
+    this.startBotAi();
+    this.matchStartedAt = this.time.now;
     this.shellEvents?.onRoundStatusChange?.("Live");
     this.shellEvents?.onLoadoutChange?.({ bombs: 1, blast: 2 });
+    this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
 
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -63,6 +83,14 @@ export class ArenaScene extends Phaser.Scene {
 
   update() {
     if (!this.player || !this.cursors || !this.wasd) {
+      return;
+    }
+
+    if (this.roundOver) {
+      if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
+        this.resetRound();
+      }
+
       return;
     }
 
@@ -129,7 +157,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private plantBomb() {
-    if (this.activeBomb) {
+    if (this.activeBomb || this.roundOver || !this.playerAlive) {
       return;
     }
 
@@ -168,11 +196,17 @@ export class ArenaScene extends Phaser.Scene {
     this.shellEvents?.onRoundStatusChange?.("Blast");
 
     const blast = this.resolveBlast(tile, 2);
+    this.blocksCleared += blast.clearedBlocks.length;
     this.playExplosion(blast);
     this.time.delayedCall(220, () => this.clearDestroyedBlocks(blast.clearedBlocks));
+    this.time.delayedCall(140, () => this.evaluateBlastHits(blast));
 
     this.cameras.main.shake(180, 0.008);
-    this.time.delayedCall(720, () => this.shellEvents?.onRoundStatusChange?.("Live"));
+    this.time.delayedCall(720, () => {
+      if (!this.roundOver) {
+        this.shellEvents?.onRoundStatusChange?.("Live");
+      }
+    });
   }
 
   private resolveBlast(origin: GridPoint, range: number): BlastResult {
@@ -338,10 +372,153 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
+  private evaluateBlastHits(blast: BlastResult) {
+    if (this.roundOver) {
+      return;
+    }
+
+    const playerHit = this.playerAlive && this.tileListIncludes(blast.tiles, this.playerTile);
+    const botHit = Boolean(this.bot?.alive && this.tileListIncludes(blast.tiles, this.bot.tile));
+
+    if (playerHit) {
+      this.playerAlive = false;
+      this.player?.setTint(0xf59e0b);
+      this.tweens.add({
+        targets: this.player,
+        alpha: 0.25,
+        scale: 0.7,
+        duration: 220,
+        ease: "Cubic.easeOut"
+      });
+    }
+
+    if (botHit && this.bot) {
+      this.bot.alive = false;
+      this.bot.sprite.setTint(0xf59e0b);
+      this.tweens.add({
+        targets: this.bot.sprite,
+        alpha: 0.2,
+        scale: 0.7,
+        duration: 220,
+        ease: "Cubic.easeOut"
+      });
+    }
+
+    if (playerHit && botHit) {
+      this.completeRound("draw");
+    } else if (botHit) {
+      this.completeRound("player");
+    } else if (playerHit) {
+      this.completeRound("bot");
+    }
+  }
+
+  private completeRound(winner: RoundWinner) {
+    if (this.roundOver) {
+      return;
+    }
+
+    this.roundOver = true;
+    this.botMoveEvent?.remove(false);
+
+    if (winner === "player") {
+      this.wins += 1;
+      this.shellEvents?.onRoundStatusChange?.("Win");
+    } else if (winner === "bot") {
+      this.losses += 1;
+      this.shellEvents?.onRoundStatusChange?.("Down");
+    } else {
+      this.shellEvents?.onRoundStatusChange?.("Draw");
+    }
+
+    this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
+    void this.recordMatch(winner);
+  }
+
+  private async recordMatch(winner: RoundWinner) {
+    try {
+      await fetch("/api/matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          winner,
+          durationMs: Math.round(this.time.now - this.matchStartedAt),
+          blocksCleared: this.blocksCleared
+        })
+      });
+    } catch {
+      // Match history should never interrupt active play.
+    }
+  }
+
   private spawnPlayer() {
     const world = this.tileToWorld(this.playerTile);
     this.player = this.add.image(world.x, world.y, "player-core").setDepth(5);
     this.fxLayer?.add(this.player);
+  }
+
+  private spawnBot() {
+    const tile = { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 };
+    const world = this.tileToWorld(tile);
+    const sprite = this.add.image(world.x, world.y, "bot-core").setDepth(11);
+
+    this.bot = {
+      tile,
+      sprite,
+      alive: true
+    };
+  }
+
+  private startBotAi() {
+    this.botMoveEvent?.remove(false);
+    this.botMoveEvent = this.time.addEvent({
+      delay: 520,
+      loop: true,
+      callback: () => this.moveBot()
+    });
+  }
+
+  private moveBot() {
+    if (!this.bot?.alive || this.roundOver) {
+      return;
+    }
+
+    const directions = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 }
+    ];
+
+    const candidates = directions
+      .map((direction) => ({
+        x: this.bot!.tile.x + direction.x,
+        y: this.bot!.tile.y + direction.y
+      }))
+      .filter((tile) => isWalkable(this.arena, tile) && !this.activeBombAt(tile));
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    candidates.sort((a, b) => this.distanceToPlayer(a) - this.distanceToPlayer(b));
+    const shouldChase = Phaser.Math.Between(0, 100) < 72;
+    const nextTile = shouldChase
+      ? candidates[0]
+      : Phaser.Utils.Array.GetRandom(candidates);
+
+    this.bot.tile = nextTile;
+    const world = this.tileToWorld(nextTile);
+
+    this.tweens.add({
+      targets: this.bot.sprite,
+      x: world.x,
+      y: world.y,
+      duration: 160,
+      ease: "Quad.easeOut"
+    });
   }
 
   private handleResize() {
@@ -355,6 +532,11 @@ export class ArenaScene extends Phaser.Scene {
     if (this.activeBomb) {
       const world = this.tileToWorld(this.activeBomb.tile);
       this.activeBomb.sprite.setPosition(world.x, world.y);
+    }
+
+    if (this.bot) {
+      const world = this.tileToWorld(this.bot.tile);
+      this.bot.sprite.setPosition(world.x, world.y);
     }
   }
 
@@ -377,14 +559,24 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private resetRound() {
+    this.botMoveEvent?.remove(false);
     this.activeBomb?.timer.destroy();
     this.activeBomb?.sprite.destroy();
     this.activeBomb = undefined;
+    this.player?.destroy();
+    this.bot?.sprite.destroy();
+    this.bot = undefined;
     this.arena = createInitialArena();
     this.playerTile = { x: 1, y: 1 };
+    this.playerAlive = true;
+    this.roundOver = false;
+    this.blocksCleared = 0;
+    this.matchStartedAt = this.time.now;
     this.fxLayer?.removeAll(true);
     this.drawArena();
     this.spawnPlayer();
+    this.spawnBot();
+    this.startBotAi();
     this.shellEvents?.onRoundStatusChange?.("Live");
   }
 
@@ -397,5 +589,13 @@ export class ArenaScene extends Phaser.Scene {
 
   private tileKey(tile: GridPoint) {
     return `${tile.x}:${tile.y}`;
+  }
+
+  private tileListIncludes(tiles: GridPoint[], target: GridPoint) {
+    return tiles.some((tile) => tile.x === target.x && tile.y === target.y);
+  }
+
+  private distanceToPlayer(tile: GridPoint) {
+    return Math.abs(tile.x - this.playerTile.x) + Math.abs(tile.y - this.playerTile.y);
   }
 }

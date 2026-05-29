@@ -11,21 +11,25 @@ type Loadout = {
 type PhaserGameProps = {
   onRoundStatusChange?: (status: string) => void;
   onLoadoutChange?: (loadout: Loadout) => void;
+  onMatchStatsChange?: (stats: { wins: number; losses: number }) => void;
 };
 
 export function PhaserGame({
   onRoundStatusChange,
-  onLoadoutChange
+  onLoadoutChange,
+  onMatchStatsChange
 }: PhaserGameProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const roundStatusChangeRef = useRef(onRoundStatusChange);
   const loadoutChangeRef = useRef(onLoadoutChange);
+  const matchStatsChangeRef = useRef(onMatchStatsChange);
 
   useEffect(() => {
     roundStatusChangeRef.current = onRoundStatusChange;
     loadoutChangeRef.current = onLoadoutChange;
-  }, [onLoadoutChange, onRoundStatusChange]);
+    matchStatsChangeRef.current = onMatchStatsChange;
+  }, [onLoadoutChange, onMatchStatsChange, onRoundStatusChange]);
 
   useEffect(() => {
     let isMounted = true;
@@ -41,7 +45,8 @@ export function PhaserGame({
         parent: hostRef.current,
         events: {
           onRoundStatusChange: (status) => roundStatusChangeRef.current?.(status),
-          onLoadoutChange: (loadout) => loadoutChangeRef.current?.(loadout)
+          onLoadoutChange: (loadout) => loadoutChangeRef.current?.(loadout),
+          onMatchStatsChange: (stats) => matchStatsChangeRef.current?.(stats)
         }
       });
     }
