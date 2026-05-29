@@ -8,16 +8,12 @@ import {
   type GridPoint,
   isWalkable
 } from "../simulation/arena";
+import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 
 type ActiveBomb = {
   tile: GridPoint;
   sprite: Phaser.GameObjects.Image;
   timer: Phaser.Time.TimerEvent;
-};
-
-type BlastResult = {
-  tiles: GridPoint[];
-  clearedBlocks: GridPoint[];
 };
 
 type BotOpponent = {
@@ -195,7 +191,7 @@ export class ArenaScene extends Phaser.Scene {
     this.activeBomb = undefined;
     this.shellEvents?.onRoundStatusChange?.("Blast");
 
-    const blast = this.resolveBlast(tile, 2);
+    const blast = resolveBlast(this.arena, tile, 2);
     this.blocksCleared += blast.clearedBlocks.length;
     this.playExplosion(blast);
     this.time.delayedCall(220, () => this.clearDestroyedBlocks(blast.clearedBlocks));
@@ -207,42 +203,6 @@ export class ArenaScene extends Phaser.Scene {
         this.shellEvents?.onRoundStatusChange?.("Live");
       }
     });
-  }
-
-  private resolveBlast(origin: GridPoint, range: number): BlastResult {
-    const tiles: GridPoint[] = [origin];
-    const clearedBlocks: GridPoint[] = [];
-    const directions = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 }
-    ];
-
-    directions.forEach((direction) => {
-      for (let distance = 1; distance <= range; distance += 1) {
-        const tile = {
-          x: origin.x + direction.x * distance,
-          y: origin.y + direction.y * distance
-        };
-
-        const cell = this.arena[tile.y]?.[tile.x];
-
-        if (!cell || cell === "hard") {
-          break;
-        }
-
-        tiles.push(tile);
-
-        if (cell === "soft") {
-          this.arena[tile.y][tile.x] = "floor";
-          clearedBlocks.push(tile);
-          break;
-        }
-      }
-    });
-
-    return { tiles, clearedBlocks };
   }
 
   private playExplosion(blast: BlastResult) {
@@ -377,8 +337,8 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    const playerHit = this.playerAlive && this.tileListIncludes(blast.tiles, this.playerTile);
-    const botHit = Boolean(this.bot?.alive && this.tileListIncludes(blast.tiles, this.bot.tile));
+    const playerHit = this.playerAlive && tileListIncludes(blast.tiles, this.playerTile);
+    const botHit = Boolean(this.bot?.alive && tileListIncludes(blast.tiles, this.bot.tile));
 
     if (playerHit) {
       this.playerAlive = false;
@@ -589,10 +549,6 @@ export class ArenaScene extends Phaser.Scene {
 
   private tileKey(tile: GridPoint) {
     return `${tile.x}:${tile.y}`;
-  }
-
-  private tileListIncludes(tiles: GridPoint[], target: GridPoint) {
-    return tiles.some((tile) => tile.x === target.x && tile.y === target.y);
   }
 
   private distanceToPlayer(tile: GridPoint) {
