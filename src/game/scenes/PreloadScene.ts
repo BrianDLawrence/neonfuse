@@ -17,6 +17,12 @@ export class PreloadScene extends Phaser.Scene {
     graphics.fillRoundedRect(0, 0, 34, 34, 8);
     graphics.lineStyle(2, 0xf8fafc, 0.9);
     graphics.strokeRoundedRect(3, 3, 28, 28, 7);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillRoundedRect(9, 10, 6, 7, 2);
+    graphics.fillRoundedRect(20, 10, 6, 7, 2);
+    graphics.fillStyle(0xf8fafc, 1);
+    graphics.fillRect(11, 11, 2, 2);
+    graphics.fillRect(22, 11, 2, 2);
     graphics.generateTexture("player-core", 34, 34);
     graphics.clear();
 

@@ -60,15 +60,24 @@ export function GameShell() {
               <strong>{roundStatus}</strong>
             </div>
             <div className="hud-chip">
-              <span>Bombs</span>
+              <span className="metric-label">
+                <i className="stat-icon stat-icon-bomb" aria-hidden="true" />
+                Bombs
+              </span>
               <strong>{bombs}</strong>
             </div>
             <div className="hud-chip">
-              <span>Blast</span>
+              <span className="metric-label">
+                <i className="stat-icon stat-icon-blast" aria-hidden="true" />
+                Blast
+              </span>
               <strong>{blast}</strong>
             </div>
             <div className="hud-chip">
-              <span>Speed</span>
+              <span className="metric-label">
+                <i className="stat-icon stat-icon-speed" aria-hidden="true" />
+                Speed
+              </span>
               <strong>{speed}</strong>
             </div>
             <div className="hud-chip">
