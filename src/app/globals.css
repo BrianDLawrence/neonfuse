@@ -1,0 +1,240 @@
+:root {
+  --background: #101217;
+  --background-deep: #07080d;
+  --panel: rgba(17, 20, 30, 0.82);
+  --panel-strong: rgba(8, 10, 18, 0.94);
+  --line: rgba(34, 211, 238, 0.38);
+  --line-strong: rgba(34, 211, 238, 0.82);
+  --cyan: #22d3ee;
+  --pink: #f43f5e;
+  --green: #a3e635;
+  --amber: #f59e0b;
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --danger: #fb7185;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--background-deep);
+  color: var(--text);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-frame {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(34, 211, 238, 0.18), transparent 32%),
+    radial-gradient(circle at 82% 16%, rgba(244, 63, 94, 0.16), transparent 28%),
+    linear-gradient(145deg, #07080d 0%, #101217 44%, #07080d 100%);
+}
+
+.game-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.game-canvas-host {
+  width: 100%;
+  height: 100%;
+}
+
+.game-canvas-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hud {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+.hud-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: clamp(14px, 2vw, 24px);
+}
+
+.brand-lockup {
+  min-width: 0;
+}
+
+.brand-lockup h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(28px, 5vw, 72px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.9;
+  text-transform: uppercase;
+  text-shadow: 0 0 22px rgba(34, 211, 238, 0.62);
+}
+
+.brand-lockup p {
+  max-width: 580px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: clamp(14px, 1.5vw, 18px);
+  line-height: 1.45;
+}
+
+.hud-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: min(520px, 50vw);
+}
+
+.hud-chip {
+  min-width: 104px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow:
+    0 0 24px rgba(34, 211, 238, 0.12),
+    inset 0 0 18px rgba(34, 211, 238, 0.06);
+  padding: 10px 12px;
+}
+
+.hud-chip span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-chip strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.start-panel {
+  pointer-events: auto;
+  position: absolute;
+  left: clamp(14px, 2vw, 24px);
+  bottom: clamp(14px, 2vw, 24px);
+  width: min(440px, calc(100vw - 28px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.42),
+    0 0 36px rgba(244, 63, 94, 0.12);
+  padding: 18px;
+}
+
+.start-panel h2 {
+  margin: 0;
+  color: var(--green);
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.start-panel p {
+  margin: 10px 0 16px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.command-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.command-button {
+  border: 1px solid rgba(34, 211, 238, 0.64);
+  border-radius: 8px;
+  background: rgba(34, 211, 238, 0.14);
+  color: var(--text);
+  font-weight: 800;
+  padding: 11px 14px;
+  text-transform: uppercase;
+}
+
+.command-button.secondary {
+  border-color: rgba(244, 63, 94, 0.54);
+  background: rgba(244, 63, 94, 0.12);
+}
+
+.control-strip {
+  pointer-events: none;
+  position: absolute;
+  right: clamp(14px, 2vw, 24px);
+  bottom: clamp(14px, 2vw, 24px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: min(520px, calc(100vw - 28px));
+}
+
+.key-chip {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+  background: rgba(8, 10, 18, 0.72);
+  color: var(--muted);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+@media (max-width: 760px) {
+  .hud-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hud-cluster {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .brand-lockup p {
+    display: none;
+  }
+
+  .start-panel {
+    right: 14px;
+    width: auto;
+  }
+
+  .control-strip {
+    display: none;
+  }
+}

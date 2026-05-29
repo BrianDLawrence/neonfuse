@@ -1,0 +1,49 @@
+import * as Phaser from "phaser";
+
+export class PreloadScene extends Phaser.Scene {
+  constructor() {
+    super("PreloadScene");
+  }
+
+  create() {
+    this.createGeneratedTextures();
+    this.scene.start("ArenaScene");
+  }
+
+  private createGeneratedTextures() {
+    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+
+    graphics.fillStyle(0x22d3ee, 1);
+    graphics.fillRoundedRect(0, 0, 34, 34, 8);
+    graphics.lineStyle(2, 0xf8fafc, 0.9);
+    graphics.strokeRoundedRect(3, 3, 28, 28, 7);
+    graphics.generateTexture("player-core", 34, 34);
+    graphics.clear();
+
+    graphics.fillStyle(0xf43f5e, 1);
+    graphics.fillCircle(18, 20, 15);
+    graphics.fillStyle(0xf59e0b, 1);
+    graphics.fillCircle(26, 9, 5);
+    graphics.generateTexture("bomb-core", 36, 36);
+    graphics.clear();
+
+    graphics.fillStyle(0x151924, 1);
+    graphics.fillRoundedRect(0, 0, 38, 38, 6);
+    graphics.lineStyle(2, 0x22d3ee, 0.44);
+    graphics.strokeRoundedRect(2, 2, 34, 34, 5);
+    graphics.generateTexture("hard-block", 38, 38);
+    graphics.clear();
+
+    graphics.fillStyle(0x2b1020, 1);
+    graphics.fillRoundedRect(0, 0, 38, 38, 6);
+    graphics.lineStyle(2, 0xf43f5e, 0.5);
+    graphics.strokeRoundedRect(2, 2, 34, 34, 5);
+    graphics.generateTexture("soft-block", 38, 38);
+    graphics.clear();
+
+    graphics.fillStyle(0xa3e635, 1);
+    graphics.fillRoundedRect(0, 0, 16, 16, 3);
+    graphics.generateTexture("spark", 16, 16);
+    graphics.destroy();
+  }
+}
