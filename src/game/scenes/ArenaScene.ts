@@ -9,9 +9,18 @@ import {
   isWalkable
 } from "../simulation/arena";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
+import { chooseBotMove, isDangerTile, manhattanDistance } from "../simulation/danger";
+
+const PLAYER_BLAST_RANGE = 2;
+const BOT_BLAST_RANGE = 2;
+const PLAYER_FUSE_MS = 1400;
+const BOT_FUSE_MS = 1800;
+const BOT_MOVE_MS = 520;
 
 type ActiveBomb = {
+  owner: "player" | "bot";
   tile: GridPoint;
+  range: number;
   sprite: Phaser.GameObjects.Image;
   timer: Phaser.Time.TimerEvent;
 };
@@ -33,7 +42,7 @@ export class ArenaScene extends Phaser.Scene {
   private playerAlive = true;
   private bot?: BotOpponent;
   private botMoveEvent?: Phaser.Time.TimerEvent;
-  private activeBomb?: ActiveBomb;
+  private activeBombs: ActiveBomb[] = [];
   private shellEvents?: GameEvents;
   private boardOrigin = { x: 0, y: 0 };
   private boardLayer?: Phaser.GameObjects.Container;
@@ -153,14 +162,23 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private plantBomb() {
-    if (this.activeBomb || this.roundOver || !this.playerAlive) {
+    if (this.hasActiveBomb("player") || this.roundOver || !this.playerAlive) {
       return;
     }
 
-    const world = this.tileToWorld(this.playerTile);
-    const sprite = this.add.image(world.x, world.y, "bomb-core").setDepth(4);
-    sprite.setDepth(12);
+    this.plantBombAt("player", { ...this.playerTile }, PLAYER_BLAST_RANGE, PLAYER_FUSE_MS);
+    this.shellEvents?.onRoundStatusChange?.("Fuse");
+  }
 
+  private plantBombAt(
+    owner: ActiveBomb["owner"],
+    tile: GridPoint,
+    range: number,
+    fuseMs: number
+  ) {
+    const world = this.tileToWorld(tile);
+    const sprite = this.add.image(world.x, world.y, owner === "bot" ? "bot-bomb-core" : "bomb-core");
+    sprite.setDepth(12);
     this.tweens.add({
       targets: sprite,
       scale: { from: 0.92, to: 1.08 },
@@ -170,28 +188,29 @@ export class ArenaScene extends Phaser.Scene {
       ease: "Sine.easeInOut"
     });
 
-    const tile = { ...this.playerTile };
-
-    this.activeBomb = {
+    const bomb: ActiveBomb = {
+      owner,
       tile,
+      range,
       sprite,
-      timer: this.time.delayedCall(1400, () => this.detonateBomb(tile))
+      timer: this.time.delayedCall(fuseMs, () => this.detonateBomb(bomb))
     };
 
-    this.shellEvents?.onRoundStatusChange?.("Fuse");
+    this.activeBombs.push(bomb);
+    return bomb;
   }
 
-  private detonateBomb(tile: GridPoint) {
-    if (!this.activeBomb) {
+  private detonateBomb(bomb: ActiveBomb) {
+    if (!this.activeBombs.includes(bomb)) {
       return;
     }
 
-    this.activeBomb.sprite.destroy();
-    this.activeBomb.timer.destroy();
-    this.activeBomb = undefined;
+    this.activeBombs = this.activeBombs.filter((activeBomb) => activeBomb !== bomb);
+    bomb.sprite.destroy();
+    bomb.timer.destroy();
     this.shellEvents?.onRoundStatusChange?.("Blast");
 
-    const blast = resolveBlast(this.arena, tile, 2);
+    const blast = resolveBlast(this.arena, bomb.tile, bomb.range);
     this.blocksCleared += blast.clearedBlocks.length;
     this.playExplosion(blast);
     this.time.delayedCall(220, () => this.clearDestroyedBlocks(blast.clearedBlocks));
@@ -199,7 +218,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.cameras.main.shake(180, 0.008);
     this.time.delayedCall(720, () => {
-      if (!this.roundOver) {
+      if (!this.roundOver && this.activeBombs.length === 0) {
         this.shellEvents?.onRoundStatusChange?.("Live");
       }
     });
@@ -434,7 +453,7 @@ export class ArenaScene extends Phaser.Scene {
   private startBotAi() {
     this.botMoveEvent?.remove(false);
     this.botMoveEvent = this.time.addEvent({
-      delay: 520,
+      delay: BOT_MOVE_MS,
       loop: true,
       callback: () => this.moveBot()
     });
@@ -445,29 +464,20 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    const directions = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 }
-    ];
+    this.maybePlantBotBomb();
 
-    const candidates = directions
-      .map((direction) => ({
-        x: this.bot!.tile.x + direction.x,
-        y: this.bot!.tile.y + direction.y
-      }))
-      .filter((tile) => isWalkable(this.arena, tile) && !this.activeBombAt(tile));
+    const bombThreats = this.getBombThreats();
+    const nextTile = chooseBotMove({
+      arena: this.arena,
+      from: this.bot.tile,
+      target: this.playerTile,
+      bombs: bombThreats,
+      blockedTiles: this.activeBombs.map((bomb) => bomb.tile)
+    });
 
-    if (candidates.length === 0) {
+    if (nextTile.x === this.bot.tile.x && nextTile.y === this.bot.tile.y) {
       return;
     }
-
-    candidates.sort((a, b) => this.distanceToPlayer(a) - this.distanceToPlayer(b));
-    const shouldChase = Phaser.Math.Between(0, 100) < 72;
-    const nextTile = shouldChase
-      ? candidates[0]
-      : Phaser.Utils.Array.GetRandom(candidates);
 
     this.bot.tile = nextTile;
     const world = this.tileToWorld(nextTile);
@@ -489,10 +499,10 @@ export class ArenaScene extends Phaser.Scene {
       this.player.setPosition(world.x, world.y);
     }
 
-    if (this.activeBomb) {
-      const world = this.tileToWorld(this.activeBomb.tile);
-      this.activeBomb.sprite.setPosition(world.x, world.y);
-    }
+    this.activeBombs.forEach((bomb) => {
+      const world = this.tileToWorld(bomb.tile);
+      bomb.sprite.setPosition(world.x, world.y);
+    });
 
     if (this.bot) {
       const world = this.tileToWorld(this.bot.tile);
@@ -515,14 +525,16 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private activeBombAt(tile: GridPoint) {
-    return this.activeBomb?.tile.x === tile.x && this.activeBomb.tile.y === tile.y;
+    return this.activeBombs.some((bomb) => bomb.tile.x === tile.x && bomb.tile.y === tile.y);
   }
 
   private resetRound() {
     this.botMoveEvent?.remove(false);
-    this.activeBomb?.timer.destroy();
-    this.activeBomb?.sprite.destroy();
-    this.activeBomb = undefined;
+    this.activeBombs.forEach((bomb) => {
+      bomb.timer.destroy();
+      bomb.sprite.destroy();
+    });
+    this.activeBombs = [];
     this.player?.destroy();
     this.bot?.sprite.destroy();
     this.bot = undefined;
@@ -551,7 +563,46 @@ export class ArenaScene extends Phaser.Scene {
     return `${tile.x}:${tile.y}`;
   }
 
-  private distanceToPlayer(tile: GridPoint) {
-    return Math.abs(tile.x - this.playerTile.x) + Math.abs(tile.y - this.playerTile.y);
+  private hasActiveBomb(owner: ActiveBomb["owner"]) {
+    return this.activeBombs.some((bomb) => bomb.owner === owner);
+  }
+
+  private maybePlantBotBomb() {
+    if (!this.bot?.alive || this.hasActiveBomb("bot") || this.roundOver) {
+      return;
+    }
+
+    const bombThreats = this.getBombThreats();
+
+    if (isDangerTile(this.arena, bombThreats, this.bot.tile)) {
+      return;
+    }
+
+    const nearPlayer = manhattanDistance(this.bot.tile, this.playerTile) <= 2;
+    const nearSoftBlock = this.hasAdjacentSoftBlock(this.bot.tile);
+    const shouldBomb = nearPlayer || (nearSoftBlock && Phaser.Math.Between(0, 100) < 42);
+
+    if (!shouldBomb) {
+      return;
+    }
+
+    this.plantBombAt("bot", { ...this.bot.tile }, BOT_BLAST_RANGE, BOT_FUSE_MS);
+    this.shellEvents?.onRoundStatusChange?.("Danger");
+  }
+
+  private hasAdjacentSoftBlock(tile: GridPoint) {
+    return [
+      { x: tile.x + 1, y: tile.y },
+      { x: tile.x - 1, y: tile.y },
+      { x: tile.x, y: tile.y + 1 },
+      { x: tile.x, y: tile.y - 1 }
+    ].some((neighbor) => this.arena[neighbor.y]?.[neighbor.x] === "soft");
+  }
+
+  private getBombThreats() {
+    return this.activeBombs.map((bomb) => ({
+      tile: bomb.tile,
+      range: bomb.range
+    }));
   }
 }

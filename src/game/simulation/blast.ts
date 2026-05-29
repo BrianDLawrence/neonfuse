@@ -12,7 +12,20 @@ const BLAST_DIRECTIONS: GridPoint[] = [
   { x: 0, y: -1 }
 ];
 
+export function previewBlast(arena: ArenaGrid, origin: GridPoint, range: number): BlastResult {
+  return calculateBlast(arena, origin, range, false);
+}
+
 export function resolveBlast(arena: ArenaGrid, origin: GridPoint, range: number): BlastResult {
+  return calculateBlast(arena, origin, range, true);
+}
+
+function calculateBlast(
+  arena: ArenaGrid,
+  origin: GridPoint,
+  range: number,
+  clearSoftBlocks: boolean
+): BlastResult {
   const tiles: GridPoint[] = [origin];
   const clearedBlocks: GridPoint[] = [];
 
@@ -32,7 +45,10 @@ export function resolveBlast(arena: ArenaGrid, origin: GridPoint, range: number)
       tiles.push(tile);
 
       if (cell === "soft") {
-        arena[tile.y][tile.x] = "floor";
+        if (clearSoftBlocks) {
+          arena[tile.y][tile.x] = "floor";
+        }
+
         clearedBlocks.push(tile);
         break;
       }

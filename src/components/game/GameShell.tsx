@@ -69,7 +69,7 @@ export function GameShell() {
         <aside className="start-panel">
           <h2>Prototype Zero</h2>
           <p>
-            Hunt the red bot, avoid your own blast, and clear soft blocks to open
+            Hunt the red bot, dodge hostile fuses, and clear soft blocks to open
             attack lanes. Round results are ready to save to MongoDB.
           </p>
           <div className="command-row">
@@ -87,6 +87,7 @@ export function GameShell() {
           <span className="key-chip">Space: Bomb</span>
           <span className="key-chip">R: Reset</span>
           <span className="key-chip">Goal: Blast the red bot</span>
+          <span className="key-chip">Danger: Bot bombs</span>
         </div>
       </div>
     </main>
