@@ -2,6 +2,21 @@
 
 import { useCallback, useState } from "react";
 import { PhaserGame } from "./PhaserGame";
+import {
+  DEFAULT_POWERUP_DROP_RATES,
+  type PowerupDropRates,
+  type PowerupType
+} from "@/game/simulation/powerups";
+
+const POWERUP_CONTROLS: Array<{
+  type: PowerupType;
+  label: string;
+  iconClass: string;
+}> = [
+  { type: "bomb", label: "Bomb", iconClass: "stat-icon-bomb" },
+  { type: "blast", label: "Blast", iconClass: "stat-icon-blast" },
+  { type: "speed", label: "Speed", iconClass: "stat-icon-speed" }
+];
 
 export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
@@ -10,6 +25,7 @@ export function GameShell() {
   const [speed, setSpeed] = useState(1);
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
+  const [powerupDropRates, setPowerupDropRates] = useState<PowerupDropRates>(DEFAULT_POWERUP_DROP_RATES);
   const handleLoadoutChange = useCallback(
     ({
       bombs: nextBombs,
@@ -33,11 +49,18 @@ export function GameShell() {
     },
     []
   );
+  const handlePowerupRateChange = useCallback((type: PowerupType, value: number) => {
+    setPowerupDropRates((currentRates) => ({
+      ...currentRates,
+      [type]: value
+    }));
+  }, []);
 
   return (
     <main className="app-frame">
       <section className="game-stage" aria-label="Neon Fuse game prototype">
         <PhaserGame
+          powerupDropRates={powerupDropRates}
           onRoundStatusChange={setRoundStatus}
           onLoadoutChange={handleLoadoutChange}
           onMatchStatsChange={handleMatchStatsChange}
@@ -102,6 +125,30 @@ export function GameShell() {
             <button className="command-button secondary" type="button">
               Bot Skirmish
             </button>
+          </div>
+          <div className="admin-panel" aria-label="Powerup admin controls">
+            <div className="admin-panel-header">
+              <h3>Admin</h3>
+              <span>Powerup rate</span>
+            </div>
+            {POWERUP_CONTROLS.map((control) => (
+              <label className="slider-row" key={control.type}>
+                <span className="slider-label">
+                  <i className={`stat-icon ${control.iconClass}`} aria-hidden="true" />
+                  {control.label}
+                </span>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={powerupDropRates[control.type]}
+                  onChange={(event) =>
+                    handlePowerupRateChange(control.type, Number(event.target.value))
+                  }
+                />
+                <strong>{powerupDropRates[control.type]}</strong>
+              </label>
+            ))}
           </div>
         </aside>
 

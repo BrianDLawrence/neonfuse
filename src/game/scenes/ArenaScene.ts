@@ -382,7 +382,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private spawnPowerups(blocks: GridPoint[]) {
     blocks.forEach((blockTile) => {
-      const powerup = choosePowerupDrop(blockTile);
+      const powerup = choosePowerupDrop(
+        blockTile,
+        this.shellEvents?.getPowerupDropRates?.()
+      );
 
       if (!powerup) {
         return;

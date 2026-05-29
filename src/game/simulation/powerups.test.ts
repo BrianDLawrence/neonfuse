@@ -3,8 +3,15 @@ import { applyPowerup, choosePowerupDrop, createInitialLoadout } from "./powerup
 
 describe("choosePowerupDrop", () => {
   it("deterministically chooses a drop from a tile", () => {
-    expect(choosePowerupDrop({ x: 1, y: 0 })).toBe("blast");
+    expect(choosePowerupDrop({ x: 0, y: 0 })).toBe("bomb");
     expect(choosePowerupDrop({ x: 1, y: 1 })).toBeNull();
+  });
+
+  it("uses per-type drop rates", () => {
+    expect(choosePowerupDrop({ x: 0, y: 0 }, { bomb: 1, blast: 1, speed: 1 })).toBeNull();
+    expect(choosePowerupDrop({ x: 0, y: 0 }, { bomb: 10, blast: 1, speed: 1 })).toBe("bomb");
+    expect(choosePowerupDrop({ x: 0, y: 0 }, { bomb: 1, blast: 10, speed: 1 })).toBe("blast");
+    expect(choosePowerupDrop({ x: 0, y: 0 }, { bomb: 1, blast: 1, speed: 10 })).toBe("speed");
   });
 });
 

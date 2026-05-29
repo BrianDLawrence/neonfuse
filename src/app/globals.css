@@ -252,6 +252,62 @@ button {
   background: rgba(244, 63, 94, 0.12);
 }
 
+.admin-panel {
+  margin-top: 16px;
+  border-top: 1px solid rgba(34, 211, 238, 0.2);
+  padding-top: 14px;
+}
+
+.admin-panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.admin-panel-header h3 {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-panel-header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.slider-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row input {
+  width: 100%;
+  accent-color: var(--cyan);
+}
+
+.slider-row strong {
+  color: var(--text);
+  font-size: 14px;
+  text-align: right;
+}
+
 .control-strip {
   pointer-events: none;
   position: absolute;
