@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArenaGrid } from "./arena";
-import { resolveBlast, tileListIncludes } from "./blast";
+import { previewBlast, resolveBlast, tileListIncludes } from "./blast";
 
 function makeArena(): ArenaGrid {
   return [
@@ -33,6 +33,16 @@ describe("resolveBlast", () => {
     expect(result.tiles).toContainEqual({ x: 3, y: 1 });
     expect(result.clearedBlocks).toEqual([{ x: 3, y: 1 }]);
     expect(arena[1][3]).toBe("floor");
+  });
+});
+
+describe("previewBlast", () => {
+  it("does not mutate soft blocks", () => {
+    const arena = makeArena();
+    const result = previewBlast(arena, { x: 1, y: 1 }, 4);
+
+    expect(result.clearedBlocks).toEqual([{ x: 3, y: 1 }]);
+    expect(arena[1][3]).toBe("soft");
   });
 });
 
