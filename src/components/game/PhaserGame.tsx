@@ -6,6 +6,7 @@ import type * as Phaser from "phaser";
 type Loadout = {
   bombs: number;
   blast: number;
+  speed: number;
 };
 
 type PhaserGameProps = {

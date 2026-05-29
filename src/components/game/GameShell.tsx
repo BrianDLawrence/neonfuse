@@ -7,12 +7,22 @@ export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
   const [blast, setBlast] = useState(2);
+  const [speed, setSpeed] = useState(1);
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const handleLoadoutChange = useCallback(
-    ({ bombs: nextBombs, blast: nextBlast }: { bombs: number; blast: number }) => {
+    ({
+      bombs: nextBombs,
+      blast: nextBlast,
+      speed: nextSpeed
+    }: {
+      bombs: number;
+      blast: number;
+      speed: number;
+    }) => {
       setBombs(nextBombs);
       setBlast(nextBlast);
+      setSpeed(nextSpeed);
     },
     []
   );
@@ -58,6 +68,10 @@ export function GameShell() {
               <strong>{blast}</strong>
             </div>
             <div className="hud-chip">
+              <span>Speed</span>
+              <strong>{speed}</strong>
+            </div>
+            <div className="hud-chip">
               <span>Record</span>
               <strong>
                 {wins}-{losses}
@@ -69,8 +83,8 @@ export function GameShell() {
         <aside className="start-panel">
           <h2>Prototype Zero</h2>
           <p>
-            Hunt the red bot, dodge hostile fuses, and clear soft blocks to open
-            attack lanes. Round results are ready to save to MongoDB.
+            Hunt the red bot, dodge hostile fuses, and break soft blocks for
+            upgrades. Round results are ready to save to MongoDB.
           </p>
           <div className="command-row">
             <button className="command-button" type="button">

@@ -5,7 +5,7 @@ import { PreloadScene } from "./scenes/PreloadScene";
 
 export type GameEvents = {
   onRoundStatusChange?: (status: string) => void;
-  onLoadoutChange?: (loadout: { bombs: number; blast: number }) => void;
+  onLoadoutChange?: (loadout: { bombs: number; blast: number; speed: number }) => void;
   onMatchStatsChange?: (stats: { wins: number; losses: number }) => void;
 };
 
