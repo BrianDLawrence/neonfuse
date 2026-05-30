@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ArenaGrid } from "./arena";
+import { createInitialArena, type ArenaGrid } from "./arena";
 import { BOT_PROFILES, chooseBotTurn, type BotActorState } from "./bots";
 import { createInitialLoadout } from "./powerups";
 
@@ -90,6 +90,32 @@ describe("chooseBotTurn", () => {
     });
 
     expect(intent).toEqual({ type: "plant-bomb", moveTo: { x: 1, y: 2 } });
+  });
+
+  it("moves toward an occupied opponent tile without needing to enter it", () => {
+    const intent = chooseBotTurn({
+      arena: makeArena(),
+      actor: makeBot(),
+      opponentTile: { x: 3, y: 3 },
+      bombs: [],
+      activeBombCount: 0,
+      blockedTiles: [{ x: 3, y: 3 }]
+    });
+
+    expect(intent).toEqual({ type: "move", tile: { x: 2, y: 1 } });
+  });
+
+  it("moves from the default bot spawn toward the default player spawn", () => {
+    const intent = chooseBotTurn({
+      arena: createInitialArena(),
+      actor: makeBot({ tile: { x: 11, y: 9 } }),
+      opponentTile: { x: 1, y: 1 },
+      bombs: [],
+      activeBombCount: 0,
+      blockedTiles: [{ x: 1, y: 1 }]
+    });
+
+    expect(intent).not.toEqual({ type: "wait" });
   });
 
   it("prioritizes powerups based on profile traits", () => {

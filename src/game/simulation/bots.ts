@@ -268,7 +268,8 @@ function choosePressureMove({
     from,
     target,
     bombs,
-    blockedTiles
+    blockedTiles,
+    acceptNearest: true
   });
 
   return step ? { type: "move", tile: step } : { type: "wait" };
@@ -279,22 +280,37 @@ function findFirstStepToward({
   from,
   target,
   bombs,
-  blockedTiles
+  blockedTiles,
+  acceptNearest = false
 }: {
   arena: ArenaGrid;
   from: GridPoint;
   target: GridPoint;
   bombs: BombThreat[];
   blockedTiles: GridPoint[];
+  acceptNearest?: boolean;
 }) {
   const queue: Array<{ tile: GridPoint; path: GridPoint[] }> = [{ tile: from, path: [] }];
   const visited = new Set([tileKey(from)]);
+  let nearest: { distance: number; path: GridPoint[] } | null = null;
 
   while (queue.length > 0) {
     const current = queue.shift()!;
+    const currentDistance = manhattanDistance(current.tile, target);
 
     if (sameTile(current.tile, target) && current.path.length > 0) {
       return current.path[0];
+    }
+
+    if (
+      acceptNearest &&
+      current.path.length > 0 &&
+      (!nearest || currentDistance < nearest.distance)
+    ) {
+      nearest = {
+        distance: currentDistance,
+        path: current.path
+      };
     }
 
     getAdjacentTiles(current.tile)
@@ -316,6 +332,10 @@ function findFirstStepToward({
           path: [...current.path, neighbor]
         });
       });
+  }
+
+  if (acceptNearest && nearest) {
+    return nearest.path[0];
   }
 
   return null;
