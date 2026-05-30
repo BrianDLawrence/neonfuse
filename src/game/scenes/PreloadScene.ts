@@ -17,6 +17,12 @@ export class PreloadScene extends Phaser.Scene {
     graphics.fillRoundedRect(0, 0, 34, 34, 8);
     graphics.lineStyle(2, 0xf8fafc, 0.9);
     graphics.strokeRoundedRect(3, 3, 28, 28, 7);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillRoundedRect(9, 10, 6, 7, 2);
+    graphics.fillRoundedRect(20, 10, 6, 7, 2);
+    graphics.fillStyle(0xf8fafc, 1);
+    graphics.fillRect(11, 11, 2, 2);
+    graphics.fillRect(22, 11, 2, 2);
     graphics.generateTexture("player-core", 34, 34);
     graphics.clear();
 
@@ -63,6 +69,29 @@ export class PreloadScene extends Phaser.Scene {
     graphics.fillStyle(0xa3e635, 1);
     graphics.fillRoundedRect(0, 0, 16, 16, 3);
     graphics.generateTexture("spark", 16, 16);
+    graphics.clear();
+
+    graphics.fillStyle(0xa3e635, 1);
+    graphics.fillCircle(18, 18, 15);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillRoundedRect(13, 7, 10, 22, 3);
+    graphics.fillRoundedRect(7, 13, 22, 10, 3);
+    graphics.generateTexture("powerup-bomb", 36, 36);
+    graphics.clear();
+
+    graphics.fillStyle(0x22d3ee, 1);
+    graphics.fillCircle(18, 18, 15);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillRect(16, 8, 4, 20);
+    graphics.fillRect(8, 16, 20, 4);
+    graphics.generateTexture("powerup-blast", 36, 36);
+    graphics.clear();
+
+    graphics.fillStyle(0xf59e0b, 1);
+    graphics.fillCircle(18, 18, 15);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillTriangle(12, 8, 26, 18, 12, 28);
+    graphics.generateTexture("powerup-speed", 36, 36);
     graphics.destroy();
   }
 }

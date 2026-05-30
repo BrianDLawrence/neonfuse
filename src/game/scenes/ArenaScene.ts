@@ -15,12 +15,19 @@ import {
   isDangerTile,
   manhattanDistance
 } from "../simulation/danger";
+import {
+  applyPowerup,
+  choosePowerupDrop,
+  createInitialLoadout,
+  type PlayerLoadout,
+  type PowerupType
+} from "../simulation/powerups";
 
-const PLAYER_BLAST_RANGE = 2;
 const BOT_BLAST_RANGE = 2;
 const PLAYER_FUSE_MS = 1400;
 const BOT_FUSE_MS = 1800;
 const BOT_MOVE_MS = 520;
+const COUNTDOWN_LABELS = ["3", "2", "1", "Fuse!"];
 
 type ActiveBomb = {
   owner: "player" | "bot";
@@ -36,6 +43,12 @@ type BotOpponent = {
   alive: boolean;
 };
 
+type ActivePowerup = {
+  tile: GridPoint;
+  type: PowerupType;
+  sprite: Phaser.GameObjects.Image;
+};
+
 type RoundWinner = "player" | "bot" | "draw";
 
 export class ArenaScene extends Phaser.Scene {
@@ -45,9 +58,12 @@ export class ArenaScene extends Phaser.Scene {
   private player?: Phaser.GameObjects.Image;
   private playerTile: GridPoint = { x: 1, y: 1 };
   private playerAlive = true;
+  private playerLoadout: PlayerLoadout = createInitialLoadout();
   private bot?: BotOpponent;
   private botMoveEvent?: Phaser.Time.TimerEvent;
+  private countdownEvents: Phaser.Time.TimerEvent[] = [];
   private activeBombs: ActiveBomb[] = [];
+  private activePowerups = new Map<string, ActivePowerup>();
   private shellEvents?: GameEvents;
   private boardOrigin = { x: 0, y: 0 };
   private boardLayer?: Phaser.GameObjects.Container;
@@ -55,6 +71,7 @@ export class ArenaScene extends Phaser.Scene {
   private fxLayer?: Phaser.GameObjects.Container;
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
   private roundOver = false;
+  private roundActive = false;
   private matchStartedAt = 0;
   private wins = 0;
   private losses = 0;
@@ -79,10 +96,8 @@ export class ArenaScene extends Phaser.Scene {
     this.drawArena();
     this.spawnPlayer();
     this.spawnBot();
-    this.startBotAi();
-    this.matchStartedAt = this.time.now;
-    this.shellEvents?.onRoundStatusChange?.("Live");
-    this.shellEvents?.onLoadoutChange?.({ bombs: 1, blast: 2 });
+    this.startRoundCountdown();
+    this.emitLoadout();
     this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
 
     this.scale.on("resize", this.handleResize, this);
@@ -96,7 +111,7 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    if (this.roundOver) {
+    if (this.roundOver || !this.roundActive) {
       if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
         this.resetRound();
       }
@@ -156,22 +171,28 @@ export class ArenaScene extends Phaser.Scene {
 
     this.playerTile = nextTile;
     const world = this.tileToWorld(nextTile);
+    this.collectPowerupAt(nextTile);
 
     this.tweens.add({
       targets: this.player,
       x: world.x,
       y: world.y,
-      duration: 90,
+      duration: this.getPlayerMoveDuration(),
       ease: "Quad.easeOut"
     });
   }
 
   private plantBomb() {
-    if (this.hasActiveBomb("player") || this.roundOver || !this.playerAlive) {
+    if (
+      this.activeBombCount("player") >= this.playerLoadout.bombs ||
+      this.roundOver ||
+      !this.roundActive ||
+      !this.playerAlive
+    ) {
       return;
     }
 
-    this.plantBombAt("player", { ...this.playerTile }, PLAYER_BLAST_RANGE, PLAYER_FUSE_MS);
+    this.plantBombAt("player", { ...this.playerTile }, this.playerLoadout.blast, PLAYER_FUSE_MS);
     this.shellEvents?.onRoundStatusChange?.("Fuse");
   }
 
@@ -218,7 +239,10 @@ export class ArenaScene extends Phaser.Scene {
     const blast = resolveBlast(this.arena, bomb.tile, bomb.range);
     this.blocksCleared += blast.clearedBlocks.length;
     this.playExplosion(blast);
-    this.time.delayedCall(220, () => this.clearDestroyedBlocks(blast.clearedBlocks));
+    this.time.delayedCall(220, () => {
+      this.clearDestroyedBlocks(blast.clearedBlocks);
+      this.spawnPowerups(blast.clearedBlocks);
+    });
     this.time.delayedCall(140, () => this.evaluateBlastHits(blast));
 
     this.cameras.main.shake(180, 0.008);
@@ -356,6 +380,57 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
+  private spawnPowerups(blocks: GridPoint[]) {
+    blocks.forEach((blockTile) => {
+      const powerup = choosePowerupDrop(
+        blockTile,
+        this.shellEvents?.getPowerupDropRates?.()
+      );
+
+      if (!powerup) {
+        return;
+      }
+
+      const key = this.tileKey(blockTile);
+
+      if (this.activePowerups.has(key)) {
+        return;
+      }
+
+      const world = this.tileToWorld(blockTile);
+      const sprite = this.add.image(world.x, world.y, this.getPowerupTexture(powerup));
+      sprite.setDepth(8);
+      this.tweens.add({
+        targets: sprite,
+        y: world.y - 5,
+        yoyo: true,
+        repeat: -1,
+        duration: 640,
+        ease: "Sine.easeInOut"
+      });
+
+      this.activePowerups.set(key, {
+        tile: blockTile,
+        type: powerup,
+        sprite
+      });
+    });
+  }
+
+  private collectPowerupAt(tile: GridPoint) {
+    const key = this.tileKey(tile);
+    const powerup = this.activePowerups.get(key);
+
+    if (!powerup) {
+      return;
+    }
+
+    this.playerLoadout = applyPowerup(this.playerLoadout, powerup.type);
+    this.emitLoadout();
+    powerup.sprite.destroy();
+    this.activePowerups.delete(key);
+  }
+
   private evaluateBlastHits(blast: BlastResult) {
     if (this.roundOver) {
       return;
@@ -403,6 +478,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.roundOver = true;
+    this.roundActive = false;
     this.botMoveEvent?.remove(false);
 
     if (winner === "player") {
@@ -465,7 +541,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private moveBot() {
-    if (!this.bot?.alive || this.roundOver) {
+    if (!this.bot?.alive || this.roundOver || !this.roundActive) {
       return;
     }
 
@@ -509,6 +585,11 @@ export class ArenaScene extends Phaser.Scene {
       bomb.sprite.setPosition(world.x, world.y);
     });
 
+    this.activePowerups.forEach((powerup) => {
+      const world = this.tileToWorld(powerup.tile);
+      powerup.sprite.setPosition(world.x, world.y);
+    });
+
     if (this.bot) {
       const world = this.tileToWorld(this.bot.tile);
       this.bot.sprite.setPosition(world.x, world.y);
@@ -535,11 +616,14 @@ export class ArenaScene extends Phaser.Scene {
 
   private resetRound() {
     this.botMoveEvent?.remove(false);
+    this.clearCountdownEvents();
     this.activeBombs.forEach((bomb) => {
       bomb.timer.destroy();
       bomb.sprite.destroy();
     });
     this.activeBombs = [];
+    this.activePowerups.forEach((powerup) => powerup.sprite.destroy());
+    this.activePowerups.clear();
     this.player?.destroy();
     this.bot?.sprite.destroy();
     this.bot = undefined;
@@ -547,14 +631,15 @@ export class ArenaScene extends Phaser.Scene {
     this.playerTile = { x: 1, y: 1 };
     this.playerAlive = true;
     this.roundOver = false;
+    this.roundActive = false;
+    this.playerLoadout = createInitialLoadout();
     this.blocksCleared = 0;
-    this.matchStartedAt = this.time.now;
     this.fxLayer?.removeAll(true);
     this.drawArena();
     this.spawnPlayer();
     this.spawnBot();
-    this.startBotAi();
-    this.shellEvents?.onRoundStatusChange?.("Live");
+    this.emitLoadout();
+    this.startRoundCountdown();
   }
 
   private tileToWorld(tile: GridPoint) {
@@ -570,6 +655,10 @@ export class ArenaScene extends Phaser.Scene {
 
   private hasActiveBomb(owner: ActiveBomb["owner"]) {
     return this.activeBombs.some((bomb) => bomb.owner === owner);
+  }
+
+  private activeBombCount(owner: ActiveBomb["owner"]) {
+    return this.activeBombs.filter((bomb) => bomb.owner === owner).length;
   }
 
   private maybePlantBotBomb() {
@@ -626,5 +715,53 @@ export class ArenaScene extends Phaser.Scene {
       tile: bomb.tile,
       range: bomb.range
     }));
+  }
+
+  private startRoundCountdown() {
+    this.roundActive = false;
+    this.botMoveEvent?.remove(false);
+    this.clearCountdownEvents();
+
+    COUNTDOWN_LABELS.forEach((label, index) => {
+      const event = this.time.delayedCall(index * 650, () => {
+        if (this.roundOver) {
+          return;
+        }
+
+        this.shellEvents?.onRoundStatusChange?.(label);
+      });
+
+      this.countdownEvents.push(event);
+    });
+
+    const startEvent = this.time.delayedCall(COUNTDOWN_LABELS.length * 650, () => {
+      if (this.roundOver) {
+        return;
+      }
+
+      this.roundActive = true;
+      this.matchStartedAt = this.time.now;
+      this.shellEvents?.onRoundStatusChange?.("Live");
+      this.startBotAi();
+    });
+
+    this.countdownEvents.push(startEvent);
+  }
+
+  private emitLoadout() {
+    this.shellEvents?.onLoadoutChange?.(this.playerLoadout);
+  }
+
+  private getPlayerMoveDuration() {
+    return Math.max(54, 104 - this.playerLoadout.speed * 14);
+  }
+
+  private getPowerupTexture(powerup: PowerupType) {
+    return `powerup-${powerup}`;
+  }
+
+  private clearCountdownEvents() {
+    this.countdownEvents.forEach((event) => event.remove(false));
+    this.countdownEvents = [];
   }
 }
