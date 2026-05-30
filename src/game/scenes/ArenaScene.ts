@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 import type { GameEvents } from "../createGame";
+import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
 import {
   ARENA_COLS,
   ARENA_ROWS,
@@ -10,37 +11,47 @@ import {
 } from "../simulation/arena";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 import {
-  chooseBotMove,
-  findSafeEscapeMove,
-  isDangerTile,
-  manhattanDistance
-} from "../simulation/danger";
+  BOT_PROFILES,
+  chooseBotTurn,
+  type BotActorState,
+  type BotId,
+  type BotPowerupTarget,
+  type BotProfile
+} from "../simulation/bots";
+import type { BombThreat } from "../simulation/danger";
 import {
   applyPowerup,
   choosePowerupDrop,
   createInitialLoadout,
-  type PlayerLoadout,
+  type ActorLoadout,
   type PowerupType
 } from "../simulation/powerups";
 
-const BOT_BLAST_RANGE = 2;
 const PLAYER_FUSE_MS = 1400;
 const BOT_FUSE_MS = 1800;
-const BOT_MOVE_MS = 520;
+const BOT_AI_TICK_MS = 120;
+const BASE_BOT_MOVE_MS = 560;
 const COUNTDOWN_LABELS = ["3", "2", "1", "Fuse!"];
 
+type ActorId = "player" | BotId;
+
 type ActiveBomb = {
-  owner: "player" | "bot";
+  owner: ActorId;
   tile: GridPoint;
   range: number;
   sprite: Phaser.GameObjects.Image;
   timer: Phaser.Time.TimerEvent;
 };
 
-type BotOpponent = {
+type CombatActor = {
+  id: ActorId;
+  kind: "player" | "bot";
   tile: GridPoint;
   sprite: Phaser.GameObjects.Image;
   alive: boolean;
+  loadout: ActorLoadout;
+  profile?: BotProfile;
+  nextMoveAt: number;
 };
 
 type ActivePowerup = {
@@ -49,17 +60,13 @@ type ActivePowerup = {
   sprite: Phaser.GameObjects.Image;
 };
 
-type RoundWinner = "player" | "bot" | "draw";
+type RoundWinner = ActorId | "bot" | "draw";
 
 export class ArenaScene extends Phaser.Scene {
   private arena = createInitialArena();
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd?: Record<string, Phaser.Input.Keyboard.Key>;
-  private player?: Phaser.GameObjects.Image;
-  private playerTile: GridPoint = { x: 1, y: 1 };
-  private playerAlive = true;
-  private playerLoadout: PlayerLoadout = createInitialLoadout();
-  private bot?: BotOpponent;
+  private actors = new Map<ActorId, CombatActor>();
   private botMoveEvent?: Phaser.Time.TimerEvent;
   private countdownEvents: Phaser.Time.TimerEvent[] = [];
   private activeBombs: ActiveBomb[] = [];
@@ -70,6 +77,7 @@ export class ArenaScene extends Phaser.Scene {
   private blockLayer?: Phaser.GameObjects.Container;
   private fxLayer?: Phaser.GameObjects.Container;
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
+  private currentMode: GameMode = DEFAULT_GAME_MODE;
   private roundOver = false;
   private roundActive = false;
   private matchStartedAt = 0;
@@ -93,45 +101,77 @@ export class ArenaScene extends Phaser.Scene {
     this.blockLayer = this.add.container(0, 0).setDepth(1);
     this.fxLayer = this.add.container(0, 0).setDepth(2);
 
-    this.drawArena();
-    this.spawnPlayer();
-    this.spawnBot();
-    this.startRoundCountdown();
-    this.emitLoadout();
-    this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
-
+    this.game.events.on("mode-change", this.handleModeChange, this);
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off("mode-change", this.handleModeChange, this);
       this.scale.off("resize", this.handleResize, this);
     });
+
+    const mode = (this.registry.get("gameMode") as GameMode | undefined) ?? DEFAULT_GAME_MODE;
+    this.startMode(mode);
+    this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
   }
 
   update() {
-    if (!this.player || !this.cursors || !this.wasd) {
+    if (!this.cursors || !this.wasd) {
       return;
     }
 
-    if (this.roundOver || !this.roundActive) {
-      if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
-        this.resetRound();
-      }
+    if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
+      this.resetRound();
+      return;
+    }
 
+    if (this.roundOver || !this.roundActive || this.currentMode !== "player-vs-bot") {
+      return;
+    }
+
+    const player = this.actors.get("player");
+
+    if (!player?.alive) {
       return;
     }
 
     const move = this.getMoveIntent();
 
     if (move) {
-      this.tryMove(move);
+      this.tryMovePlayer(player, move);
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.wasd.SPACE)) {
-      this.plantBomb();
+      this.plantPlayerBomb(player);
+    }
+  }
+
+  private handleModeChange(mode: GameMode) {
+    this.startMode(mode);
+  }
+
+  private startMode(mode: GameMode) {
+    this.currentMode = mode;
+    this.clearRoundObjects();
+    this.arena = createInitialArena();
+    this.roundOver = false;
+    this.roundActive = false;
+    this.blocksCleared = 0;
+    this.drawArena();
+
+    if (mode === "player-vs-bot") {
+      this.spawnActor("player", { x: 1, y: 1 });
+      this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, BOT_PROFILES["bot-a"]);
+    } else {
+      this.spawnActor("bot-a", { x: 1, y: 1 }, BOT_PROFILES["bot-a"]);
+      this.spawnActor("bot-b", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, BOT_PROFILES["bot-b"]);
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
-      this.resetRound();
-    }
+    this.emitLoadout();
+    this.emitBotHud();
+    this.startRoundCountdown();
+  }
+
+  private resetRound() {
+    this.startMode(this.currentMode);
   }
 
   private getMoveIntent(): GridPoint | null {
@@ -158,52 +198,37 @@ export class ArenaScene extends Phaser.Scene {
     return null;
   }
 
-  private tryMove(delta: GridPoint) {
+  private tryMovePlayer(player: CombatActor, delta: GridPoint) {
     const nextTile = {
-      x: this.playerTile.x + delta.x,
-      y: this.playerTile.y + delta.y
+      x: player.tile.x + delta.x,
+      y: player.tile.y + delta.y
     };
 
-    if (!isWalkable(this.arena, nextTile) || this.activeBombAt(nextTile)) {
-      this.bumpPlayer(delta);
+    if (!this.canActorMoveTo(player, nextTile)) {
+      this.bumpActor(player, delta);
       return;
     }
 
-    this.playerTile = nextTile;
-    const world = this.tileToWorld(nextTile);
-    this.collectPowerupAt(nextTile);
-
-    this.tweens.add({
-      targets: this.player,
-      x: world.x,
-      y: world.y,
-      duration: this.getPlayerMoveDuration(),
-      ease: "Quad.easeOut"
-    });
+    this.moveActorTo(player, nextTile, this.getPlayerMoveDuration(player));
   }
 
-  private plantBomb() {
+  private plantPlayerBomb(player: CombatActor) {
     if (
-      this.activeBombCount("player") >= this.playerLoadout.bombs ||
+      this.activeBombCount(player.id) >= player.loadout.bombs ||
       this.roundOver ||
       !this.roundActive ||
-      !this.playerAlive
+      !player.alive
     ) {
       return;
     }
 
-    this.plantBombAt("player", { ...this.playerTile }, this.playerLoadout.blast, PLAYER_FUSE_MS);
+    this.plantBombAt(player.id, { ...player.tile }, player.loadout.blast, PLAYER_FUSE_MS);
     this.shellEvents?.onRoundStatusChange?.("Fuse");
   }
 
-  private plantBombAt(
-    owner: ActiveBomb["owner"],
-    tile: GridPoint,
-    range: number,
-    fuseMs: number
-  ) {
+  private plantBombAt(owner: ActorId, tile: GridPoint, range: number, fuseMs: number) {
     const world = this.tileToWorld(tile);
-    const sprite = this.add.image(world.x, world.y, owner === "bot" ? "bot-bomb-core" : "bomb-core");
+    const sprite = this.add.image(world.x, world.y, owner === "player" ? "bomb-core" : "bot-bomb-core");
     sprite.setDepth(12);
     this.tweens.add({
       targets: sprite,
@@ -417,18 +442,20 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
-  private collectPowerupAt(tile: GridPoint) {
+  private collectPowerupAt(tile: GridPoint, actorId: ActorId) {
     const key = this.tileKey(tile);
     const powerup = this.activePowerups.get(key);
+    const actor = this.actors.get(actorId);
 
-    if (!powerup) {
+    if (!powerup || !actor) {
       return;
     }
 
-    this.playerLoadout = applyPowerup(this.playerLoadout, powerup.type);
-    this.emitLoadout();
+    actor.loadout = applyPowerup(actor.loadout, powerup.type);
     powerup.sprite.destroy();
     this.activePowerups.delete(key);
+    this.emitLoadout();
+    this.emitBotHud();
   }
 
   private evaluateBlastHits(blast: BlastResult) {
@@ -436,39 +463,49 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    const playerHit = this.playerAlive && tileListIncludes(blast.tiles, this.playerTile);
-    const botHit = Boolean(this.bot?.alive && tileListIncludes(blast.tiles, this.bot.tile));
+    const hitActors = Array.from(this.actors.values()).filter(
+      (actor) => actor.alive && tileListIncludes(blast.tiles, actor.tile)
+    );
 
-    if (playerHit) {
-      this.playerAlive = false;
-      this.player?.setTint(0xf59e0b);
+    hitActors.forEach((actor) => {
+      actor.alive = false;
+      actor.sprite.setTint(0xf59e0b);
       this.tweens.add({
-        targets: this.player,
-        alpha: 0.25,
+        targets: actor.sprite,
+        alpha: 0.22,
         scale: 0.7,
         duration: 220,
         ease: "Cubic.easeOut"
       });
+    });
+
+    if (hitActors.length === 0) {
+      return;
     }
 
-    if (botHit && this.bot) {
-      this.bot.alive = false;
-      this.bot.sprite.setTint(0xf59e0b);
-      this.tweens.add({
-        targets: this.bot.sprite,
-        alpha: 0.2,
-        scale: 0.7,
-        duration: 220,
-        ease: "Cubic.easeOut"
-      });
+    this.emitBotHud();
+
+    if (this.currentMode === "player-vs-bot") {
+      const playerHit = hitActors.some((actor) => actor.id === "player");
+      const botHit = hitActors.some((actor) => actor.kind === "bot");
+
+      if (playerHit && botHit) {
+        this.completeRound("draw");
+      } else if (botHit) {
+        this.completeRound("player");
+      } else if (playerHit) {
+        this.completeRound("bot");
+      }
+
+      return;
     }
 
-    if (playerHit && botHit) {
+    const liveBots = this.getLiveBots();
+
+    if (liveBots.length === 0) {
       this.completeRound("draw");
-    } else if (botHit) {
-      this.completeRound("player");
-    } else if (playerHit) {
-      this.completeRound("bot");
+    } else if (liveBots.length === 1) {
+      this.completeRound(liveBots[0].id);
     }
   }
 
@@ -481,17 +518,27 @@ export class ArenaScene extends Phaser.Scene {
     this.roundActive = false;
     this.botMoveEvent?.remove(false);
 
-    if (winner === "player") {
-      this.wins += 1;
-      this.shellEvents?.onRoundStatusChange?.("Win");
-    } else if (winner === "bot") {
-      this.losses += 1;
-      this.shellEvents?.onRoundStatusChange?.("Down");
+    if (this.currentMode === "player-vs-bot") {
+      if (winner === "player") {
+        this.wins += 1;
+        this.shellEvents?.onRoundStatusChange?.("Win");
+      } else if (winner === "bot") {
+        this.losses += 1;
+        this.shellEvents?.onRoundStatusChange?.("Down");
+      } else {
+        this.shellEvents?.onRoundStatusChange?.("Draw");
+      }
+
+      this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
+    } else if (winner === "draw") {
+      this.shellEvents?.onRoundStatusChange?.("Draw");
+    } else if (winner === "bot-a" || winner === "bot-b") {
+      const winnerName = this.actors.get(winner)?.profile?.name ?? "Bot";
+      this.shellEvents?.onRoundStatusChange?.(`${winnerName} Wins`);
     } else {
       this.shellEvents?.onRoundStatusChange?.("Draw");
     }
 
-    this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
     void this.recordMatch(winner);
   }
 
@@ -503,6 +550,7 @@ export class ArenaScene extends Phaser.Scene {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          mode: this.currentMode,
           winner,
           durationMs: Math.round(this.time.now - this.matchStartedAt),
           blocksCleared: this.blocksCleared
@@ -513,72 +561,116 @@ export class ArenaScene extends Phaser.Scene {
     }
   }
 
-  private spawnPlayer() {
-    const world = this.tileToWorld(this.playerTile);
-    this.player = this.add.image(world.x, world.y, "player-core").setDepth(5);
-    this.fxLayer?.add(this.player);
-  }
-
-  private spawnBot() {
-    const tile = { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 };
+  private spawnActor(id: ActorId, tile: GridPoint, profile?: BotProfile) {
     const world = this.tileToWorld(tile);
-    const sprite = this.add.image(world.x, world.y, "bot-core").setDepth(11);
+    const kind = id === "player" ? "player" : "bot";
+    const texture = kind === "player" ? "player-core" : profile?.texture ?? BOT_PROFILES["bot-a"].texture;
+    const sprite = this.add.image(world.x, world.y, texture).setDepth(kind === "player" ? 5 : 11);
 
-    this.bot = {
+    this.actors.set(id, {
+      id,
+      kind,
       tile,
       sprite,
-      alive: true
-    };
+      alive: true,
+      loadout: createInitialLoadout(),
+      profile,
+      nextMoveAt: this.time.now + 280
+    });
   }
 
   private startBotAi() {
     this.botMoveEvent?.remove(false);
     this.botMoveEvent = this.time.addEvent({
-      delay: BOT_MOVE_MS,
+      delay: BOT_AI_TICK_MS,
       loop: true,
-      callback: () => this.moveBot()
+      callback: () => this.moveBots()
     });
   }
 
-  private moveBot() {
-    if (!this.bot?.alive || this.roundOver || !this.roundActive) {
+  private moveBots() {
+    if (this.roundOver || !this.roundActive) {
       return;
     }
 
-    this.maybePlantBotBomb();
+    this.getLiveBots().forEach((bot) => {
+      if (this.time.now < bot.nextMoveAt) {
+        return;
+      }
 
-    const bombThreats = this.getBombThreats();
-    const nextTile = chooseBotMove({
+      this.executeBotTurn(bot);
+      bot.nextMoveAt = this.time.now + this.getBotMoveDelay(bot);
+    });
+  }
+
+  private executeBotTurn(bot: CombatActor) {
+    const opponent = this.findOpponentFor(bot);
+
+    if (!opponent || !bot.profile) {
+      return;
+    }
+
+    const intent = chooseBotTurn({
       arena: this.arena,
-      from: this.bot.tile,
-      target: this.playerTile,
-      bombs: bombThreats,
-      blockedTiles: this.activeBombs.map((bomb) => bomb.tile)
+      actor: this.toBotActorState(bot),
+      opponentTile: opponent.tile,
+      bombs: this.getBombThreats(),
+      activeBombCount: this.activeBombCount(bot.id),
+      blockedTiles: this.getBlockedTiles(bot.id),
+      powerups: this.getBotPowerupTargets()
     });
 
-    if (nextTile.x === this.bot.tile.x && nextTile.y === this.bot.tile.y) {
+    if (intent.type === "wait") {
       return;
     }
 
-    this.bot.tile = nextTile;
-    const world = this.tileToWorld(nextTile);
+    if (intent.type === "plant-bomb") {
+      this.plantBombAt(bot.id, { ...bot.tile }, bot.loadout.blast, BOT_FUSE_MS);
+      this.shellEvents?.onRoundStatusChange?.("Danger");
+
+      if (intent.moveTo && this.canActorMoveTo(bot, intent.moveTo)) {
+        this.moveActorTo(bot, intent.moveTo, this.getBotTweenDuration(bot));
+      }
+
+      return;
+    }
+
+    if (this.canActorMoveTo(bot, intent.tile)) {
+      this.moveActorTo(bot, intent.tile, this.getBotTweenDuration(bot));
+    }
+  }
+
+  private moveActorTo(actor: CombatActor, tile: GridPoint, duration: number) {
+    actor.tile = tile;
+    const world = this.tileToWorld(tile);
+    this.collectPowerupAt(tile, actor.id);
 
     this.tweens.add({
-      targets: this.bot.sprite,
+      targets: actor.sprite,
       x: world.x,
       y: world.y,
-      duration: 160,
+      duration,
       ease: "Quad.easeOut"
     });
+  }
+
+  private canActorMoveTo(actor: CombatActor, tile: GridPoint) {
+    return (
+      isWalkable(this.arena, tile) &&
+      !this.activeBombAt(tile) &&
+      !Array.from(this.actors.values()).some(
+        (otherActor) => otherActor.id !== actor.id && otherActor.alive && this.sameTile(otherActor.tile, tile)
+      )
+    );
   }
 
   private handleResize() {
     this.drawArena();
 
-    if (this.player) {
-      const world = this.tileToWorld(this.playerTile);
-      this.player.setPosition(world.x, world.y);
-    }
+    this.actors.forEach((actor) => {
+      const world = this.tileToWorld(actor.tile);
+      actor.sprite.setPosition(world.x, world.y);
+    });
 
     this.activeBombs.forEach((bomb) => {
       const world = this.tileToWorld(bomb.tile);
@@ -589,32 +681,23 @@ export class ArenaScene extends Phaser.Scene {
       const world = this.tileToWorld(powerup.tile);
       powerup.sprite.setPosition(world.x, world.y);
     });
-
-    if (this.bot) {
-      const world = this.tileToWorld(this.bot.tile);
-      this.bot.sprite.setPosition(world.x, world.y);
-    }
   }
 
-  private bumpPlayer(delta: GridPoint) {
-    if (!this.player) {
-      return;
-    }
-
+  private bumpActor(actor: CombatActor, delta: GridPoint) {
     this.tweens.add({
-      targets: this.player,
-      x: this.player.x + delta.x * 5,
-      y: this.player.y + delta.y * 5,
+      targets: actor.sprite,
+      x: actor.sprite.x + delta.x * 5,
+      y: actor.sprite.y + delta.y * 5,
       yoyo: true,
       duration: 42
     });
   }
 
   private activeBombAt(tile: GridPoint) {
-    return this.activeBombs.some((bomb) => bomb.tile.x === tile.x && bomb.tile.y === tile.y);
+    return this.activeBombs.some((bomb) => this.sameTile(bomb.tile, tile));
   }
 
-  private resetRound() {
+  private clearRoundObjects() {
     this.botMoveEvent?.remove(false);
     this.clearCountdownEvents();
     this.activeBombs.forEach((bomb) => {
@@ -624,22 +707,9 @@ export class ArenaScene extends Phaser.Scene {
     this.activeBombs = [];
     this.activePowerups.forEach((powerup) => powerup.sprite.destroy());
     this.activePowerups.clear();
-    this.player?.destroy();
-    this.bot?.sprite.destroy();
-    this.bot = undefined;
-    this.arena = createInitialArena();
-    this.playerTile = { x: 1, y: 1 };
-    this.playerAlive = true;
-    this.roundOver = false;
-    this.roundActive = false;
-    this.playerLoadout = createInitialLoadout();
-    this.blocksCleared = 0;
+    this.actors.forEach((actor) => actor.sprite.destroy());
+    this.actors.clear();
     this.fxLayer?.removeAll(true);
-    this.drawArena();
-    this.spawnPlayer();
-    this.spawnBot();
-    this.emitLoadout();
-    this.startRoundCountdown();
   }
 
   private tileToWorld(tile: GridPoint) {
@@ -653,67 +723,29 @@ export class ArenaScene extends Phaser.Scene {
     return `${tile.x}:${tile.y}`;
   }
 
-  private hasActiveBomb(owner: ActiveBomb["owner"]) {
-    return this.activeBombs.some((bomb) => bomb.owner === owner);
-  }
-
-  private activeBombCount(owner: ActiveBomb["owner"]) {
+  private activeBombCount(owner: ActorId) {
     return this.activeBombs.filter((bomb) => bomb.owner === owner).length;
   }
 
-  private maybePlantBotBomb() {
-    if (!this.bot?.alive || this.hasActiveBomb("bot") || this.roundOver) {
-      return;
-    }
+  private getBlockedTiles(actorId: ActorId) {
+    const actorTiles = Array.from(this.actors.values())
+      .filter((actor) => actor.id !== actorId && actor.alive)
+      .map((actor) => actor.tile);
 
-    const bombThreats = this.getBombThreats();
-
-    if (isDangerTile(this.arena, bombThreats, this.bot.tile)) {
-      return;
-    }
-
-    const nearPlayer = manhattanDistance(this.bot.tile, this.playerTile) <= 2;
-    const nearSoftBlock = this.hasAdjacentSoftBlock(this.bot.tile);
-    const shouldBomb = nearPlayer || (nearSoftBlock && Phaser.Math.Between(0, 100) < 42);
-
-    if (!shouldBomb) {
-      return;
-    }
-
-    const escapeMove = findSafeEscapeMove({
-      arena: this.arena,
-      from: this.bot.tile,
-      bombs: [
-        ...bombThreats,
-        {
-          tile: this.bot.tile,
-          range: BOT_BLAST_RANGE
-        }
-      ],
-      blockedTiles: [...this.activeBombs.map((bomb) => bomb.tile), this.bot.tile]
-    });
-
-    if (!escapeMove) {
-      return;
-    }
-
-    this.plantBombAt("bot", { ...this.bot.tile }, BOT_BLAST_RANGE, BOT_FUSE_MS);
-    this.shellEvents?.onRoundStatusChange?.("Danger");
+    return [...this.activeBombs.map((bomb) => bomb.tile), ...actorTiles];
   }
 
-  private hasAdjacentSoftBlock(tile: GridPoint) {
-    return [
-      { x: tile.x + 1, y: tile.y },
-      { x: tile.x - 1, y: tile.y },
-      { x: tile.x, y: tile.y + 1 },
-      { x: tile.x, y: tile.y - 1 }
-    ].some((neighbor) => this.arena[neighbor.y]?.[neighbor.x] === "soft");
-  }
-
-  private getBombThreats() {
+  private getBombThreats(): BombThreat[] {
     return this.activeBombs.map((bomb) => ({
       tile: bomb.tile,
       range: bomb.range
+    }));
+  }
+
+  private getBotPowerupTargets(): BotPowerupTarget[] {
+    return Array.from(this.activePowerups.values()).map((powerup) => ({
+      tile: powerup.tile,
+      type: powerup.type
     }));
   }
 
@@ -749,11 +781,33 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private emitLoadout() {
-    this.shellEvents?.onLoadoutChange?.(this.playerLoadout);
+    const player = this.actors.get("player");
+    this.shellEvents?.onLoadoutChange?.(player?.loadout ?? createInitialLoadout());
   }
 
-  private getPlayerMoveDuration() {
-    return Math.max(54, 104 - this.playerLoadout.speed * 14);
+  private emitBotHud() {
+    this.shellEvents?.onBotHudChange?.(
+      this.getBots().map((bot) => ({
+        id: bot.id as BotId,
+        name: bot.profile?.name ?? "Bot",
+        alive: bot.alive,
+        bombs: bot.loadout.bombs,
+        blast: bot.loadout.blast,
+        speed: bot.loadout.speed
+      }))
+    );
+  }
+
+  private getPlayerMoveDuration(player: CombatActor) {
+    return Math.max(54, 104 - player.loadout.speed * 14);
+  }
+
+  private getBotMoveDelay(bot: CombatActor) {
+    return Math.max(260, BASE_BOT_MOVE_MS - bot.loadout.speed * 70);
+  }
+
+  private getBotTweenDuration(bot: CombatActor) {
+    return Math.max(90, 180 - bot.loadout.speed * 22);
   }
 
   private getPowerupTexture(powerup: PowerupType) {
@@ -763,5 +817,35 @@ export class ArenaScene extends Phaser.Scene {
   private clearCountdownEvents() {
     this.countdownEvents.forEach((event) => event.remove(false));
     this.countdownEvents = [];
+  }
+
+  private getBots() {
+    return Array.from(this.actors.values()).filter((actor) => actor.kind === "bot");
+  }
+
+  private getLiveBots() {
+    return this.getBots().filter((bot) => bot.alive);
+  }
+
+  private findOpponentFor(actor: CombatActor) {
+    if (this.currentMode === "player-vs-bot") {
+      return actor.kind === "bot" ? this.actors.get("player") : this.getLiveBots()[0];
+    }
+
+    return this.getLiveBots().find((bot) => bot.id !== actor.id);
+  }
+
+  private toBotActorState(bot: CombatActor): BotActorState {
+    return {
+      id: bot.id as BotId,
+      tile: bot.tile,
+      alive: bot.alive,
+      loadout: bot.loadout,
+      profile: bot.profile ?? BOT_PROFILES["bot-a"]
+    };
+  }
+
+  private sameTile(a: GridPoint, b: GridPoint) {
+    return a.x === b.x && a.y === b.y;
   }
 }

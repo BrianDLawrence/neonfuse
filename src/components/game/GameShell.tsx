@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { PhaserGame } from "./PhaserGame";
+import type { BotHudState } from "@/game/createGame";
+import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import {
   DEFAULT_POWERUP_DROP_RATES,
   type PowerupDropRates,
@@ -26,6 +28,11 @@ export function GameShell() {
   const [speed, setSpeed] = useState(1);
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
+  const [botHud, setBotHud] = useState<BotHudState[]>([]);
+  const [modeCommand, setModeCommand] = useState<{ mode: GameMode; sequence: number }>({
+    mode: DEFAULT_GAME_MODE,
+    sequence: 0
+  });
   const [powerupDropRates, setPowerupDropRates] = useState<PowerupDropRates>(DEFAULT_POWERUP_DROP_RATES);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
 
@@ -77,14 +84,23 @@ export function GameShell() {
     event.preventDefault();
     setIsAdminOpen(true);
   }, []);
+  const handleModeStart = useCallback((mode: GameMode) => {
+    setModeCommand((currentCommand) => ({
+      mode,
+      sequence: currentCommand.sequence + 1
+    }));
+    setRoundStatus("Warmup");
+  }, []);
 
   return (
     <main className="app-frame">
       <section className="game-stage" aria-label="Neon Fuse game prototype">
         <PhaserGame
+          modeCommand={modeCommand}
           powerupDropRates={powerupDropRates}
           onRoundStatusChange={setRoundStatus}
           onLoadoutChange={handleLoadoutChange}
+          onBotHudChange={setBotHud}
           onMatchStatsChange={handleMatchStatsChange}
         />
       </section>
@@ -104,42 +120,65 @@ export function GameShell() {
               <span>Round</span>
               <strong>{roundStatus}</strong>
             </div>
-            <div className="hud-chip">
-              <span className="metric-label">
-                <i className="stat-icon stat-icon-bomb" aria-hidden="true" />
-                Bombs
-              </span>
-              <strong>{bombs}</strong>
-            </div>
-            <div className="hud-chip">
-              <span className="metric-label">
-                <i className="stat-icon stat-icon-blast" aria-hidden="true" />
-                Blast
-              </span>
-              <strong>{blast}</strong>
-            </div>
-            <div className="hud-chip">
-              <span className="metric-label">
-                <i className="stat-icon stat-icon-speed" aria-hidden="true" />
-                Speed
-              </span>
-              <strong>{speed}</strong>
-            </div>
-            <div className="hud-chip">
-              <span>Record</span>
-              <strong>
-                {wins}-{losses}
-              </strong>
-            </div>
+            {modeCommand.mode === "bot-skirmish" ? (
+              botHud.map((bot) => (
+                <div className="hud-chip bot-hud-chip" key={bot.id}>
+                  <span>{bot.alive ? bot.name : `${bot.name} Down`}</span>
+                  <strong>
+                    B{bot.bombs} / R{bot.blast} / S{bot.speed}
+                  </strong>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="hud-chip">
+                  <span className="metric-label">
+                    <i className="stat-icon stat-icon-bomb" aria-hidden="true" />
+                    Bombs
+                  </span>
+                  <strong>{bombs}</strong>
+                </div>
+                <div className="hud-chip">
+                  <span className="metric-label">
+                    <i className="stat-icon stat-icon-blast" aria-hidden="true" />
+                    Blast
+                  </span>
+                  <strong>{blast}</strong>
+                </div>
+                <div className="hud-chip">
+                  <span className="metric-label">
+                    <i className="stat-icon stat-icon-speed" aria-hidden="true" />
+                    Speed
+                  </span>
+                  <strong>{speed}</strong>
+                </div>
+                <div className="hud-chip">
+                  <span>Record</span>
+                  <strong>
+                    {wins}-{losses}
+                  </strong>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         <aside className="match-actions" aria-label="Match actions">
           <div className="command-row">
-            <button className="command-button" type="button">
+            <button
+              aria-pressed={modeCommand.mode === "player-vs-bot"}
+              className="command-button"
+              onClick={() => handleModeStart("player-vs-bot")}
+              type="button"
+            >
               Local Match
             </button>
-            <button className="command-button secondary" type="button">
+            <button
+              aria-pressed={modeCommand.mode === "bot-skirmish"}
+              className="command-button secondary"
+              onClick={() => handleModeStart("bot-skirmish")}
+              type="button"
+            >
               Bot Skirmish
             </button>
           </div>
@@ -194,10 +233,18 @@ export function GameShell() {
         ) : null}
 
         <div className="control-strip">
-          <span className="key-chip">Arrow Keys / WASD: Move</span>
-          <span className="key-chip">Space: Bomb</span>
+          {modeCommand.mode === "player-vs-bot" ? (
+            <>
+              <span className="key-chip">Arrow Keys / WASD: Move</span>
+              <span className="key-chip">Space: Bomb</span>
+            </>
+          ) : (
+            <span className="key-chip">Bot Skirmish: Watch only</span>
+          )}
           <span className="key-chip">R: Reset</span>
-          <span className="key-chip">Goal: Blast the red bot</span>
+          <span className="key-chip">
+            Goal: {modeCommand.mode === "bot-skirmish" ? "Last bot standing" : "Blast the red bot"}
+          </span>
           <span className="key-chip">Danger: Bot bombs</span>
         </div>
       </div>

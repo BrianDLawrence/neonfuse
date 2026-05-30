@@ -10,13 +10,15 @@ export type PlayerLoadout = {
   speed: number;
 };
 
+export type ActorLoadout = PlayerLoadout;
+
 export const DEFAULT_POWERUP_DROP_RATES: PowerupDropRates = {
   bomb: 4,
   blast: 4,
   speed: 4
 };
 
-const MAX_LOADOUT: PlayerLoadout = {
+export const MAX_LOADOUT: PlayerLoadout = {
   bombs: 4,
   blast: 5,
   speed: 3
