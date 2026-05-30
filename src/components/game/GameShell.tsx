@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { MouseEvent } from "react";
 import { PhaserGame } from "./PhaserGame";
 import {
   DEFAULT_POWERUP_DROP_RATES,
@@ -26,6 +27,23 @@ export function GameShell() {
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [powerupDropRates, setPowerupDropRates] = useState<PowerupDropRates>(DEFAULT_POWERUP_DROP_RATES);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAdminOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsAdminOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isAdminOpen]);
+
   const handleLoadoutChange = useCallback(
     ({
       bombs: nextBombs,
@@ -54,6 +72,10 @@ export function GameShell() {
       ...currentRates,
       [type]: value
     }));
+  }, []);
+  const handleAdminLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setIsAdminOpen(true);
   }, []);
 
   return (
@@ -112,12 +134,7 @@ export function GameShell() {
           </div>
         </div>
 
-        <aside className="start-panel">
-          <h2>Prototype Zero</h2>
-          <p>
-            Hunt the red bot, dodge hostile fuses, and break soft blocks for
-            upgrades. Round results are ready to save to MongoDB.
-          </p>
+        <aside className="match-actions" aria-label="Match actions">
           <div className="command-row">
             <button className="command-button" type="button">
               Local Match
@@ -126,31 +143,55 @@ export function GameShell() {
               Bot Skirmish
             </button>
           </div>
-          <div className="admin-panel" aria-label="Powerup admin controls">
-            <div className="admin-panel-header">
-              <h3>Admin</h3>
-              <span>Powerup rate</span>
-            </div>
-            {POWERUP_CONTROLS.map((control) => (
-              <label className="slider-row" key={control.type}>
-                <span className="slider-label">
-                  <i className={`stat-icon ${control.iconClass}`} aria-hidden="true" />
-                  {control.label}
-                </span>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={powerupDropRates[control.type]}
-                  onChange={(event) =>
-                    handlePowerupRateChange(control.type, Number(event.target.value))
-                  }
-                />
-                <strong>{powerupDropRates[control.type]}</strong>
-              </label>
-            ))}
-          </div>
+          <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
+            Admin
+          </a>
         </aside>
+
+        {isAdminOpen ? (
+          <div className="admin-dialog-backdrop" onClick={() => setIsAdminOpen(false)}>
+            <section
+              aria-labelledby="admin-settings-title"
+              aria-modal="true"
+              className="admin-dialog"
+              id="admin-settings"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="admin-panel" aria-label="Powerup admin controls">
+                <div className="admin-panel-header">
+                  <h3 id="admin-settings-title">Admin</h3>
+                  <span>Powerup rate</span>
+                </div>
+                {POWERUP_CONTROLS.map((control) => (
+                  <label className="slider-row" key={control.type}>
+                    <span className="slider-label">
+                      <i className={`stat-icon ${control.iconClass}`} aria-hidden="true" />
+                      {control.label}
+                    </span>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={powerupDropRates[control.type]}
+                      onChange={(event) =>
+                        handlePowerupRateChange(control.type, Number(event.target.value))
+                      }
+                    />
+                    <strong>{powerupDropRates[control.type]}</strong>
+                  </label>
+                ))}
+                <button
+                  className="dialog-close-button"
+                  onClick={() => setIsAdminOpen(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         <div className="control-strip">
           <span className="key-chip">Arrow Keys / WASD: Move</span>
