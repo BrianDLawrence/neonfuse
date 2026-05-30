@@ -38,6 +38,7 @@ function makeBot(overrides: Partial<BotActorState> = {}): BotActorState {
     alive: true,
     loadout: createInitialLoadout(),
     profile: BOT_PROFILES["bot-a"],
+    turn: 0,
     ...overrides
   };
 }
@@ -90,6 +91,18 @@ describe("chooseBotTurn", () => {
     });
 
     expect(intent).toEqual({ type: "plant-bomb", moveTo: { x: 1, y: 2 } });
+  });
+
+  it("lets the cautious profile drop bombs when the opening is good", () => {
+    const intent = chooseBotTurn({
+      arena: makeSoftArena(),
+      actor: makeBot({ profile: BOT_PROFILES["bot-b"] }),
+      opponentTile: { x: 3, y: 3 },
+      bombs: [],
+      activeBombCount: 0
+    });
+
+    expect(intent.type).toBe("plant-bomb");
   });
 
   it("moves toward an occupied opponent tile without needing to enter it", () => {

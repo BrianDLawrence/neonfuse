@@ -33,6 +33,7 @@ export type BotActorState = {
   alive: boolean;
   loadout: ActorLoadout;
   profile: BotProfile;
+  turn: number;
 };
 
 export type BotPowerupTarget = {
@@ -53,6 +54,7 @@ export type BotTurnContext = {
   activeBombCount: number;
   blockedTiles?: GridPoint[];
   powerups?: BotPowerupTarget[];
+  decisionSeed?: number;
 };
 
 export const BOT_PROFILES: Record<BotId, BotProfile> = {
@@ -89,7 +91,8 @@ export function chooseBotTurn({
   bombs,
   activeBombCount,
   blockedTiles = [],
-  powerups = []
+  powerups = [],
+  decisionSeed = 0
 }: BotTurnContext): BotTurnIntent {
   const blockedWithoutActor = blockedTiles.filter((tile) => !sameTile(tile, actor.tile));
 
@@ -117,13 +120,27 @@ export function chooseBotTurn({
     return cautiousPowerupMove ? { type: "move", tile: cautiousPowerupMove } : { type: "wait" };
   }
 
+  const preferredPowerupMove = findPowerupMove({
+    arena,
+    actor,
+    bombs,
+    blockedTiles: blockedWithoutActor,
+    powerups,
+    minimumScore: 11
+  });
+
+  if (preferredPowerupMove) {
+    return { type: "move", tile: preferredPowerupMove };
+  }
+
   const bombIntent = chooseBombIntent({
     arena,
     actor,
     opponentTile,
     bombs,
     activeBombCount,
-    blockedTiles: blockedWithoutActor
+    blockedTiles: blockedWithoutActor,
+    decisionSeed
   });
 
   if (bombIntent) {
@@ -158,7 +175,8 @@ function chooseBombIntent({
   opponentTile,
   bombs,
   activeBombCount,
-  blockedTiles
+  blockedTiles,
+  decisionSeed
 }: {
   arena: ArenaGrid;
   actor: BotActorState;
@@ -166,6 +184,7 @@ function chooseBombIntent({
   bombs: BombThreat[];
   activeBombCount: number;
   blockedTiles: GridPoint[];
+  decisionSeed: number;
 }): BotTurnIntent | null {
   if (activeBombCount >= actor.loadout.bombs) {
     return null;
@@ -174,15 +193,18 @@ function chooseBombIntent({
   const nearOpponent = manhattanDistance(actor.tile, opponentTile) <= actor.loadout.blast;
   const nearSoftBlock = hasAdjacentSoftBlock(arena, actor.tile);
   const traits = actor.profile.traits;
+  const jitter = seededJitter(actor.tile, actor.turn + decisionSeed);
   const bombScore =
-    (nearOpponent ? traits.aggression * 1.4 : 0) + (nearSoftBlock ? traits.blockGreed : 0);
-  const threshold = 9 + traits.patience * 0.2 - traits.riskTolerance * 0.25;
+    (nearOpponent ? traits.aggression * 1.35 : 0) +
+    (nearSoftBlock ? traits.blockGreed * 1.25 : 0) +
+    jitter * 3;
+  const threshold = 8.4 + traits.patience * 0.16 - traits.riskTolerance * 0.32;
 
   if (bombScore < threshold) {
     return null;
   }
 
-  const escapeMove = findSafeEscapeMove({
+  const escapePath = findSafeEscapePath({
     arena,
     from: actor.tile,
     bombs: [
@@ -195,11 +217,60 @@ function chooseBombIntent({
     blockedTiles: [...blockedTiles, actor.tile]
   });
 
-  if (!escapeMove) {
+  if (!escapePath) {
     return null;
   }
 
-  return { type: "plant-bomb", moveTo: escapeMove };
+  return { type: "plant-bomb", moveTo: escapePath[0] };
+}
+
+function findSafeEscapePath({
+  arena,
+  from,
+  bombs,
+  blockedTiles,
+  maxDepth = 6
+}: {
+  arena: ArenaGrid;
+  from: GridPoint;
+  bombs: BombThreat[];
+  blockedTiles: GridPoint[];
+  maxDepth?: number;
+}) {
+  const queue: Array<{ tile: GridPoint; path: GridPoint[] }> = [{ tile: from, path: [] }];
+  const visited = new Set([tileKey(from)]);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    if (current.path.length > 0 && !isDangerTile(arena, bombs, current.tile)) {
+      return current.path;
+    }
+
+    if (current.path.length >= maxDepth) {
+      continue;
+    }
+
+    getAdjacentTiles(current.tile).forEach((neighbor) => {
+      const key = tileKey(neighbor);
+
+      if (
+        visited.has(key) ||
+        !isWalkable(arena, neighbor) ||
+        blockedTiles.some((blocked) => sameTile(blocked, neighbor))
+      ) {
+        return;
+      }
+
+      visited.add(key);
+      queue.push({
+        tile: neighbor,
+        path: [...current.path, neighbor]
+      });
+    });
+  }
+
+  return null;
 }
 
 function findPowerupMove({
@@ -363,4 +434,9 @@ function sameTile(a: GridPoint, b: GridPoint) {
 
 function tileKey(tile: GridPoint) {
   return `${tile.x}:${tile.y}`;
+}
+
+function seededJitter(tile: GridPoint, seed: number) {
+  const value = tile.x * 31 + tile.y * 17 + seed * 13;
+  return ((value % 100) + 100) % 100 / 100;
 }

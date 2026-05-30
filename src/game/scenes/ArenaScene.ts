@@ -52,6 +52,7 @@ type CombatActor = {
   loadout: ActorLoadout;
   profile?: BotProfile;
   nextMoveAt: number;
+  turn: number;
 };
 
 type ActivePowerup = {
@@ -575,7 +576,8 @@ export class ArenaScene extends Phaser.Scene {
       alive: true,
       loadout: createInitialLoadout(),
       profile,
-      nextMoveAt: this.time.now + 280
+      nextMoveAt: this.time.now + 280,
+      turn: 0
     });
   }
 
@@ -617,8 +619,11 @@ export class ArenaScene extends Phaser.Scene {
       bombs: this.getBombThreats(),
       activeBombCount: this.activeBombCount(bot.id),
       blockedTiles: this.getBlockedTiles(bot.id),
-      powerups: this.getBotPowerupTargets()
+      powerups: this.getBotPowerupTargets(),
+      decisionSeed: Math.floor(this.time.now / BOT_AI_TICK_MS)
     });
+
+    bot.turn += 1;
 
     if (intent.type === "wait") {
       return;
@@ -841,7 +846,8 @@ export class ArenaScene extends Phaser.Scene {
       tile: bot.tile,
       alive: bot.alive,
       loadout: bot.loadout,
-      profile: bot.profile ?? BOT_PROFILES["bot-a"]
+      profile: bot.profile ?? BOT_PROFILES["bot-a"],
+      turn: bot.turn
     };
   }
 
