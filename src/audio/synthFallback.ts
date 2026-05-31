@@ -1,4 +1,4 @@
-import type { AudioAssetKey, AudioBusName, MusicIntensity } from "./types";
+import type { AudioAssetKey, AudioBusName, MusicIntensity, MusicLayer, MusicTrack } from "./types";
 import { Mixer } from "./Mixer";
 
 type SynthOptions = {
@@ -148,6 +148,149 @@ export function createProceduralMusicLoop(
 
   schedule();
   const timer = window.setInterval(schedule, 500);
+
+  return {
+    gain: output,
+    stop: (when: number) => {
+      stopped = true;
+      window.clearInterval(timer);
+      activeNodes.forEach((node) => node.stop(when));
+    }
+  };
+}
+
+const SEMITONES: Record<string, number> = {
+  c: 0,
+  "c#": 1,
+  d: 2,
+  "d#": 3,
+  e: 4,
+  f: 5,
+  "f#": 6,
+  g: 7,
+  "g#": 8,
+  a: 9,
+  "a#": 10,
+  b: 11
+};
+
+// Convert a note name like "a4" / "f#3" to a frequency in Hz (A4 = 440, equal
+// temperament). Used by the data-driven track engine so tracks can be written
+// as readable note patterns instead of raw frequencies.
+export function noteFrequency(name: string): number {
+  const match = /^([a-g])(#?)(-?\d+)$/.exec(name.trim().toLowerCase());
+
+  if (!match) {
+    throw new Error(`Invalid note name "${name}"`);
+  }
+
+  const [, letter, sharp, octaveText] = match;
+  const semitone = SEMITONES[`${letter}${sharp}`];
+  const octave = Number(octaveText);
+  const midi = (octave + 1) * 12 + semitone;
+
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+// Relative loudness of a synth voice by role, kept in the same magnitude band
+// as the legacy procedural loop so tracks never blast louder than the SFX bus.
+const ROLE_VOLUME: Record<MusicLayer["role"], number> = {
+  lead: 0.05,
+  arp: 0.038,
+  bass: 0.07,
+  pad: 0.034
+};
+
+// Render a data-driven MusicTrack into a looping Web Audio graph. Mirrors
+// createProceduralMusicLoop's contract (returns { gain, stop }) and reuses the
+// same scheduleTone helper, but the notes/tempo/filter come from track data and
+// the current intensity nudges tempo, cutoff, and gain via intensityProfiles.
+export function createTrackMusicLoop(
+  context: AudioContext,
+  mixer: Mixer,
+  track: MusicTrack,
+  intensity: MusicIntensity,
+  fadeMs: number
+): ProceduralLoop {
+  const profile = track.intensityProfiles?.[intensity] ?? {};
+  const tempoMul = profile.tempoMul ?? 1;
+  const cutoffMul = profile.cutoffMul ?? 1;
+  const gainMul = profile.gainMul ?? 1;
+
+  const output = context.createGain();
+  const now = context.currentTime;
+  const fadeEnd = now + fadeMs / 1000;
+  const activeNodes = new Set<AudioScheduledSourceNode>();
+
+  // A sequencer "step" is a 16th note; pattern entries can hold several steps.
+  const stepSeconds = 60 / track.bpm / 4 / tempoMul;
+  const layers = track.layers.filter(
+    (layer) => !layer.intensities || layer.intensities.includes(intensity)
+  );
+  const layerSpanSteps = (layer: MusicLayer) => layer.pattern.length * (layer.stepsPerNote ?? 1);
+  const loopSteps = layers.reduce((max, layer) => Math.max(max, layerSpanSteps(layer)), 1);
+  const barSeconds = loopSteps * stepSeconds;
+
+  output.gain.value = 0;
+  output.connect(mixer.getBus("music"));
+  output.gain.linearRampToValueAtTime(getIntensityVolume(intensity) * gainMul, fadeEnd);
+
+  const filter = context.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = track.filterBase * cutoffMul;
+  filter.Q.value = 0.9;
+  filter.connect(output);
+
+  const register = (node: AudioScheduledSourceNode) => {
+    activeNodes.add(node);
+    node.addEventListener("ended", () => activeNodes.delete(node));
+  };
+
+  let nextLoopAt = now + 0.04;
+  let stopped = false;
+
+  const scheduleLoopFrom = (loopStart: number) => {
+    layers.forEach((layer) => {
+      const steps = layer.stepsPerNote ?? 1;
+      const noteSeconds = steps * stepSeconds;
+      const octaveMul = Math.pow(2, layer.octaveShift ?? 0);
+      const volume = Math.max(0.0001, ROLE_VOLUME[layer.role] * layer.gain);
+
+      layer.pattern.forEach((noteName, index) => {
+        if (!noteName) {
+          return;
+        }
+
+        const frequency = noteFrequency(noteName) * octaveMul;
+
+        scheduleTone(context, filter, activeNodes, register, {
+          at: loopStart + index * noteSeconds,
+          frequency,
+          duration: noteSeconds * (layer.role === "pad" ? 0.96 : 0.82),
+          volume,
+          type: layer.waveform,
+          detune: layer.detune ?? 0,
+          endFrequency: layer.role === "bass" ? frequency * 0.85 : undefined
+        });
+      });
+    });
+  };
+
+  const tick = () => {
+    if (stopped) {
+      return;
+    }
+
+    const scheduleUntil = context.currentTime + barSeconds + 0.1;
+
+    while (nextLoopAt < scheduleUntil) {
+      scheduleLoopFrom(nextLoopAt);
+      nextLoopAt += barSeconds;
+    }
+  };
+
+  tick();
+  const timer = window.setInterval(tick, 500);
 
   return {
     gain: output,

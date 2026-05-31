@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
+import type { MusicTrack } from "@/audio";
 import type { BotHudState, TouchInputState } from "@/game/createGame";
 import type { GameMode } from "@/game/modes";
 import type { Direction } from "@/game/simulation/arena";
@@ -21,6 +22,8 @@ export type TouchControlsApi = {
   setMusicEnabled: (enabled: boolean, volume: number) => void;
   setMusicVolume: (volume: number) => void;
   setSfxVolume: (volume: number) => void;
+  setMusicTrack: (track: MusicTrack | null) => void;
+  previewMusicTrack: (track: MusicTrack | null) => void;
   tapBomb: () => void;
   requestReset: () => void;
 };
@@ -131,6 +134,22 @@ export function PhaserGame({
         setSfxVolume: (volume) => {
           const audio = game.registry.get("audio") as { setSfxVolume?: (nextVolume: number) => void } | undefined;
           audio?.setSfxVolume?.(volume);
+        },
+        setMusicTrack: (track) => {
+          const audio = game.registry.get("audio") as
+            | { setActiveTrack?: (nextTrack: MusicTrack | null) => void }
+            | undefined;
+          audio?.setActiveTrack?.(track);
+        },
+        previewMusicTrack: (track) => {
+          const audio = game.registry.get("audio") as
+            | { previewTrack?: (nextTrack: MusicTrack) => void; stopPreview?: () => void }
+            | undefined;
+          if (track) {
+            audio?.previewTrack?.(track);
+          } else {
+            audio?.stopPreview?.();
+          }
         },
         tapBomb: () => game.events.emit("touch-bomb"),
         requestReset: () => game.events.emit("touch-reset")

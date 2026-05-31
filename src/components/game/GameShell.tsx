@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
+import { MusicScreen } from "./MusicScreen";
+import type { MusicTrack } from "@/audio/types";
 import type { BotHudState } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import type { Direction } from "@/game/simulation/arena";
@@ -69,13 +71,16 @@ export function GameShell() {
   const [selectedBotInfo, setSelectedBotInfo] = useState<BotProfileId>(DEFAULT_BOT_SELECTION["bot-a"]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isBotLabOpen, setIsBotLabOpen] = useState(false);
+  const [isMusicOpen, setIsMusicOpen] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicVolume, setMusicVolume] = useState(8);
   const [sfxVolume, setSfxVolume] = useState(9);
+  const [selectedTrack, setSelectedTrack] = useState<MusicTrack | null>(null);
   const touchApiRef = useRef<TouchControlsApi | null>(null);
   const musicEnabledRef = useRef(musicEnabled);
   const musicVolumeRef = useRef(musicVolume);
   const sfxVolumeRef = useRef(sfxVolume);
+  const selectedTrackRef = useRef(selectedTrack);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
 
   useEffect(() => {
@@ -91,7 +96,26 @@ export function GameShell() {
   }, [sfxVolume]);
 
   useEffect(() => {
-    if (!isAdminOpen && !isBotLabOpen) {
+    selectedTrackRef.current = selectedTrack;
+  }, [selectedTrack]);
+
+  // Restore the last chosen music track (the app's only persisted preference)
+  // so it drives gameplay again after a reload.
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("neon-fuse:music-track");
+      if (stored) {
+        const parsed = JSON.parse(stored) as MusicTrack;
+        setSelectedTrack(parsed);
+        selectedTrackRef.current = parsed;
+      }
+    } catch {
+      // Ignore unreadable/corrupt storage.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAdminOpen && !isBotLabOpen && !isMusicOpen) {
       return undefined;
     }
 
@@ -99,12 +123,13 @@ export function GameShell() {
       if (event.key === "Escape") {
         setIsAdminOpen(false);
         setIsBotLabOpen(false);
+        setIsMusicOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdminOpen, isBotLabOpen]);
+  }, [isAdminOpen, isBotLabOpen, isMusicOpen]);
 
   const handleLoadoutChange = useCallback(
     ({
@@ -143,6 +168,10 @@ export function GameShell() {
     event.preventDefault();
     setIsBotLabOpen(true);
   }, []);
+  const handleMusicLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setIsMusicOpen(true);
+  }, []);
   const handleBotSelectionChange = useCallback((slot: BotId, profileId: BotProfileId) => {
     setBotSelection((currentSelection) => ({
       ...currentSelection,
@@ -161,6 +190,24 @@ export function GameShell() {
     touchApiRef.current = api;
     api?.setMusicEnabled(musicEnabledRef.current, musicVolumeRef.current / 10);
     api?.setSfxVolume(sfxVolumeRef.current / 10);
+    api?.setMusicTrack(selectedTrackRef.current);
+  }, []);
+  const handleSelectTrack = useCallback((track: MusicTrack) => {
+    setSelectedTrack(track);
+    selectedTrackRef.current = track;
+    touchApiRef.current?.setMusicTrack(track);
+
+    try {
+      window.localStorage.setItem("neon-fuse:music-track", JSON.stringify(track));
+    } catch {
+      // Storage may be unavailable (private mode); the choice still applies this session.
+    }
+  }, []);
+  const handlePreviewTrack = useCallback((track: MusicTrack) => {
+    touchApiRef.current?.previewMusicTrack(track);
+  }, []);
+  const handleStopPreviewTrack = useCallback(() => {
+    touchApiRef.current?.previewMusicTrack(null);
   }, []);
   const handleMusicToggle = useCallback(() => {
     setMusicEnabled((currentEnabled) => {
@@ -299,6 +346,9 @@ export function GameShell() {
             >
               Music {musicEnabled ? "On" : "Off"}
             </button>
+            <a className="admin-link" href="#music" onClick={handleMusicLinkClick}>
+              Tracks
+            </a>
             <a className="admin-link" href="#bot-lab" onClick={handleBotLabLinkClick}>
               Bots
             </a>
@@ -489,6 +539,16 @@ export function GameShell() {
               </div>
             </section>
           </div>
+        ) : null}
+
+        {isMusicOpen ? (
+          <MusicScreen
+            selectedTrackId={selectedTrack?.id ?? null}
+            onSelect={handleSelectTrack}
+            onPreview={handlePreviewTrack}
+            onStopPreview={handleStopPreviewTrack}
+            onClose={() => setIsMusicOpen(false)}
+          />
         ) : null}
 
         <div className="control-strip">

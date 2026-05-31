@@ -2,7 +2,7 @@ import { audioEvents } from "./audioEvents";
 import { Mixer } from "./Mixer";
 import { MusicManager } from "./MusicManager";
 import { SfxManager } from "./SfxManager";
-import type { AudioEventName, AudioEventPayload } from "./types";
+import type { AudioEventName, AudioEventPayload, MusicTrack } from "./types";
 
 const randomBetween = ([min, max]: readonly [number, number]) => {
   return min + Math.random() * (max - min);
@@ -105,6 +105,26 @@ export class AudioDirector {
     }
 
     await this.music.setIntensity(intensity);
+  }
+
+  // Choose the active gameplay theme. Stored even before the audio context is
+  // unlocked; startLoop picks it up when intensity first plays after unlock.
+  async setActiveTrack(track: MusicTrack | null) {
+    await this.music.setActiveTrack(track);
+  }
+
+  // Triggered by a user gesture on the Music screen, so it can resume the
+  // context directly before auditioning.
+  async previewTrack(track: MusicTrack) {
+    if (this.context.state !== "running") {
+      await this.context.resume();
+    }
+
+    await this.music.previewTrack(track);
+  }
+
+  async stopPreview() {
+    await this.music.stopPreview();
   }
 
   async dispose() {
