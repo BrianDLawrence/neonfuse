@@ -3,8 +3,13 @@ import { ArenaScene } from "./scenes/ArenaScene";
 import { BootScene } from "./scenes/BootScene";
 import { PreloadScene } from "./scenes/PreloadScene";
 import { DEFAULT_GAME_MODE, type GameMode } from "./modes";
+import type { Direction } from "./simulation/arena";
 import type { BotId, BotSelection } from "./simulation/bots";
 import type { PowerupDropRates } from "./simulation/powerups";
+
+export type TouchInputState = {
+  dir: Direction | null;
+};
 
 export type BotHudState = {
   id: BotId;
@@ -52,6 +57,9 @@ export function createGame({ parent, initialMode = DEFAULT_GAME_MODE, events }: 
 
   game.registry.set("events", events);
   game.registry.set("gameMode", initialMode);
+  // Shared, mutable-in-place touch input state. React writes `.dir` on the same
+  // object; ArenaScene polls it each frame (mirrors how it polls the keyboard).
+  game.registry.set("touchInput", { dir: null } satisfies TouchInputState);
 
   return game;
 }

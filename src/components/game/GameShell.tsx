@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
-import { PhaserGame } from "./PhaserGame";
+import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import type { BotHudState } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
+import type { Direction } from "@/game/simulation/arena";
 import {
   BOT_PROFILE_ORDER,
   BOT_PROFILES,
@@ -35,6 +36,13 @@ const BOT_SLOTS: Array<{ id: BotId; label: string }> = [
   { id: "bot-b", label: "Slot B" }
 ];
 
+const TOUCH_DIRECTIONS: Array<{ dir: Direction; label: string; glyph: string }> = [
+  { dir: "up", label: "Move up", glyph: "▲" },
+  { dir: "left", label: "Move left", glyph: "◀" },
+  { dir: "right", label: "Move right", glyph: "▶" },
+  { dir: "down", label: "Move down", glyph: "▼" }
+];
+
 export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
@@ -52,6 +60,7 @@ export function GameShell() {
   const [selectedBotInfo, setSelectedBotInfo] = useState<BotProfileId>(DEFAULT_BOT_SELECTION["bot-a"]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isBotLabOpen, setIsBotLabOpen] = useState(false);
+  const touchApiRef = useRef<TouchControlsApi | null>(null);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
 
   useEffect(() => {
@@ -121,6 +130,21 @@ export function GameShell() {
     }));
     setRoundStatus("Warmup");
   }, []);
+  const handleRegisterTouchControls = useCallback((api: TouchControlsApi | null) => {
+    touchApiRef.current = api;
+  }, []);
+  const handleTouchDirectionStart = useCallback((direction: Direction) => {
+    touchApiRef.current?.setDirection(direction);
+  }, []);
+  const handleTouchDirectionEnd = useCallback(() => {
+    touchApiRef.current?.setDirection(null);
+  }, []);
+  const handleTouchBomb = useCallback(() => {
+    touchApiRef.current?.tapBomb();
+  }, []);
+  const handleTouchReset = useCallback(() => {
+    touchApiRef.current?.requestReset();
+  }, []);
 
   return (
     <main className="app-frame">
@@ -133,6 +157,7 @@ export function GameShell() {
           onLoadoutChange={handleLoadoutChange}
           onBotHudChange={setBotHud}
           onMatchStatsChange={handleMatchStatsChange}
+          onRegisterTouchControls={handleRegisterTouchControls}
         />
       </section>
 
@@ -394,6 +419,49 @@ export function GameShell() {
           </span>
           <span className="key-chip">Danger: Bot bombs</span>
         </div>
+
+        <aside className="touch-controls" aria-label="Touch controls">
+          {modeCommand.mode === "player-vs-bot" ? (
+            <div className="touch-pad" role="group" aria-label="Move">
+              {TOUCH_DIRECTIONS.map(({ dir, label, glyph }) => (
+                <button
+                  aria-label={label}
+                  className="touch-pad-button"
+                  data-dir={dir}
+                  key={dir}
+                  onPointerCancel={handleTouchDirectionEnd}
+                  onPointerDown={() => handleTouchDirectionStart(dir)}
+                  onPointerLeave={handleTouchDirectionEnd}
+                  onPointerUp={handleTouchDirectionEnd}
+                  type="button"
+                >
+                  <span aria-hidden="true">{glyph}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="touch-action-cluster">
+            {modeCommand.mode === "player-vs-bot" ? (
+              <button
+                aria-label="Plant bomb"
+                className="touch-button touch-button-bomb"
+                onPointerDown={handleTouchBomb}
+                type="button"
+              >
+                <span aria-hidden="true">Bomb</span>
+              </button>
+            ) : null}
+            <button
+              aria-label="Reset round"
+              className="touch-button touch-button-reset"
+              onClick={handleTouchReset}
+              type="button"
+            >
+              <span aria-hidden="true">Reset</span>
+            </button>
+          </div>
+        </aside>
       </div>
     </main>
   );
