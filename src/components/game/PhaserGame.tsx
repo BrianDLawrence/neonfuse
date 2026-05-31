@@ -18,6 +18,9 @@ type Loadout = {
 // game without GameShell ever touching a Phaser instance (keeps the boundary).
 export type TouchControlsApi = {
   setDirection: (direction: Direction | null) => void;
+  setMusicEnabled: (enabled: boolean, volume: number) => void;
+  setMusicVolume: (volume: number) => void;
+  setSfxVolume: (volume: number) => void;
   tapBomb: () => void;
   requestReset: () => void;
 };
@@ -115,6 +118,20 @@ export function PhaserGame({
             touchInput.dir = direction;
           }
         },
+        setMusicEnabled: (enabled, volume) => {
+          const audio = game.registry.get("audio") as {
+            setMusicEnabled?: (nextEnabled: boolean, nextVolume: number) => void;
+          } | undefined;
+          audio?.setMusicEnabled?.(enabled, volume);
+        },
+        setMusicVolume: (volume) => {
+          const audio = game.registry.get("audio") as { setMusicVolume?: (nextVolume: number) => void } | undefined;
+          audio?.setMusicVolume?.(volume);
+        },
+        setSfxVolume: (volume) => {
+          const audio = game.registry.get("audio") as { setSfxVolume?: (nextVolume: number) => void } | undefined;
+          audio?.setSfxVolume?.(volume);
+        },
         tapBomb: () => game.events.emit("touch-bomb"),
         requestReset: () => game.events.emit("touch-reset")
       });
@@ -125,6 +142,8 @@ export function PhaserGame({
     return () => {
       isMounted = false;
       registerTouchControlsRef.current?.(null);
+      const audio = gameRef.current?.registry.get("audio") as { dispose?: () => Promise<void> } | undefined;
+      void audio?.dispose?.();
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };

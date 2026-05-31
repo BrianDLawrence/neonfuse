@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { AudioDirector } from "@/audio";
 import { ArenaScene } from "./scenes/ArenaScene";
 import { BootScene } from "./scenes/BootScene";
 import { PreloadScene } from "./scenes/PreloadScene";
@@ -36,6 +37,7 @@ type CreateGameOptions = {
 };
 
 export function createGame({ parent, initialMode = DEFAULT_GAME_MODE, events }: CreateGameOptions) {
+  const audio = new AudioDirector();
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -57,6 +59,7 @@ export function createGame({ parent, initialMode = DEFAULT_GAME_MODE, events }: 
 
   game.registry.set("events", events);
   game.registry.set("gameMode", initialMode);
+  game.registry.set("audio", audio);
   // Shared, mutable-in-place touch input state. React writes `.dir` on the same
   // object; ArenaScene polls it each frame (mirrors how it polls the keyboard).
   game.registry.set("touchInput", { dir: null } satisfies TouchInputState);

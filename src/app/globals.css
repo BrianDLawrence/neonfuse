@@ -201,6 +201,65 @@ button {
   filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.48));
 }
 
+.stat-icon-music {
+  border-left: 4px solid var(--cyan);
+  border-bottom: 4px solid var(--cyan);
+  border-radius: 0 0 0 4px;
+  filter: drop-shadow(0 0 7px rgba(34, 211, 238, 0.48));
+}
+
+.stat-icon-music::before,
+.stat-icon-music::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: var(--cyan);
+}
+
+.stat-icon-music::before {
+  left: -5px;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+}
+
+.stat-icon-music::after {
+  right: -6px;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+}
+
+.stat-icon-sfx {
+  border-left: 6px solid var(--pink);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  filter: drop-shadow(0 0 7px rgba(244, 63, 94, 0.48));
+}
+
+.stat-icon-sfx::before,
+.stat-icon-sfx::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  border: 1px solid var(--pink);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+}
+
+.stat-icon-sfx::before {
+  top: 2px;
+  width: 5px;
+  height: 10px;
+}
+
+.stat-icon-sfx::after {
+  top: -1px;
+  width: 9px;
+  height: 16px;
+  opacity: 0.58;
+}
+
 .hud-chip strong {
   display: block;
   margin-top: 3px;
@@ -260,12 +319,23 @@ button {
 }
 
 .admin-link {
+  border: 0;
+  background: transparent;
   color: rgba(148, 163, 184, 0.8);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.1em;
+  padding: 0;
   text-decoration: none;
   text-transform: uppercase;
+}
+
+.hud-link-button {
+  line-height: 1.2;
+}
+
+.music-toggle-button[aria-pressed="true"] {
+  color: var(--green);
 }
 
 .match-links {

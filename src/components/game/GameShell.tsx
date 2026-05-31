@@ -43,6 +43,15 @@ const TOUCH_DIRECTIONS: Array<{ dir: Direction; label: string; glyph: string }> 
   { dir: "down", label: "Move down", glyph: "▼" }
 ];
 
+const AUDIO_CONTROLS: Array<{
+  type: "music" | "sfx";
+  label: string;
+  iconClass: string;
+}> = [
+  { type: "music", label: "Music", iconClass: "stat-icon-music" },
+  { type: "sfx", label: "SFX", iconClass: "stat-icon-sfx" }
+];
+
 export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
@@ -60,8 +69,26 @@ export function GameShell() {
   const [selectedBotInfo, setSelectedBotInfo] = useState<BotProfileId>(DEFAULT_BOT_SELECTION["bot-a"]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isBotLabOpen, setIsBotLabOpen] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(8);
+  const [sfxVolume, setSfxVolume] = useState(9);
   const touchApiRef = useRef<TouchControlsApi | null>(null);
+  const musicEnabledRef = useRef(musicEnabled);
+  const musicVolumeRef = useRef(musicVolume);
+  const sfxVolumeRef = useRef(sfxVolume);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
+
+  useEffect(() => {
+    musicEnabledRef.current = musicEnabled;
+  }, [musicEnabled]);
+
+  useEffect(() => {
+    musicVolumeRef.current = musicVolume;
+  }, [musicVolume]);
+
+  useEffect(() => {
+    sfxVolumeRef.current = sfxVolume;
+  }, [sfxVolume]);
 
   useEffect(() => {
     if (!isAdminOpen && !isBotLabOpen) {
@@ -132,6 +159,29 @@ export function GameShell() {
   }, []);
   const handleRegisterTouchControls = useCallback((api: TouchControlsApi | null) => {
     touchApiRef.current = api;
+    api?.setMusicEnabled(musicEnabledRef.current, musicVolumeRef.current / 10);
+    api?.setSfxVolume(sfxVolumeRef.current / 10);
+  }, []);
+  const handleMusicToggle = useCallback(() => {
+    setMusicEnabled((currentEnabled) => {
+      const nextEnabled = !currentEnabled;
+      touchApiRef.current?.setMusicEnabled(nextEnabled, musicVolumeRef.current / 10);
+      return nextEnabled;
+    });
+  }, []);
+  const handleAudioVolumeChange = useCallback((type: "music" | "sfx", value: number) => {
+    if (type === "music") {
+      setMusicVolume(value);
+
+      if (musicEnabledRef.current) {
+        touchApiRef.current?.setMusicVolume(value / 10);
+      }
+
+      return;
+    }
+
+    setSfxVolume(value);
+    touchApiRef.current?.setSfxVolume(value / 10);
   }, []);
   const handleTouchDirectionStart = useCallback((direction: Direction) => {
     touchApiRef.current?.setDirection(direction);
@@ -241,6 +291,14 @@ export function GameShell() {
             </button>
           </div>
           <div className="match-links">
+            <button
+              aria-pressed={musicEnabled}
+              className="admin-link hud-link-button music-toggle-button"
+              onClick={handleMusicToggle}
+              type="button"
+            >
+              Music {musicEnabled ? "On" : "Off"}
+            </button>
             <a className="admin-link" href="#bot-lab" onClick={handleBotLabLinkClick}>
               Bots
             </a>
@@ -374,8 +432,34 @@ export function GameShell() {
               <div className="admin-panel" aria-label="Powerup admin controls">
                 <div className="admin-panel-header">
                   <h3 id="admin-settings-title">Admin</h3>
-                  <span>Powerup rate</span>
+                  <span>Audio + powerups</span>
                 </div>
+                {AUDIO_CONTROLS.map((control) => {
+                  const value = control.type === "music" ? musicVolume : sfxVolume;
+
+                  return (
+                    <label className="slider-row" key={control.type}>
+                      <span className="slider-label">
+                        <i className={`stat-icon ${control.iconClass}`} aria-hidden="true" />
+                        {control.label}
+                      </span>
+                      <input
+                        aria-label={control.label}
+                        type="range"
+                        min="0"
+                        max="10"
+                        value={value}
+                        onInput={(event) =>
+                          handleAudioVolumeChange(control.type, Number(event.currentTarget.value))
+                        }
+                        onChange={(event) =>
+                          handleAudioVolumeChange(control.type, Number(event.target.value))
+                        }
+                      />
+                      <strong>{value}</strong>
+                    </label>
+                  );
+                })}
                 {POWERUP_CONTROLS.map((control) => (
                   <label className="slider-row" key={control.type}>
                     <span className="slider-label">
@@ -383,6 +467,7 @@ export function GameShell() {
                       {control.label}
                     </span>
                     <input
+                      aria-label={control.label}
                       type="range"
                       min="1"
                       max="10"
