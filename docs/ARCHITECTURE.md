@@ -125,6 +125,14 @@ Unit tests should cover pure simulation behavior:
 - Bot decision helpers
 - Win/loss resolution helpers
 
+## Bot AI
+
+Bot decisions live in pure simulation modules, not Phaser scenes.
+
+- Bot profiles use bounded traits such as aggression, powerup greed, block greed, risk tolerance, and patience.
+- The simulation brain returns intents such as wait, move, or plant bomb; Phaser adapts those intents into sprites, tweens, bombs, and HUD updates.
+- Future LLM-generated bot personality changes must be structured, validated, and mapped to known profile fields or bounded trait values before they affect gameplay.
+
 Browser or integration tests can come later for:
 
 - Game loads

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const payload = parsed.data;
 
   const match = {
-    mode: "bot-skirmish",
+    mode: payload.mode,
     winner: payload.winner,
     durationMs: payload.durationMs,
     blocksCleared: payload.blocksCleared,

@@ -202,6 +202,14 @@ button {
   line-height: 1;
 }
 
+.bot-hud-chip {
+  min-width: 158px;
+}
+
+.bot-hud-chip strong {
+  font-size: 16px;
+}
+
 .match-actions {
   pointer-events: auto;
   position: absolute;
@@ -232,6 +240,11 @@ button {
 .command-button.secondary {
   border-color: rgba(244, 63, 94, 0.54);
   background: rgba(244, 63, 94, 0.12);
+}
+
+.command-button[aria-pressed="true"] {
+  border-color: var(--green);
+  box-shadow: 0 0 18px rgba(163, 230, 53, 0.2);
 }
 
 .admin-link {
