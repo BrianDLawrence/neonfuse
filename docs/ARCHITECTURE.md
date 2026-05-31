@@ -130,8 +130,10 @@ Unit tests should cover pure simulation behavior:
 Bot decisions live in pure simulation modules, not Phaser scenes.
 
 - Bot profiles use bounded traits such as aggression, powerup greed, block greed, risk tolerance, and patience.
+- Bot actor IDs (`bot-a`, `bot-b`) are match slots. Bot profile IDs such as `fuse-rush` or `circuit-shade` describe personality, texture, trait values, and info-screen copy.
+- React owns bot roster selection and sends the selected profile IDs across the Phaser boundary when a round starts.
 - The simulation brain returns intents such as wait, move, or plant bomb; Phaser adapts those intents into sprites, tweens, bombs, and HUD updates.
-- Future LLM-generated bot personality changes must be structured, validated, and mapped to known profile fields or bounded trait values before they affect gameplay.
+- Future LLM-generated bot personality changes must be structured, validated, and mapped to known profile fields or bounded trait values before they affect gameplay. LLM output may patch persona data, but it must not emit arbitrary live game logic.
 
 Browser or integration tests can come later for:
 

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
 import type { BotHudState } from "@/game/createGame";
 import type { GameMode } from "@/game/modes";
+import type { BotSelection } from "@/game/simulation/bots";
 import type { PowerupDropRates } from "@/game/simulation/powerups";
 
 type Loadout = {
@@ -17,6 +18,7 @@ type PhaserGameProps = {
     mode: GameMode;
     sequence: number;
   };
+  botSelection: BotSelection;
   powerupDropRates: PowerupDropRates;
   onRoundStatusChange?: (status: string) => void;
   onLoadoutChange?: (loadout: Loadout) => void;
@@ -26,6 +28,7 @@ type PhaserGameProps = {
 
 export function PhaserGame({
   modeCommand,
+  botSelection,
   powerupDropRates,
   onRoundStatusChange,
   onLoadoutChange,
@@ -40,14 +43,23 @@ export function PhaserGame({
   const botHudChangeRef = useRef(onBotHudChange);
   const matchStatsChangeRef = useRef(onMatchStatsChange);
   const powerupDropRatesRef = useRef(powerupDropRates);
+  const botSelectionRef = useRef(botSelection);
 
   useEffect(() => {
+    botSelectionRef.current = botSelection;
     powerupDropRatesRef.current = powerupDropRates;
     roundStatusChangeRef.current = onRoundStatusChange;
     loadoutChangeRef.current = onLoadoutChange;
     botHudChangeRef.current = onBotHudChange;
     matchStatsChangeRef.current = onMatchStatsChange;
-  }, [onBotHudChange, onLoadoutChange, onMatchStatsChange, onRoundStatusChange, powerupDropRates]);
+  }, [
+    botSelection,
+    onBotHudChange,
+    onLoadoutChange,
+    onMatchStatsChange,
+    onRoundStatusChange,
+    powerupDropRates
+  ]);
 
   useEffect(() => {
     if (!gameRef.current) {
@@ -76,7 +88,8 @@ export function PhaserGame({
           onLoadoutChange: (loadout) => loadoutChangeRef.current?.(loadout),
           onBotHudChange: (bots) => botHudChangeRef.current?.(bots),
           onMatchStatsChange: (stats) => matchStatsChangeRef.current?.(stats),
-          getPowerupDropRates: () => powerupDropRatesRef.current
+          getPowerupDropRates: () => powerupDropRatesRef.current,
+          getBotSelection: () => botSelectionRef.current
         }
       });
     }

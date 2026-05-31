@@ -61,6 +61,33 @@ export class PreloadScene extends Phaser.Scene {
     graphics.generateTexture("bot-circuit-core", 34, 34);
     graphics.clear();
 
+    graphics.fillStyle(0x22d3ee, 1);
+    graphics.fillRoundedRect(0, 0, 34, 34, 8);
+    graphics.lineStyle(2, 0xa3e635, 0.9);
+    graphics.strokeRoundedRect(3, 3, 28, 28, 7);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillRoundedRect(8, 10, 6, 7, 2);
+    graphics.fillRoundedRect(20, 10, 6, 7, 2);
+    graphics.lineStyle(2, 0xf8fafc, 0.92);
+    graphics.strokeLineShape(new Phaser.Geom.Line(9, 24, 25, 24));
+    graphics.strokeLineShape(new Phaser.Geom.Line(17, 18, 17, 30));
+    graphics.generateTexture("bot-volt-core", 34, 34);
+    graphics.clear();
+
+    graphics.fillStyle(0xa3e635, 1);
+    graphics.fillRoundedRect(0, 0, 34, 34, 8);
+    graphics.lineStyle(2, 0xf43f5e, 0.9);
+    graphics.strokeRoundedRect(3, 3, 28, 28, 7);
+    graphics.fillStyle(0x101217, 1);
+    graphics.fillTriangle(8, 10, 15, 13, 8, 17);
+    graphics.fillTriangle(26, 10, 19, 13, 26, 17);
+    graphics.lineStyle(2, 0x101217, 0.9);
+    graphics.strokeLineShape(new Phaser.Geom.Line(10, 25, 15, 22));
+    graphics.strokeLineShape(new Phaser.Geom.Line(15, 22, 20, 27));
+    graphics.strokeLineShape(new Phaser.Geom.Line(20, 27, 25, 23));
+    graphics.generateTexture("bot-glitch-core", 34, 34);
+    graphics.clear();
+
     graphics.fillStyle(0xf43f5e, 1);
     graphics.fillCircle(18, 20, 15);
     graphics.fillStyle(0xf59e0b, 1);

@@ -12,6 +12,7 @@ import {
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 import {
   BOT_PROFILES,
+  DEFAULT_BOT_SELECTION,
   chooseBotTurn,
   type BotActorState,
   type BotId,
@@ -31,6 +32,7 @@ const PLAYER_FUSE_MS = 1400;
 const BOT_FUSE_MS = 1800;
 const BOT_AI_TICK_MS = 120;
 const BASE_BOT_MOVE_MS = 560;
+const BOT_MOVE_JITTER_MS = 90;
 const COUNTDOWN_LABELS = ["3", "2", "1", "Fuse!"];
 
 type ActorId = "player" | BotId;
@@ -85,6 +87,7 @@ export class ArenaScene extends Phaser.Scene {
   private wins = 0;
   private losses = 0;
   private blocksCleared = 0;
+  private roundSeed = 0;
 
   constructor() {
     super("ArenaScene");
@@ -156,14 +159,19 @@ export class ArenaScene extends Phaser.Scene {
     this.roundOver = false;
     this.roundActive = false;
     this.blocksCleared = 0;
+    this.roundSeed = Phaser.Math.Between(1, 1_000_000);
     this.drawArena();
+
+    const botSelection = this.shellEvents?.getBotSelection?.() ?? DEFAULT_BOT_SELECTION;
+    const botAProfile = BOT_PROFILES[botSelection["bot-a"]];
+    const botBProfile = BOT_PROFILES[botSelection["bot-b"]];
 
     if (mode === "player-vs-bot") {
       this.spawnActor("player", { x: 1, y: 1 });
-      this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, BOT_PROFILES["bot-a"]);
+      this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, botAProfile);
     } else {
-      this.spawnActor("bot-a", { x: 1, y: 1 }, BOT_PROFILES["bot-a"]);
-      this.spawnActor("bot-b", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, BOT_PROFILES["bot-b"]);
+      this.spawnActor("bot-a", { x: 1, y: 1 }, botAProfile);
+      this.spawnActor("bot-b", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, botBProfile);
     }
 
     this.emitLoadout();
@@ -565,7 +573,8 @@ export class ArenaScene extends Phaser.Scene {
   private spawnActor(id: ActorId, tile: GridPoint, profile?: BotProfile) {
     const world = this.tileToWorld(tile);
     const kind = id === "player" ? "player" : "bot";
-    const texture = kind === "player" ? "player-core" : profile?.texture ?? BOT_PROFILES["bot-a"].texture;
+    const texture =
+      kind === "player" ? "player-core" : profile?.texture ?? BOT_PROFILES[DEFAULT_BOT_SELECTION["bot-a"]].texture;
     const sprite = this.add.image(world.x, world.y, texture).setDepth(kind === "player" ? 5 : 11);
 
     this.actors.set(id, {
@@ -601,7 +610,7 @@ export class ArenaScene extends Phaser.Scene {
       }
 
       this.executeBotTurn(bot);
-      bot.nextMoveAt = this.time.now + this.getBotMoveDelay(bot);
+      bot.nextMoveAt = this.time.now + this.getBotNextMoveDelay(bot);
     });
   }
 
@@ -620,7 +629,7 @@ export class ArenaScene extends Phaser.Scene {
       activeBombCount: this.activeBombCount(bot.id),
       blockedTiles: this.getBlockedTiles(bot.id),
       powerups: this.getBotPowerupTargets(),
-      decisionSeed: Math.floor(this.time.now / BOT_AI_TICK_MS)
+      decisionSeed: this.getBotDecisionSeed(bot)
     });
 
     bot.turn += 1;
@@ -811,8 +820,19 @@ export class ArenaScene extends Phaser.Scene {
     return Math.max(260, BASE_BOT_MOVE_MS - bot.loadout.speed * 70);
   }
 
+  private getBotNextMoveDelay(bot: CombatActor) {
+    return Math.max(
+      220,
+      this.getBotMoveDelay(bot) + Phaser.Math.Between(-BOT_MOVE_JITTER_MS, BOT_MOVE_JITTER_MS)
+    );
+  }
+
   private getBotTweenDuration(bot: CombatActor) {
     return Math.max(90, 180 - bot.loadout.speed * 22);
+  }
+
+  private getBotDecisionSeed(bot: CombatActor) {
+    return this.roundSeed + bot.turn * 101 + (bot.id === "bot-b" ? 9_973 : 0);
   }
 
   private getPowerupTexture(powerup: PowerupType) {
@@ -846,7 +866,7 @@ export class ArenaScene extends Phaser.Scene {
       tile: bot.tile,
       alive: bot.alive,
       loadout: bot.loadout,
-      profile: bot.profile ?? BOT_PROFILES["bot-a"],
+      profile: bot.profile ?? BOT_PROFILES[DEFAULT_BOT_SELECTION["bot-a"]],
       turn: bot.turn
     };
   }
