@@ -3,7 +3,7 @@ import { ArenaScene } from "./scenes/ArenaScene";
 import { BootScene } from "./scenes/BootScene";
 import { PreloadScene } from "./scenes/PreloadScene";
 import { DEFAULT_GAME_MODE, type GameMode } from "./modes";
-import type { BotId } from "./simulation/bots";
+import type { BotId, BotSelection } from "./simulation/bots";
 import type { PowerupDropRates } from "./simulation/powerups";
 
 export type BotHudState = {
@@ -21,6 +21,7 @@ export type GameEvents = {
   onBotHudChange?: (bots: BotHudState[]) => void;
   onMatchStatsChange?: (stats: { wins: number; losses: number }) => void;
   getPowerupDropRates?: () => PowerupDropRates;
+  getBotSelection?: () => BotSelection;
 };
 
 type CreateGameOptions = {

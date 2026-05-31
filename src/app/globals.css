@@ -34,7 +34,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -256,6 +257,12 @@ button {
   text-transform: uppercase;
 }
 
+.match-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
 .admin-link:hover,
 .admin-link:focus-visible {
   color: var(--cyan);
@@ -284,6 +291,10 @@ button {
     0 0 42px rgba(34, 211, 238, 0.16);
   color: var(--text);
   padding: 0;
+}
+
+.bot-lab-dialog {
+  width: min(860px, calc(100vw - 32px));
 }
 
 .admin-panel {
@@ -338,6 +349,179 @@ button {
   color: var(--text);
   font-size: 14px;
   text-align: right;
+}
+
+.bot-lab-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.86fr) minmax(280px, 1.14fr);
+  gap: 16px;
+}
+
+.bot-slot-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.bot-slot-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bot-select {
+  width: 100%;
+  border: 1px solid rgba(34, 211, 238, 0.38);
+  border-radius: 8px;
+  background: rgba(8, 10, 18, 0.78);
+  color: var(--text);
+  padding: 9px 10px;
+}
+
+.bot-roster {
+  display: grid;
+  gap: 9px;
+}
+
+.bot-roster-button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(17, 20, 30, 0.76);
+  color: var(--text);
+  padding: 10px;
+  text-align: left;
+}
+
+.bot-roster-button[aria-pressed="true"] {
+  background: rgba(34, 211, 238, 0.14);
+  box-shadow: inset 0 0 18px rgba(34, 211, 238, 0.08);
+}
+
+.bot-roster-button span,
+.bot-roster-button small {
+  display: block;
+}
+
+.bot-roster-button span {
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.bot-roster-button small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.bot-detail-panel {
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
+  padding-left: 16px;
+}
+
+.bot-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bot-detail-title > span {
+  width: 14px;
+  height: 44px;
+  border-radius: 999px;
+  box-shadow: 0 0 18px currentcolor;
+}
+
+.bot-detail-title h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.bot-detail-title p,
+.bot-summary,
+.bot-quirk,
+.bot-persona {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.bot-detail-title p {
+  margin: 4px 0 0;
+}
+
+.bot-summary {
+  margin: 14px 0 0;
+}
+
+.bot-strengths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.bot-strengths span {
+  border: 1px solid rgba(163, 230, 53, 0.28);
+  border-radius: 999px;
+  background: rgba(163, 230, 53, 0.08);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.trait-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.trait-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 10, 18, 0.46);
+  padding: 9px 10px;
+}
+
+.trait-pill span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.trait-pill strong {
+  color: var(--cyan);
+  font-size: 15px;
+}
+
+.bot-quirk {
+  margin: 14px 0 0;
+}
+
+.bot-persona {
+  margin: 10px 0 0;
+}
+
+.bot-persona strong {
+  color: var(--text);
 }
 
 .dialog-close-button {
@@ -399,6 +583,21 @@ button {
 
   .match-actions {
     right: 14px;
+  }
+
+  .bot-lab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bot-detail-panel {
+    border-left: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+
+  .trait-grid {
+    grid-template-columns: 1fr;
   }
 
   .control-strip {

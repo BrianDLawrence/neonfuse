@@ -6,6 +6,14 @@ import { PhaserGame } from "./PhaserGame";
 import type { BotHudState } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import {
+  BOT_PROFILE_ORDER,
+  BOT_PROFILES,
+  DEFAULT_BOT_SELECTION,
+  type BotId,
+  type BotProfileId,
+  type BotSelection
+} from "@/game/simulation/bots";
+import {
   DEFAULT_POWERUP_DROP_RATES,
   type PowerupDropRates,
   type PowerupType
@@ -21,6 +29,11 @@ const POWERUP_CONTROLS: Array<{
   { type: "speed", label: "Speed", iconClass: "stat-icon-speed" }
 ];
 
+const BOT_SLOTS: Array<{ id: BotId; label: string }> = [
+  { id: "bot-a", label: "Slot A" },
+  { id: "bot-b", label: "Slot B" }
+];
+
 export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
@@ -34,22 +47,27 @@ export function GameShell() {
     sequence: 0
   });
   const [powerupDropRates, setPowerupDropRates] = useState<PowerupDropRates>(DEFAULT_POWERUP_DROP_RATES);
+  const [botSelection, setBotSelection] = useState<BotSelection>(DEFAULT_BOT_SELECTION);
+  const [selectedBotInfo, setSelectedBotInfo] = useState<BotProfileId>(DEFAULT_BOT_SELECTION["bot-a"]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isBotLabOpen, setIsBotLabOpen] = useState(false);
+  const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
 
   useEffect(() => {
-    if (!isAdminOpen) {
+    if (!isAdminOpen && !isBotLabOpen) {
       return undefined;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsAdminOpen(false);
+        setIsBotLabOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdminOpen]);
+  }, [isAdminOpen, isBotLabOpen]);
 
   const handleLoadoutChange = useCallback(
     ({
@@ -84,6 +102,17 @@ export function GameShell() {
     event.preventDefault();
     setIsAdminOpen(true);
   }, []);
+  const handleBotLabLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setIsBotLabOpen(true);
+  }, []);
+  const handleBotSelectionChange = useCallback((slot: BotId, profileId: BotProfileId) => {
+    setBotSelection((currentSelection) => ({
+      ...currentSelection,
+      [slot]: profileId
+    }));
+    setSelectedBotInfo(profileId);
+  }, []);
   const handleModeStart = useCallback((mode: GameMode) => {
     setModeCommand((currentCommand) => ({
       mode,
@@ -96,6 +125,7 @@ export function GameShell() {
     <main className="app-frame">
       <section className="game-stage" aria-label="Neon Fuse game prototype">
         <PhaserGame
+          botSelection={botSelection}
           modeCommand={modeCommand}
           powerupDropRates={powerupDropRates}
           onRoundStatusChange={setRoundStatus}
@@ -182,10 +212,124 @@ export function GameShell() {
               Bot Skirmish
             </button>
           </div>
-          <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
-            Admin
-          </a>
+          <div className="match-links">
+            <a className="admin-link" href="#bot-lab" onClick={handleBotLabLinkClick}>
+              Bots
+            </a>
+            <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
+              Admin
+            </a>
+          </div>
         </aside>
+
+        {isBotLabOpen ? (
+          <div className="admin-dialog-backdrop" onClick={() => setIsBotLabOpen(false)}>
+            <section
+              aria-labelledby="bot-lab-title"
+              aria-modal="true"
+              className="admin-dialog bot-lab-dialog"
+              id="bot-lab"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+            >
+              <div className="admin-panel">
+                <div className="admin-panel-header">
+                  <h3 id="bot-lab-title">Bot Lab</h3>
+                  <span>Roster setup</span>
+                </div>
+
+                <div className="bot-lab-grid">
+                  <section className="bot-setup-panel" aria-label="Bot slot selection">
+                    <div className="bot-slot-grid">
+                      {BOT_SLOTS.map((slot) => {
+                        const otherSlot = slot.id === "bot-a" ? "bot-b" : "bot-a";
+
+                        return (
+                          <label className="bot-slot-row" key={slot.id}>
+                            <span>{slot.label}</span>
+                            <select
+                              className="bot-select"
+                              value={botSelection[slot.id]}
+                              onChange={(event) =>
+                                handleBotSelectionChange(slot.id, event.target.value as BotProfileId)
+                              }
+                            >
+                              {BOT_PROFILE_ORDER.map((profileId) => (
+                                <option
+                                  disabled={botSelection[otherSlot] === profileId}
+                                  key={profileId}
+                                  value={profileId}
+                                >
+                                  {BOT_PROFILES[profileId].name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bot-roster" aria-label="Bot profile info">
+                      {BOT_PROFILE_ORDER.map((profileId) => {
+                        const profile = BOT_PROFILES[profileId];
+
+                        return (
+                          <button
+                            aria-pressed={selectedBotInfo === profileId}
+                            className="bot-roster-button"
+                            key={profileId}
+                            onClick={() => setSelectedBotInfo(profileId)}
+                            style={{ borderColor: profile.accent }}
+                            type="button"
+                          >
+                            <span>{profile.name}</span>
+                            <small>{profile.tagline}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <section className="bot-detail-panel" aria-live="polite">
+                    <div className="bot-detail-title">
+                      <span style={{ backgroundColor: selectedBotProfile.accent }} />
+                      <div>
+                        <h4>{selectedBotProfile.name}</h4>
+                        <p>{selectedBotProfile.tagline}</p>
+                      </div>
+                    </div>
+                    <p className="bot-summary">{selectedBotProfile.summary}</p>
+                    <div className="bot-strengths">
+                      {selectedBotProfile.strengths.map((strength) => (
+                        <span key={strength}>{strength}</span>
+                      ))}
+                    </div>
+                    <div className="trait-grid" aria-label={`${selectedBotProfile.name} traits`}>
+                      {Object.entries(selectedBotProfile.traits).map(([trait, value]) => (
+                        <div className="trait-pill" key={trait}>
+                          <span>{trait.replace(/([A-Z])/g, " $1")}</span>
+                          <strong>{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="bot-quirk">{selectedBotProfile.quirk}</p>
+                    <p className="bot-persona">
+                      <strong>LLM seed:</strong> {selectedBotProfile.llmPersona}
+                    </p>
+                  </section>
+                </div>
+
+                <button
+                  className="dialog-close-button"
+                  onClick={() => setIsBotLabOpen(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
 
         {isAdminOpen ? (
           <div className="admin-dialog-backdrop" onClick={() => setIsAdminOpen(false)}>

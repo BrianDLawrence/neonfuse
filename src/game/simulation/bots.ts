@@ -1,7 +1,6 @@
 import type { ArenaGrid, GridPoint } from "./arena";
 import { isWalkable } from "./arena";
 import {
-  findSafeEscapeMove,
   getAdjacentTiles,
   isDangerTile,
   manhattanDistance,
@@ -11,6 +10,8 @@ import type { ActorLoadout, PowerupType } from "./powerups";
 import { MAX_LOADOUT } from "./powerups";
 
 export type BotId = "bot-a" | "bot-b";
+export type BotProfileId = "fuse-rush" | "circuit-shade" | "volt-warden" | "glitch-bloom";
+export type BotSelection = Record<BotId, BotProfileId>;
 
 export type BotTraitSet = {
   aggression: number;
@@ -21,9 +22,15 @@ export type BotTraitSet = {
 };
 
 export type BotProfile = {
-  id: string;
+  id: BotProfileId;
   name: string;
   texture: string;
+  accent: string;
+  tagline: string;
+  summary: string;
+  strengths: string[];
+  quirk: string;
+  llmPersona: string;
   traits: BotTraitSet;
 };
 
@@ -57,11 +64,30 @@ export type BotTurnContext = {
   decisionSeed?: number;
 };
 
-export const BOT_PROFILES: Record<BotId, BotProfile> = {
-  "bot-a": {
+export const BOT_PROFILE_ORDER: BotProfileId[] = [
+  "fuse-rush",
+  "circuit-shade",
+  "volt-warden",
+  "glitch-bloom"
+];
+
+export const DEFAULT_BOT_SELECTION: BotSelection = {
+  "bot-a": "fuse-rush",
+  "bot-b": "circuit-shade"
+};
+
+export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
+  "fuse-rush": {
     id: "fuse-rush",
     name: "Fuse Rush",
     texture: "bot-fuse-core",
+    accent: "#f43f5e",
+    tagline: "Aggressive lane breaker",
+    summary: "Presses forward, cracks soft blocks early, and looks for fast bomb pressure.",
+    strengths: ["Early block clearing", "Direct pressure", "Low hesitation"],
+    quirk: "Can overcommit if the arena narrows before an escape opens.",
+    llmPersona:
+      "A bold, momentum-driven bomber that values tempo, soft-block pressure, and forcing action.",
     traits: {
       aggression: 9,
       powerupGreed: 4,
@@ -70,16 +96,61 @@ export const BOT_PROFILES: Record<BotId, BotProfile> = {
       patience: 3
     }
   },
-  "bot-b": {
+  "circuit-shade": {
     id: "circuit-shade",
     name: "Circuit Shade",
     texture: "bot-circuit-core",
+    accent: "#8b5cf6",
+    tagline: "Cautious upgrade hunter",
+    summary: "Prioritizes useful powerups, waits out danger, and bombs when the opening is clean.",
+    strengths: ["Powerup routing", "Survival bias", "Patient timing"],
+    quirk: "Can give up initiative while searching for the perfect upgrade path.",
+    llmPersona:
+      "A reserved tactical bot that prefers upgrades, safe lanes, and measured counterplay.",
     traits: {
       aggression: 5,
       powerupGreed: 9,
       blockGreed: 6,
       riskTolerance: 4,
       patience: 8
+    }
+  },
+  "volt-warden": {
+    id: "volt-warden",
+    name: "Volt Warden",
+    texture: "bot-volt-core",
+    accent: "#22d3ee",
+    tagline: "Trap-setting defender",
+    summary: "Controls space with careful bombs and tries to turn soft-block pockets into traps.",
+    strengths: ["Defensive spacing", "Trap setup", "Stable escapes"],
+    quirk: "Sometimes spends extra time shaping the arena before committing to a chase.",
+    llmPersona:
+      "A disciplined trapper bot that values lane control, defensive spacing, and reliable exits.",
+    traits: {
+      aggression: 6,
+      powerupGreed: 5,
+      blockGreed: 9,
+      riskTolerance: 3,
+      patience: 7
+    }
+  },
+  "glitch-bloom": {
+    id: "glitch-bloom",
+    name: "Glitch Bloom",
+    texture: "bot-glitch-core",
+    accent: "#a3e635",
+    tagline: "Chaotic power spike",
+    summary: "Takes odd routes, chases tempo swings, and is comfortable making messy fights happen.",
+    strengths: ["Route variety", "Swingy attacks", "Powerup opportunism"],
+    quirk: "Its high-risk choices can create spectacular wins or very loud mistakes.",
+    llmPersona:
+      "A volatile opportunist bot that embraces messy routes, sudden attacks, and expressive risk.",
+    traits: {
+      aggression: 7,
+      powerupGreed: 8,
+      blockGreed: 5,
+      riskTolerance: 8,
+      patience: 4
     }
   }
 };
@@ -97,14 +168,15 @@ export function chooseBotTurn({
   const blockedWithoutActor = blockedTiles.filter((tile) => !sameTile(tile, actor.tile));
 
   if (isDangerTile(arena, bombs, actor.tile)) {
-    const escapeMove = findSafeEscapeMove({
+    const escapePath = findSafeEscapePath({
       arena,
       from: actor.tile,
       bombs,
-      blockedTiles: blockedWithoutActor
+      blockedTiles: blockedWithoutActor,
+      pathSeed: decisionSeed + actor.turn * 19
     });
 
-    return escapeMove ? { type: "move", tile: escapeMove } : { type: "wait" };
+    return escapePath ? { type: "move", tile: escapePath[0] } : { type: "wait" };
   }
 
   if (bombs.length > 0) {
@@ -114,7 +186,8 @@ export function chooseBotTurn({
       bombs,
       blockedTiles: blockedWithoutActor,
       powerups,
-      minimumScore: 11
+      minimumScore: 11,
+      decisionSeed
     });
 
     return cautiousPowerupMove ? { type: "move", tile: cautiousPowerupMove } : { type: "wait" };
@@ -126,7 +199,8 @@ export function chooseBotTurn({
     bombs,
     blockedTiles: blockedWithoutActor,
     powerups,
-    minimumScore: 11
+    minimumScore: 11,
+    decisionSeed
   });
 
   if (preferredPowerupMove) {
@@ -153,7 +227,8 @@ export function chooseBotTurn({
     bombs,
     blockedTiles: blockedWithoutActor,
     powerups,
-    minimumScore: 7
+    minimumScore: 7,
+    decisionSeed
   });
 
   if (powerupMove) {
@@ -165,7 +240,8 @@ export function chooseBotTurn({
     from: actor.tile,
     target: opponentTile,
     bombs,
-    blockedTiles: blockedWithoutActor
+    blockedTiles: blockedWithoutActor,
+    decisionSeed
   });
 }
 
@@ -214,7 +290,8 @@ function chooseBombIntent({
         range: actor.loadout.blast
       }
     ],
-    blockedTiles: [...blockedTiles, actor.tile]
+    blockedTiles: [...blockedTiles, actor.tile],
+    pathSeed: decisionSeed + actor.turn * 23
   });
 
   if (!escapePath) {
@@ -229,12 +306,14 @@ function findSafeEscapePath({
   from,
   bombs,
   blockedTiles,
+  pathSeed,
   maxDepth = 6
 }: {
   arena: ArenaGrid;
   from: GridPoint;
   bombs: BombThreat[];
   blockedTiles: GridPoint[];
+  pathSeed?: number;
   maxDepth?: number;
 }) {
   const queue: Array<{ tile: GridPoint; path: GridPoint[] }> = [{ tile: from, path: [] }];
@@ -251,7 +330,7 @@ function findSafeEscapePath({
       continue;
     }
 
-    getAdjacentTiles(current.tile).forEach((neighbor) => {
+    sortTilesByJitter(getAdjacentTiles(current.tile), pathSeed).forEach((neighbor) => {
       const key = tileKey(neighbor);
 
       if (
@@ -279,7 +358,8 @@ function findPowerupMove({
   bombs,
   blockedTiles,
   powerups,
-  minimumScore
+  minimumScore,
+  decisionSeed
 }: {
   arena: ArenaGrid;
   actor: BotActorState;
@@ -287,6 +367,7 @@ function findPowerupMove({
   blockedTiles: GridPoint[];
   powerups: BotPowerupTarget[];
   minimumScore: number;
+  decisionSeed: number;
 }) {
   const candidates = powerups
     .map((powerup) => {
@@ -295,7 +376,8 @@ function findPowerupMove({
         from: actor.tile,
         target: powerup.tile,
         bombs,
-        blockedTiles
+        blockedTiles,
+        pathSeed: decisionSeed + actor.turn * 29
       });
 
       if (!step) {
@@ -326,13 +408,15 @@ function choosePressureMove({
   from,
   target,
   bombs,
-  blockedTiles
+  blockedTiles,
+  decisionSeed
 }: {
   arena: ArenaGrid;
   from: GridPoint;
   target: GridPoint;
   bombs: BombThreat[];
   blockedTiles: GridPoint[];
+  decisionSeed: number;
 }): BotTurnIntent {
   const step = findFirstStepToward({
     arena,
@@ -340,7 +424,8 @@ function choosePressureMove({
     target,
     bombs,
     blockedTiles,
-    acceptNearest: true
+    acceptNearest: true,
+    pathSeed: decisionSeed
   });
 
   return step ? { type: "move", tile: step } : { type: "wait" };
@@ -352,7 +437,8 @@ function findFirstStepToward({
   target,
   bombs,
   blockedTiles,
-  acceptNearest = false
+  acceptNearest = false,
+  pathSeed
 }: {
   arena: ArenaGrid;
   from: GridPoint;
@@ -360,6 +446,7 @@ function findFirstStepToward({
   bombs: BombThreat[];
   blockedTiles: GridPoint[];
   acceptNearest?: boolean;
+  pathSeed?: number;
 }) {
   const queue: Array<{ tile: GridPoint; path: GridPoint[] }> = [{ tile: from, path: [] }];
   const visited = new Set([tileKey(from)]);
@@ -384,7 +471,7 @@ function findFirstStepToward({
       };
     }
 
-    getAdjacentTiles(current.tile)
+    sortTilesByDistance(getAdjacentTiles(current.tile), target, pathSeed)
       .filter((neighbor) => {
         const key = tileKey(neighbor);
 
@@ -395,7 +482,6 @@ function findFirstStepToward({
           !isDangerTile(arena, bombs, neighbor)
         );
       })
-      .sort((a, b) => manhattanDistance(a, target) - manhattanDistance(b, target))
       .forEach((neighbor) => {
         visited.add(tileKey(neighbor));
         queue.push({
@@ -434,6 +520,27 @@ function sameTile(a: GridPoint, b: GridPoint) {
 
 function tileKey(tile: GridPoint) {
   return `${tile.x}:${tile.y}`;
+}
+
+function sortTilesByDistance(tiles: GridPoint[], target: GridPoint, seed?: number) {
+  return [...tiles].sort((a, b) => {
+    const aScore = manhattanDistance(a, target) + seededTileNoise(a, seed) * 0.45;
+    const bScore = manhattanDistance(b, target) + seededTileNoise(b, seed) * 0.45;
+
+    return aScore - bScore;
+  });
+}
+
+function sortTilesByJitter(tiles: GridPoint[], seed?: number) {
+  return [...tiles].sort((a, b) => seededTileNoise(a, seed) - seededTileNoise(b, seed));
+}
+
+function seededTileNoise(tile: GridPoint, seed = 0) {
+  if (seed === 0) {
+    return 0;
+  }
+
+  return seededJitter(tile, seed);
 }
 
 function seededJitter(tile: GridPoint, seed: number) {
