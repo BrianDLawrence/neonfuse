@@ -11,7 +11,7 @@ import {
   type GridPoint,
   isWalkable
 } from "../simulation/arena";
-import { computeBoardFit } from "../simulation/layout";
+import { computeBoardFit, computeReservedBands } from "../simulation/layout";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 import {
   BOT_PROFILES,
@@ -40,14 +40,6 @@ const COUNTDOWN_LABELS = ["3", "2", "1", "Fuse!"];
 // Auto-repeat cadence for a held touch D-pad direction. Kept just above the
 // player move tween so steps don't queue ahead of the animation.
 const TOUCH_STEP_MS = 140;
-// Mirror the CSS breakpoints (globals.css) so the camera reserves room for the
-// HUD and touch controls: in portrait a top band for the HUD chrome plus a
-// bottom band for the D-pad; in landscape, side bands for the controls.
-const MOBILE_BREAKPOINT = 760;
-const LANDSCAPE_MAX_HEIGHT = 520;
-const HUD_TOP_PX = 176;
-const TOUCH_BAND_PX = 176;
-const TOUCH_SIDE_PX = 150;
 
 type ActorId = "player" | BotId;
 
@@ -463,23 +455,14 @@ export class ArenaScene extends Phaser.Scene {
     camera.centerOn(boardCenterX, boardCenterY + verticalNudge);
   }
 
-  // Room the HUD + touch controls need, matched to the CSS layout: in portrait a
-  // top band for the HUD chrome and a bottom band for the D-pad; in landscape,
-  // side bands for the controls. The bottom/side control bands only apply when
-  // the player is actually playing (player-vs-bot); the top HUD band always does.
-  private getReserved(): { reservedTop: number; reservedBottom: number; reservedSides: number } {
-    const isPortrait = this.scale.height >= this.scale.width;
-    const isPlayer = this.currentMode === "player-vs-bot";
-
-    if (isPortrait && this.scale.width <= MOBILE_BREAKPOINT) {
-      return { reservedTop: HUD_TOP_PX, reservedBottom: isPlayer ? TOUCH_BAND_PX : 0, reservedSides: 0 };
-    }
-
-    if (!isPortrait && this.scale.height <= LANDSCAPE_MAX_HEIGHT) {
-      return { reservedTop: 0, reservedBottom: 0, reservedSides: isPlayer ? TOUCH_SIDE_PX * 2 : 0 };
-    }
-
-    return { reservedTop: 0, reservedBottom: 0, reservedSides: 0 };
+  // Thin adapter over the pure computeReservedBands (src/game/simulation/layout.ts),
+  // which mirrors the CSS layout in globals.css. Reads the live (visible) viewport.
+  private getReserved() {
+    return computeReservedBands(
+      this.scale.width,
+      this.scale.height,
+      this.currentMode === "player-vs-bot"
+    );
   }
 
   private redrawBlocks() {

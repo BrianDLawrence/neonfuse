@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { computeBoardFit } from "./layout";
+import { computeBoardFit, computeReservedBands } from "./layout";
 
 const BOARD_W = 624;
 const BOARD_H = 528;
+
+// Assert the full board (all rows/cols) fits inside the play area left after the
+// reserved bands are removed — i.e. nothing is clipped at the bottom/sides.
+function expectBoardFullyVisible(viewportW: number, viewportH: number, isPlayer: boolean) {
+  const bands = computeReservedBands(viewportW, viewportH, isPlayer);
+  const fit = computeBoardFit(viewportW, viewportH, BOARD_W, BOARD_H, {
+    reservedWidth: bands.reservedSides,
+    reservedHeight: bands.reservedTop + bands.reservedBottom
+  });
+  const availableW = viewportW - bands.reservedSides;
+  const availableH = viewportH - bands.reservedTop - bands.reservedBottom;
+
+  expect(BOARD_W * fit.zoom).toBeLessThanOrEqual(availableW + 0.001);
+  expect(BOARD_H * fit.zoom).toBeLessThanOrEqual(availableH + 0.001);
+  expect(fit.zoom).toBeGreaterThan(0);
+  return { bands, fit };
+}
 
 describe("computeBoardFit", () => {
   it("never upscales when the viewport already fits the board", () => {
@@ -63,5 +80,58 @@ describe("computeBoardFit", () => {
       expect(Number.isFinite(fit.zoom)).toBe(true);
       expect(fit.zoom).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("computeReservedBands", () => {
+  it("reserves a top HUD band + bottom D-pad band on a portrait phone (playing)", () => {
+    expect(computeReservedBands(390, 640, true)).toEqual({
+      reservedTop: 120,
+      reservedBottom: 176,
+      reservedSides: 0
+    });
+  });
+
+  it("reserves only the top HUD band in portrait when watching (bot-skirmish)", () => {
+    expect(computeReservedBands(390, 640, false)).toEqual({
+      reservedTop: 120,
+      reservedBottom: 0,
+      reservedSides: 0
+    });
+  });
+
+  it("reserves side bands on a landscape phone (playing)", () => {
+    expect(computeReservedBands(844, 340, true)).toEqual({
+      reservedTop: 0,
+      reservedBottom: 0,
+      reservedSides: 300
+    });
+  });
+
+  it("reserves nothing on desktop", () => {
+    expect(computeReservedBands(1280, 800, true)).toEqual({
+      reservedTop: 0,
+      reservedBottom: 0,
+      reservedSides: 0
+    });
+  });
+});
+
+// Regression for the iOS Safari bug: at the REDUCED visible viewport sizes Safari
+// actually exposes (toolbars eat height), the whole board must still be visible and
+// the control bands intact. The prior test used the full 390x844 device size and
+// missed this.
+describe("board fits at reduced iOS visible viewports", () => {
+  it("portrait 390x640 — full board visible above the D-pad band", () => {
+    expectBoardFullyVisible(390, 640, true);
+  });
+
+  it("portrait 390x620 (heavy toolbar, tightest case) — full board still visible", () => {
+    expectBoardFullyVisible(390, 620, true);
+  });
+
+  it("landscape 844x340 — full board height visible, not cut at the bottom", () => {
+    const { bands } = expectBoardFullyVisible(844, 340, true);
+    expect(bands.reservedSides).toBe(300);
   });
 });

@@ -36,3 +36,63 @@ export function computeBoardFit(
 
   return { zoom, offsetX, offsetY };
 }
+
+export type ReservedBands = {
+  reservedTop: number;
+  reservedBottom: number;
+  reservedSides: number;
+};
+
+export type ReservedBandsConfig = {
+  // Widths/heights below these thresholds are treated as a phone (must mirror the
+  // CSS @media breakpoints in globals.css).
+  mobileBreakpoint: number;
+  landscapeMaxHeight: number;
+  // Space the HUD chrome / touch controls occupy (must mirror the CSS sizes).
+  hudTopPx: number;
+  touchBandPx: number;
+  touchSidePx: number;
+};
+
+export const DEFAULT_RESERVED_BANDS_CONFIG: ReservedBandsConfig = {
+  mobileBreakpoint: 760,
+  landscapeMaxHeight: 520,
+  hudTopPx: 120,
+  touchBandPx: 176,
+  touchSidePx: 150
+};
+
+// How much room the HUD + on-screen touch controls need so the camera can keep the
+// board fully visible: in portrait a top band for the HUD plus (when playing) a
+// bottom band for the D-pad; in landscape, (when playing) side bands for the
+// controls. Pure so it can be unit-tested at the real visible viewport sizes.
+//
+// NOTE: these are fixed values that mirror the CSS in globals.css and will drift if
+// the CSS changes. A future hardening would measure the real HUD/control heights
+// (getBoundingClientRect) and pass them across the GameEvents boundary.
+export function computeReservedBands(
+  viewportWidth: number,
+  viewportHeight: number,
+  isPlayer: boolean,
+  config: ReservedBandsConfig = DEFAULT_RESERVED_BANDS_CONFIG
+): ReservedBands {
+  const isPortrait = viewportHeight >= viewportWidth;
+
+  if (isPortrait && viewportWidth <= config.mobileBreakpoint) {
+    return {
+      reservedTop: config.hudTopPx,
+      reservedBottom: isPlayer ? config.touchBandPx : 0,
+      reservedSides: 0
+    };
+  }
+
+  if (!isPortrait && viewportHeight <= config.landscapeMaxHeight) {
+    return {
+      reservedTop: 0,
+      reservedBottom: 0,
+      reservedSides: isPlayer ? config.touchSidePx * 2 : 0
+    };
+  }
+
+  return { reservedTop: 0, reservedBottom: 0, reservedSides: 0 };
+}

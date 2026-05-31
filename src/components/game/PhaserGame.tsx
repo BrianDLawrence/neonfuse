@@ -130,5 +130,47 @@ export function PhaserGame({
     };
   }, []);
 
+  // Keep the layout + Phaser canvas sized to the VISIBLE viewport. iOS Safari's
+  // 100vh includes the area behind the dynamic toolbars and does not fire a
+  // window "resize" when the toolbar shows/hides — only visualViewport does — so
+  // we sync an --app-height var (consumed by .app-frame) and force Phaser to
+  // re-fit. scale.resize dispatches the RESIZE event ArenaScene.handleResize uses.
+  useEffect(() => {
+    let frame = 0;
+
+    const syncViewport = () => {
+      const visibleHeight = window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty("--app-height", `${visibleHeight}px`);
+
+      const game = gameRef.current;
+      const host = hostRef.current;
+      if (game && host) {
+        game.scale.resize(host.clientWidth, visibleHeight);
+      }
+    };
+
+    const onViewportChange = () => {
+      // Coalesce rapid toolbar/scroll events into one re-fit per frame.
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(syncViewport);
+    };
+
+    syncViewport();
+
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", onViewportChange);
+    viewport?.addEventListener("scroll", onViewportChange);
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("orientationchange", onViewportChange);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport?.removeEventListener("resize", onViewportChange);
+      viewport?.removeEventListener("scroll", onViewportChange);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("orientationchange", onViewportChange);
+    };
+  }, []);
+
   return <div ref={hostRef} className="game-canvas-host" />;
 }
