@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
-import type { BotHudState } from "@/game/createGame";
+import type { BotHudState, TouchInputState } from "@/game/createGame";
 import type { GameMode } from "@/game/modes";
+import type { Direction } from "@/game/simulation/arena";
 import type { BotSelection } from "@/game/simulation/bots";
 import type { PowerupDropRates } from "@/game/simulation/powerups";
 
@@ -11,6 +12,14 @@ type Loadout = {
   bombs: number;
   blast: number;
   speed: number;
+};
+
+// Imperative handle handed to the React HUD so its touch buttons can drive the
+// game without GameShell ever touching a Phaser instance (keeps the boundary).
+export type TouchControlsApi = {
+  setDirection: (direction: Direction | null) => void;
+  tapBomb: () => void;
+  requestReset: () => void;
 };
 
 type PhaserGameProps = {
@@ -24,6 +33,7 @@ type PhaserGameProps = {
   onLoadoutChange?: (loadout: Loadout) => void;
   onBotHudChange?: (bots: BotHudState[]) => void;
   onMatchStatsChange?: (stats: { wins: number; losses: number }) => void;
+  onRegisterTouchControls?: (api: TouchControlsApi | null) => void;
 };
 
 export function PhaserGame({
@@ -33,7 +43,8 @@ export function PhaserGame({
   onRoundStatusChange,
   onLoadoutChange,
   onBotHudChange,
-  onMatchStatsChange
+  onMatchStatsChange,
+  onRegisterTouchControls
 }: PhaserGameProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
@@ -42,6 +53,7 @@ export function PhaserGame({
   const loadoutChangeRef = useRef(onLoadoutChange);
   const botHudChangeRef = useRef(onBotHudChange);
   const matchStatsChangeRef = useRef(onMatchStatsChange);
+  const registerTouchControlsRef = useRef(onRegisterTouchControls);
   const powerupDropRatesRef = useRef(powerupDropRates);
   const botSelectionRef = useRef(botSelection);
 
@@ -52,11 +64,13 @@ export function PhaserGame({
     loadoutChangeRef.current = onLoadoutChange;
     botHudChangeRef.current = onBotHudChange;
     matchStatsChangeRef.current = onMatchStatsChange;
+    registerTouchControlsRef.current = onRegisterTouchControls;
   }, [
     botSelection,
     onBotHudChange,
     onLoadoutChange,
     onMatchStatsChange,
+    onRegisterTouchControls,
     onRoundStatusChange,
     powerupDropRates
   ]);
@@ -80,7 +94,7 @@ export function PhaserGame({
         return;
       }
 
-      gameRef.current = createGame({
+      const game = createGame({
         parent: hostRef.current,
         initialMode: initialModeRef.current,
         events: {
@@ -92,12 +106,25 @@ export function PhaserGame({
           getBotSelection: () => botSelectionRef.current
         }
       });
+      gameRef.current = game;
+
+      registerTouchControlsRef.current?.({
+        setDirection: (direction) => {
+          const touchInput = game.registry.get("touchInput") as TouchInputState | undefined;
+          if (touchInput) {
+            touchInput.dir = direction;
+          }
+        },
+        tapBomb: () => game.events.emit("touch-bomb"),
+        requestReset: () => game.events.emit("touch-reset")
+      });
     }
 
     mountGame();
 
     return () => {
       isMounted = false;
+      registerTouchControlsRef.current?.(null);
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };

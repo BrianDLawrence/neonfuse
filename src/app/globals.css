@@ -578,23 +578,187 @@ button {
   font-weight: 750;
 }
 
+/* Touch controls — neon arcade caps that glow harder when pressed. Hidden by
+   default; revealed and oriented inside the ≤760px breakpoint block below. */
+.touch-controls {
+  display: none;
+  pointer-events: none;
+}
+
+.touch-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 8px;
+  width: min(54vw, 232px);
+  aspect-ratio: 1;
+  touch-action: none;
+}
+
+.touch-pad-button {
+  pointer-events: auto;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  color: var(--cyan);
+  font-size: clamp(18px, 5vw, 24px);
+  line-height: 1;
+  box-shadow:
+    0 0 22px rgba(34, 211, 238, 0.14),
+    inset 0 0 16px rgba(34, 211, 238, 0.07);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition:
+    background 90ms ease,
+    box-shadow 90ms ease,
+    border-color 90ms ease;
+}
+
+.touch-pad-button[data-dir="up"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.touch-pad-button[data-dir="left"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.touch-pad-button[data-dir="right"] {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.touch-pad-button[data-dir="down"] {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.touch-pad-button:active {
+  border-color: var(--line-strong);
+  background: rgba(34, 211, 238, 0.2);
+  box-shadow:
+    0 0 30px rgba(34, 211, 238, 0.4),
+    inset 0 0 20px rgba(34, 211, 238, 0.14);
+}
+
+.touch-action-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.touch-button {
+  pointer-events: auto;
+  touch-action: manipulation;
+  min-width: clamp(64px, 18vw, 96px);
+  min-height: clamp(64px, 18vw, 96px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition:
+    background 90ms ease,
+    box-shadow 90ms ease,
+    border-color 90ms ease;
+}
+
+.touch-button-bomb {
+  border-color: rgba(244, 63, 94, 0.6);
+  color: var(--danger);
+  background: rgba(244, 63, 94, 0.16);
+  box-shadow:
+    0 0 26px rgba(244, 63, 94, 0.22),
+    inset 0 0 18px rgba(244, 63, 94, 0.08);
+}
+
+.touch-button-bomb:active {
+  background: rgba(244, 63, 94, 0.3);
+  box-shadow:
+    0 0 36px rgba(244, 63, 94, 0.5),
+    inset 0 0 24px rgba(244, 63, 94, 0.18);
+}
+
+.touch-button-reset {
+  min-height: clamp(44px, 12vw, 60px);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.touch-button-reset:active {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.touch-pad-button:focus-visible,
+.touch-button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
 @media (max-width: 760px) {
   .hud-top {
     align-items: stretch;
     flex-direction: column;
+    /* Reserve the top-right corner for the compact match-setup column below. */
+    padding-right: clamp(140px, 40vw, 172px);
   }
 
   .hud-cluster {
     justify-content: flex-start;
     max-width: none;
+    gap: 7px;
   }
 
-  .brand-lockup p {
+  /* Compact the chips so the HUD band stays short and clears the board. */
+  .hud-chip {
+    min-width: 78px;
+    padding: 6px 9px;
+  }
+
+  .hud-chip strong {
+    font-size: 14px;
+  }
+
+  /* Smaller match buttons — they were overlaying the board on phones. */
+  .command-button {
+    padding: 8px 11px;
+    font-size: 11px;
+  }
+
+  /* Brand title is decorative — drop it on phones to free the top for the HUD. */
+  .brand-lockup {
     display: none;
   }
 
+  /* Compact match setup, pinned top-right clear of the bottom thumb zone. */
   .match-actions {
-    right: 14px;
+    top: calc(clamp(12px, 3vw, 20px) + env(safe-area-inset-top));
+    right: calc(clamp(12px, 3vw, 20px) + env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    align-items: stretch;
+    width: clamp(128px, 36vw, 160px);
+  }
+
+  .command-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .match-links {
+    justify-content: flex-end;
   }
 
   .bot-lab-grid {
@@ -614,5 +778,74 @@ button {
 
   .control-strip {
     display: none;
+  }
+
+  /* Full-screen transparent overlay; only the buttons capture pointer events. */
+  .touch-controls {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    align-items: flex-end;
+    gap: 16px;
+    padding: clamp(14px, 4vw, 24px);
+    padding-bottom: calc(clamp(14px, 4vw, 24px) + env(safe-area-inset-bottom));
+    padding-left: calc(clamp(14px, 4vw, 24px) + env(safe-area-inset-left));
+    padding-right: calc(clamp(14px, 4vw, 24px) + env(safe-area-inset-right));
+  }
+}
+
+/* Landscape phones are short and often wider than the 760px breakpoint, so they
+   are detected by height. Flank the board with controls at the sides (vertically
+   centered) and drop the desktop chrome that would overlap the arena. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .brand-lockup {
+    display: none;
+  }
+
+  .control-strip {
+    display: none;
+  }
+
+  .match-actions {
+    top: calc(10px + env(safe-area-inset-top));
+    left: calc(10px + env(safe-area-inset-left));
+    right: auto;
+    bottom: auto;
+    align-items: flex-start;
+  }
+
+  .command-row {
+    flex-direction: row;
+  }
+
+  /* Keep the stat chips clear of the top-left match buttons. */
+  .hud-top {
+    justify-content: flex-end;
+    padding: clamp(8px, 2vh, 14px);
+    padding-left: 160px;
+  }
+
+  .touch-controls {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    gap: 16px;
+    padding: clamp(8px, 2vh, 16px);
+    padding-left: calc(clamp(8px, 2vh, 16px) + env(safe-area-inset-left));
+    padding-right: calc(clamp(8px, 2vh, 16px) + env(safe-area-inset-right));
+  }
+
+  .touch-pad {
+    width: min(42vh, 168px);
+  }
+
+  .touch-button {
+    min-width: clamp(54px, 16vh, 84px);
+    min-height: clamp(54px, 16vh, 84px);
+  }
+
+  .touch-button-reset {
+    min-height: clamp(40px, 11vh, 56px);
   }
 }

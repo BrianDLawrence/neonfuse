@@ -9,6 +9,19 @@ export type GridPoint = {
   y: number;
 };
 
+export type Direction = "up" | "down" | "left" | "right";
+
+const DIRECTION_DELTAS: Record<Direction, GridPoint> = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 }
+};
+
+export function directionToDelta(direction: Direction): GridPoint {
+  return DIRECTION_DELTAS[direction];
+}
+
 export type ArenaGrid = CellType[][];
 
 export function createInitialArena(): ArenaGrid {

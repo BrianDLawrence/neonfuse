@@ -1,14 +1,17 @@
 import * as Phaser from "phaser";
-import type { GameEvents } from "../createGame";
+import type { GameEvents, TouchInputState } from "../createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
 import {
   ARENA_COLS,
   ARENA_ROWS,
   CELL_SIZE,
   createInitialArena,
+  type Direction,
+  directionToDelta,
   type GridPoint,
   isWalkable
 } from "../simulation/arena";
+import { computeBoardFit } from "../simulation/layout";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 import {
   BOT_PROFILES,
@@ -34,6 +37,17 @@ const BOT_AI_TICK_MS = 120;
 const BASE_BOT_MOVE_MS = 560;
 const BOT_MOVE_JITTER_MS = 90;
 const COUNTDOWN_LABELS = ["3", "2", "1", "Fuse!"];
+// Auto-repeat cadence for a held touch D-pad direction. Kept just above the
+// player move tween so steps don't queue ahead of the animation.
+const TOUCH_STEP_MS = 140;
+// Mirror the CSS breakpoints (globals.css) so the camera reserves room for the
+// HUD and touch controls: in portrait a top band for the HUD chrome plus a
+// bottom band for the D-pad; in landscape, side bands for the controls.
+const MOBILE_BREAKPOINT = 760;
+const LANDSCAPE_MAX_HEIGHT = 520;
+const HUD_TOP_PX = 176;
+const TOUCH_BAND_PX = 176;
+const TOUCH_SIDE_PX = 150;
 
 type ActorId = "player" | BotId;
 
@@ -69,6 +83,9 @@ export class ArenaScene extends Phaser.Scene {
   private arena = createInitialArena();
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd?: Record<string, Phaser.Input.Keyboard.Key>;
+  private touchInput?: TouchInputState;
+  private touchBombQueued = false;
+  private lastTouchStepAt = Number.NEGATIVE_INFINITY;
   private actors = new Map<ActorId, CombatActor>();
   private botMoveEvent?: Phaser.Time.TimerEvent;
   private countdownEvents: Phaser.Time.TimerEvent[] = [];
@@ -95,6 +112,7 @@ export class ArenaScene extends Phaser.Scene {
 
   create() {
     this.shellEvents = this.registry.get("events") as GameEvents | undefined;
+    this.touchInput = this.registry.get("touchInput") as TouchInputState | undefined;
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.wasd = this.input.keyboard?.addKeys("W,A,S,D,SPACE,R") as Record<
       string,
@@ -106,9 +124,13 @@ export class ArenaScene extends Phaser.Scene {
     this.fxLayer = this.add.container(0, 0).setDepth(2);
 
     this.game.events.on("mode-change", this.handleModeChange, this);
+    this.game.events.on("touch-bomb", this.handleTouchBomb, this);
+    this.game.events.on("touch-reset", this.resetRound, this);
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off("mode-change", this.handleModeChange, this);
+      this.game.events.off("touch-bomb", this.handleTouchBomb, this);
+      this.game.events.off("touch-reset", this.resetRound, this);
       this.scale.off("resize", this.handleResize, this);
     });
 
@@ -117,7 +139,7 @@ export class ArenaScene extends Phaser.Scene {
     this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
   }
 
-  update() {
+  update(time: number) {
     if (!this.cursors || !this.wasd) {
       return;
     }
@@ -137,13 +159,14 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    const move = this.getMoveIntent();
+    // Keyboard takes priority; a held touch direction auto-repeats on a cadence.
+    const direction = this.getKeyboardDirection() ?? this.getTouchStepDirection(time);
 
-    if (move) {
-      this.tryMovePlayer(player, move);
+    if (direction) {
+      this.tryMovePlayer(player, directionToDelta(direction));
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.wasd.SPACE)) {
+    if (Phaser.Input.Keyboard.JustDown(this.wasd.SPACE) || this.consumeTouchBomb()) {
       this.plantPlayerBomb(player);
     }
   }
@@ -160,6 +183,8 @@ export class ArenaScene extends Phaser.Scene {
     this.roundActive = false;
     this.blocksCleared = 0;
     this.roundSeed = Phaser.Math.Between(1, 1_000_000);
+    this.touchBombQueued = false;
+    this.lastTouchStepAt = Number.NEGATIVE_INFINITY;
     this.drawArena();
 
     const botSelection = this.shellEvents?.getBotSelection?.() ?? DEFAULT_BOT_SELECTION;
@@ -183,28 +208,58 @@ export class ArenaScene extends Phaser.Scene {
     this.startMode(this.currentMode);
   }
 
-  private getMoveIntent(): GridPoint | null {
+  private getKeyboardDirection(): Direction | null {
     if (!this.cursors || !this.wasd) {
       return null;
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.cursors.left) || Phaser.Input.Keyboard.JustDown(this.wasd.A)) {
-      return { x: -1, y: 0 };
+      return "left";
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.cursors.right) || Phaser.Input.Keyboard.JustDown(this.wasd.D)) {
-      return { x: 1, y: 0 };
+      return "right";
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasd.W)) {
-      return { x: 0, y: -1 };
+      return "up";
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.cursors.down) || Phaser.Input.Keyboard.JustDown(this.wasd.S)) {
-      return { x: 0, y: 1 };
+      return "down";
     }
 
     return null;
+  }
+
+  private getTouchStepDirection(time: number): Direction | null {
+    const direction = this.touchInput?.dir ?? null;
+
+    if (!direction) {
+      this.lastTouchStepAt = Number.NEGATIVE_INFINITY;
+      return null;
+    }
+
+    // Step immediately on press, then repeat every TOUCH_STEP_MS while held.
+    if (time - this.lastTouchStepAt >= TOUCH_STEP_MS) {
+      this.lastTouchStepAt = time;
+      return direction;
+    }
+
+    return null;
+  }
+
+  private handleTouchBomb() {
+    this.touchBombQueued = true;
+  }
+
+  private consumeTouchBomb(): boolean {
+    if (!this.touchBombQueued) {
+      return false;
+    }
+
+    this.touchBombQueued = false;
+    return true;
   }
 
   private tryMovePlayer(player: CombatActor, delta: GridPoint) {
@@ -368,6 +423,63 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.redrawBlocks();
+    this.applyCameraFit();
+  }
+
+  // Zoom/center the fixed-size board so it is always fully visible. On desktop
+  // (board fits natively, no reserved band) the camera is left at its default so
+  // behavior is unchanged; otherwise we zoom to fit and re-center via the camera,
+  // which preserves tileToWorld math and all absolute-coordinate rendering.
+  private applyCameraFit() {
+    const camera = this.cameras.main;
+
+    if (!camera) {
+      return;
+    }
+
+    const boardWidth = ARENA_COLS * CELL_SIZE;
+    const boardHeight = ARENA_ROWS * CELL_SIZE;
+    const { reservedTop, reservedBottom, reservedSides } = this.getReserved();
+    const reservedHeight = reservedTop + reservedBottom;
+    const fit = computeBoardFit(this.scale.width, this.scale.height, boardWidth, boardHeight, {
+      reservedWidth: reservedSides,
+      reservedHeight
+    });
+
+    if (fit.zoom >= 1 && reservedSides === 0 && reservedHeight === 0) {
+      camera.setZoom(1);
+      camera.setScroll(0, 0);
+      return;
+    }
+
+    camera.setZoom(fit.zoom);
+
+    const boardCenterX = this.boardOrigin.x + boardWidth / 2;
+    const boardCenterY = this.boardOrigin.y + boardHeight / 2;
+    // Center the board in the region between the reserved top/bottom bands. A
+    // larger top band pushes it down; a larger bottom band pushes it up. Side
+    // bands are symmetric, so no horizontal shift is needed.
+    const verticalNudge = (reservedBottom - reservedTop) / (2 * fit.zoom);
+    camera.centerOn(boardCenterX, boardCenterY + verticalNudge);
+  }
+
+  // Room the HUD + touch controls need, matched to the CSS layout: in portrait a
+  // top band for the HUD chrome and a bottom band for the D-pad; in landscape,
+  // side bands for the controls. The bottom/side control bands only apply when
+  // the player is actually playing (player-vs-bot); the top HUD band always does.
+  private getReserved(): { reservedTop: number; reservedBottom: number; reservedSides: number } {
+    const isPortrait = this.scale.height >= this.scale.width;
+    const isPlayer = this.currentMode === "player-vs-bot";
+
+    if (isPortrait && this.scale.width <= MOBILE_BREAKPOINT) {
+      return { reservedTop: HUD_TOP_PX, reservedBottom: isPlayer ? TOUCH_BAND_PX : 0, reservedSides: 0 };
+    }
+
+    if (!isPortrait && this.scale.height <= LANDSCAPE_MAX_HEIGHT) {
+      return { reservedTop: 0, reservedBottom: 0, reservedSides: isPlayer ? TOUCH_SIDE_PX * 2 : 0 };
+    }
+
+    return { reservedTop: 0, reservedBottom: 0, reservedSides: 0 };
   }
 
   private redrawBlocks() {
