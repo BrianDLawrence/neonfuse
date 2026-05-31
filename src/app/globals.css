@@ -729,21 +729,41 @@ button {
   .hud-cluster {
     justify-content: flex-start;
     max-width: none;
-    gap: 7px;
+    gap: 6px;
   }
 
-  /* Compact the chips so the HUD band stays short and clears the board. */
+  /* Thin, single-line chips: label and value sit inline instead of stacked, with
+     tight padding and a lighter glow so the status strip reads slim, not bulky. */
   .hud-chip {
-    min-width: 78px;
-    padding: 6px 9px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 3px 10px;
+    box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.05);
+  }
+
+  .hud-chip span {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+  }
+
+  .hud-chip .metric-label {
+    gap: 5px;
   }
 
   .hud-chip strong {
-    font-size: 14px;
+    margin-top: 0;
+    font-size: 13px;
+  }
+
+  .hud-chip .stat-icon {
+    width: 12px;
+    height: 12px;
   }
 
   /* Hide the win-loss Record on phones — show essentials only. */
-  .hud-chip-record {
+  .hud-chip.hud-chip-record {
     display: none;
   }
 
@@ -918,7 +938,7 @@ button {
     display: inline;
   }
 
-  .hud-chip-record {
+  .hud-chip.hud-chip-record {
     display: none;
   }
 
@@ -927,6 +947,39 @@ button {
     justify-content: flex-end;
     padding: clamp(8px, 2vh, 14px);
     padding-left: 160px;
+  }
+
+  /* Thin, single-line chips (matches portrait). */
+  .hud-cluster {
+    gap: 6px;
+  }
+
+  .hud-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 3px 10px;
+    box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.05);
+  }
+
+  .hud-chip span {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+  }
+
+  .hud-chip .metric-label {
+    gap: 5px;
+  }
+
+  .hud-chip strong {
+    margin-top: 0;
+    font-size: 13px;
+  }
+
+  .hud-chip .stat-icon {
+    width: 12px;
+    height: 12px;
   }
 
   .touch-controls {
