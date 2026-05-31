@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import type { AudioDirector, AudioEventName, MusicIntensity } from "@/audio";
 import type { GameEvents, TouchInputState } from "../createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
 import {
@@ -84,6 +85,7 @@ export class ArenaScene extends Phaser.Scene {
   private activeBombs: ActiveBomb[] = [];
   private activePowerups = new Map<string, ActivePowerup>();
   private shellEvents?: GameEvents;
+  private audio?: AudioDirector;
   private boardOrigin = { x: 0, y: 0 };
   private boardLayer?: Phaser.GameObjects.Container;
   private blockLayer?: Phaser.GameObjects.Container;
@@ -104,6 +106,7 @@ export class ArenaScene extends Phaser.Scene {
 
   create() {
     this.shellEvents = this.registry.get("events") as GameEvents | undefined;
+    this.audio = this.registry.get("audio") as AudioDirector | undefined;
     this.touchInput = this.registry.get("touchInput") as TouchInputState | undefined;
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.wasd = this.input.keyboard?.addKeys("W,A,S,D,SPACE,R") as Record<
@@ -118,11 +121,15 @@ export class ArenaScene extends Phaser.Scene {
     this.game.events.on("mode-change", this.handleModeChange, this);
     this.game.events.on("touch-bomb", this.handleTouchBomb, this);
     this.game.events.on("touch-reset", this.resetRound, this);
+    this.input.keyboard?.on("keydown", this.unlockAudio, this);
+    this.input.on("pointerdown", this.unlockAudio, this);
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off("mode-change", this.handleModeChange, this);
       this.game.events.off("touch-bomb", this.handleTouchBomb, this);
       this.game.events.off("touch-reset", this.resetRound, this);
+      this.input.keyboard?.off("keydown", this.unlockAudio, this);
+      this.input.off("pointerdown", this.unlockAudio, this);
       this.scale.off("resize", this.handleResize, this);
     });
 
@@ -164,10 +171,12 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private handleModeChange(mode: GameMode) {
+    this.emitAudio("ui.confirm");
     this.startMode(mode);
   }
 
   private startMode(mode: GameMode) {
+    this.setMusicIntensity("calm");
     this.currentMode = mode;
     this.clearRoundObjects();
     this.arena = createInitialArena();
@@ -197,6 +206,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private resetRound() {
+    this.emitAudio("ui.confirm");
     this.startMode(this.currentMode);
   }
 
@@ -262,10 +272,12 @@ export class ArenaScene extends Phaser.Scene {
 
     if (!this.canActorMoveTo(player, nextTile)) {
       this.bumpActor(player, delta);
+      this.emitAudio("ui.error");
       return;
     }
 
     this.moveActorTo(player, nextTile, this.getPlayerMoveDuration(player));
+    this.emitAudio("ui.move");
   }
 
   private plantPlayerBomb(player: CombatActor) {
@@ -279,6 +291,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.plantBombAt(player.id, { ...player.tile }, player.loadout.blast, PLAYER_FUSE_MS);
+    this.emitAudio("weapon.charge.start");
     this.shellEvents?.onRoundStatusChange?.("Fuse");
   }
 
@@ -304,6 +317,11 @@ export class ArenaScene extends Phaser.Scene {
     };
 
     this.activeBombs.push(bomb);
+
+    if (owner !== "player") {
+      this.emitAudio("weapon.enemy.fire");
+    }
+
     return bomb;
   }
 
@@ -319,6 +337,7 @@ export class ArenaScene extends Phaser.Scene {
 
     const blast = resolveBlast(this.arena, bomb.tile, bomb.range);
     this.blocksCleared += blast.clearedBlocks.length;
+    this.emitAudio(this.getExplosionAudioEvent(blast));
     this.playExplosion(blast);
     this.time.delayedCall(220, () => {
       this.clearDestroyedBlocks(blast.clearedBlocks);
@@ -558,6 +577,7 @@ export class ArenaScene extends Phaser.Scene {
     actor.loadout = applyPowerup(actor.loadout, powerup.type);
     powerup.sprite.destroy();
     this.activePowerups.delete(key);
+    this.emitAudio("pickup.powerup");
     this.emitLoadout();
     this.emitBotHud();
   }
@@ -573,6 +593,7 @@ export class ArenaScene extends Phaser.Scene {
 
     hitActors.forEach((actor) => {
       actor.alive = false;
+      this.emitAudio(actor.kind === "player" ? "player.damage" : "enemy.destroyed");
       actor.sprite.setTint(0xf59e0b);
       this.tweens.add({
         targets: actor.sprite,
@@ -626,21 +647,27 @@ export class ArenaScene extends Phaser.Scene {
       if (winner === "player") {
         this.wins += 1;
         this.shellEvents?.onRoundStatusChange?.("Win");
+        this.emitAudio("game.victory");
       } else if (winner === "bot") {
         this.losses += 1;
         this.shellEvents?.onRoundStatusChange?.("Down");
+        this.emitAudio("game.over");
       } else {
         this.shellEvents?.onRoundStatusChange?.("Draw");
+        this.emitAudio("wave.completed");
       }
 
       this.shellEvents?.onMatchStatsChange?.({ wins: this.wins, losses: this.losses });
     } else if (winner === "draw") {
       this.shellEvents?.onRoundStatusChange?.("Draw");
+      this.emitAudio("wave.completed");
     } else if (winner === "bot-a" || winner === "bot-b") {
       const winnerName = this.actors.get(winner)?.profile?.name ?? "Bot";
       this.shellEvents?.onRoundStatusChange?.(`${winnerName} Wins`);
+      this.emitAudio("game.victory");
     } else {
       this.shellEvents?.onRoundStatusChange?.("Draw");
+      this.emitAudio("wave.completed");
     }
 
     void this.recordMatch(winner);
@@ -870,6 +897,7 @@ export class ArenaScene extends Phaser.Scene {
         }
 
         this.shellEvents?.onRoundStatusChange?.(label);
+        this.emitAudio("wave.countdown.tick");
       });
 
       this.countdownEvents.push(event);
@@ -883,6 +911,7 @@ export class ArenaScene extends Phaser.Scene {
       this.roundActive = true;
       this.matchStartedAt = this.time.now;
       this.shellEvents?.onRoundStatusChange?.("Live");
+      this.emitAudio("wave.started");
       this.startBotAi();
     });
 
@@ -968,5 +997,29 @@ export class ArenaScene extends Phaser.Scene {
 
   private sameTile(a: GridPoint, b: GridPoint) {
     return a.x === b.x && a.y === b.y;
+  }
+
+  private getExplosionAudioEvent(blast: BlastResult): AudioEventName {
+    if (blast.clearedBlocks.length >= 2 || blast.tiles.length >= 6) {
+      return "explosion.large";
+    }
+
+    if (blast.clearedBlocks.length > 0 || blast.tiles.length >= 4) {
+      return "explosion.medium";
+    }
+
+    return "explosion.small";
+  }
+
+  private unlockAudio() {
+    void this.audio?.unlock().catch(() => undefined);
+  }
+
+  private emitAudio(eventName: AudioEventName) {
+    void this.audio?.emit(eventName).catch(() => undefined);
+  }
+
+  private setMusicIntensity(intensity: MusicIntensity) {
+    void this.audio?.setMusicIntensity(intensity).catch(() => undefined);
   }
 }
