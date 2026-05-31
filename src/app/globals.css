@@ -45,7 +45,13 @@ button {
 
 .app-frame {
   position: relative;
-  min-height: 100vh;
+  /* Size to the VISIBLE viewport, not 100vh — on iOS Safari 100vh includes the
+     area behind the dynamic toolbars, which pushed the D-pad off-screen and cut
+     the board. Cascade: old browsers keep 100vh; modern get dvh; the JS-synced
+     --app-height (PhaserGame visualViewport effect) is the exact value and wins. */
+  height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
   background:
     radial-gradient(circle at 18% 20%, rgba(34, 211, 238, 0.18), transparent 32%),
@@ -246,6 +252,11 @@ button {
 .command-button[aria-pressed="true"] {
   border-color: var(--green);
   box-shadow: 0 0 18px rgba(163, 230, 53, 0.2);
+}
+
+/* Full labels on desktop; the compact ones swap in on phones (see media block). */
+.label-compact {
+  display: none;
 }
 
 .admin-link {
@@ -711,8 +722,8 @@ button {
   .hud-top {
     align-items: stretch;
     flex-direction: column;
-    /* Reserve the top-right corner for the compact match-setup column below. */
-    padding-right: clamp(140px, 40vw, 172px);
+    /* Reserve the top-right corner for the compact match-setup pill below. */
+    padding-right: clamp(108px, 32vw, 148px);
   }
 
   .hud-cluster {
@@ -731,10 +742,47 @@ button {
     font-size: 14px;
   }
 
-  /* Smaller match buttons — they were overlaying the board on phones. */
+  /* Hide the win-loss Record on phones — show essentials only. */
+  .hud-chip-record {
+    display: none;
+  }
+
+  /* Use the short labels in the compact pill. */
+  .label-full {
+    display: none;
+  }
+
+  .label-compact {
+    display: inline;
+  }
+
+  /* Match-setup becomes ONE compact segmented toggle pill instead of two big
+     stacked buttons. The two existing buttons become the pill's segments. */
   .command-button {
-    padding: 8px 11px;
+    flex: 1 1 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 8px 12px;
     font-size: 11px;
+    text-align: center;
+  }
+
+  .command-button + .command-button {
+    border-left: 1px solid var(--line);
+  }
+
+  .command-button.secondary {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .command-button[aria-pressed="true"] {
+    border-color: transparent;
+    background: rgba(163, 230, 53, 0.16);
+    box-shadow: none;
+    color: var(--text);
   }
 
   /* Brand title is decorative — drop it on phones to free the top for the HUD. */
@@ -748,13 +796,20 @@ button {
     right: calc(clamp(12px, 3vw, 20px) + env(safe-area-inset-right));
     bottom: auto;
     left: auto;
-    align-items: stretch;
-    width: clamp(128px, 36vw, 160px);
+    align-items: flex-end;
+    width: clamp(148px, 44vw, 192px);
   }
 
+  /* The two mode buttons fuse into a single segmented pill. */
   .command-row {
-    flex-direction: column;
-    gap: 8px;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--panel);
   }
 
   .match-links {
@@ -812,13 +867,62 @@ button {
     right: auto;
     bottom: auto;
     align-items: flex-start;
+    width: min(220px, 42vw);
   }
 
+  /* Same compact segmented pill as portrait (this block also matches landscape
+     phones wider than 760px, where the max-width rules don't apply). */
   .command-row {
+    width: 100%;
     flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--panel);
   }
 
-  /* Keep the stat chips clear of the top-left match buttons. */
+  .command-button {
+    flex: 1 1 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    padding: 8px 12px;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .command-button + .command-button {
+    border-left: 1px solid var(--line);
+  }
+
+  .command-button.secondary {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .command-button[aria-pressed="true"] {
+    border-color: transparent;
+    background: rgba(163, 230, 53, 0.16);
+    box-shadow: none;
+    color: var(--text);
+  }
+
+  .label-full {
+    display: none;
+  }
+
+  .label-compact {
+    display: inline;
+  }
+
+  .hud-chip-record {
+    display: none;
+  }
+
+  /* Keep the stat chips clear of the top-left match pill. */
   .hud-top {
     justify-content: flex-end;
     padding: clamp(8px, 2vh, 14px);

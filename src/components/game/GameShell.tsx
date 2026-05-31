@@ -208,7 +208,7 @@ export function GameShell() {
                   </span>
                   <strong>{speed}</strong>
                 </div>
-                <div className="hud-chip">
+                <div className="hud-chip hud-chip-record">
                   <span>Record</span>
                   <strong>
                     {wins}-{losses}
@@ -220,14 +220,15 @@ export function GameShell() {
         </div>
 
         <aside className="match-actions" aria-label="Match actions">
-          <div className="command-row">
+          <div className="command-row" role="group" aria-label="Match mode">
             <button
               aria-pressed={modeCommand.mode === "player-vs-bot"}
               className="command-button"
               onClick={() => handleModeStart("player-vs-bot")}
               type="button"
             >
-              Local Match
+              <span className="label-full">Local Match</span>
+              <span className="label-compact">Local</span>
             </button>
             <button
               aria-pressed={modeCommand.mode === "bot-skirmish"}
@@ -235,7 +236,8 @@ export function GameShell() {
               onClick={() => handleModeStart("bot-skirmish")}
               type="button"
             >
-              Bot Skirmish
+              <span className="label-full">Bot Skirmish</span>
+              <span className="label-compact">Skirmish</span>
             </button>
           </div>
           <div className="match-links">
