@@ -89,7 +89,17 @@ export function MusicScreen({ selectedTrackId, onSelect, onPreview, onStopPrevie
         <div className="admin-panel">
           <div className="admin-panel-header">
             <h3 id="music-title">Music</h3>
-            <span>Track deck</span>
+            <div className="admin-panel-header-actions">
+              <span>Track deck</span>
+              <button
+                aria-label="Close Tracks"
+                className="dialog-icon-button"
+                onClick={onClose}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
           </div>
 
           <p className="music-intro">

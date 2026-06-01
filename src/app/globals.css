@@ -360,10 +360,12 @@ button {
   place-items: center;
   background: rgba(7, 8, 13, 0.62);
   padding: 16px;
+  overflow-y: auto;
 }
 
 .admin-dialog {
   width: min(420px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: var(--panel-strong);
@@ -372,6 +374,7 @@ button {
     0 0 42px rgba(34, 211, 238, 0.16);
   color: var(--text);
   padding: 0;
+  overflow: hidden;
 }
 
 .bot-lab-dialog {
@@ -379,15 +382,26 @@ button {
 }
 
 .admin-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  min-height: 0;
   padding: 18px;
 }
 
 .admin-panel-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+}
+
+.admin-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .admin-panel-header h3 {
@@ -402,6 +416,32 @@ button {
   color: var(--muted);
   font-size: 12px;
   font-weight: 750;
+}
+
+.dialog-icon-button {
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  padding: 6px 9px;
+  text-transform: uppercase;
+}
+
+.dialog-icon-button:hover,
+.dialog-icon-button:focus-visible {
+  border-color: var(--line-strong);
+  background: rgba(34, 211, 238, 0.14);
+}
+
+.dialog-scroll-region {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
 }
 
 .slider-row {
@@ -618,6 +658,7 @@ button {
 }
 
 .dialog-close-button {
+  flex: 0 0 auto;
   margin-top: 16px;
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.28);
@@ -965,6 +1006,34 @@ button {
 }
 
 @media (max-width: 760px) {
+  .admin-dialog-backdrop {
+    align-items: end;
+    justify-items: stretch;
+    padding: 10px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    padding-left: calc(10px + env(safe-area-inset-left));
+    padding-right: calc(10px + env(safe-area-inset-right));
+  }
+
+  .admin-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  .admin-panel {
+    padding: 14px;
+  }
+
+  .admin-panel-header {
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .admin-panel-header span {
+    display: none;
+  }
+
   .hud-top {
     align-items: stretch;
     flex-direction: column;
@@ -1084,18 +1153,146 @@ button {
 
   .bot-lab-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .bot-lab-dialog .dialog-scroll-region {
+    max-height: calc(100dvh - 104px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  .bot-slot-grid {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .bot-roster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .bot-roster-button {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .bot-profile-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .bot-profile-icon-large {
+    width: 38px;
+    height: 38px;
+  }
+
+  .bot-roster-button strong {
+    font-size: 11px;
+  }
+
+  .bot-roster-button small {
+    font-size: 10px;
+    line-height: 1.25;
   }
 
   .music-track-grid {
-    grid-template-columns: 1fr;
-    max-height: 56vh;
+    flex: 1 1 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 8px;
+    max-height: none;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .music-dialog {
+    height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  .music-dialog .admin-panel {
+    height: 100%;
+  }
+
+  .music-dialog .dialog-close-button {
+    display: none;
+  }
+
+  .music-intro {
+    flex: 0 0 auto;
+    margin-bottom: 10px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .music-track-card {
+    min-height: 0;
+    gap: 6px;
+    overflow: hidden;
+    padding: 8px;
+  }
+
+  .music-track-meta {
+    align-items: flex-start;
+    gap: 7px;
+  }
+
+  .music-eq {
+    width: 18px;
+    height: 18px;
+  }
+
+  .music-track-title strong {
+    font-size: 11px;
+  }
+
+  .music-track-title small,
+  .music-track-inspiration {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .music-track-inspiration {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .music-track-actions {
+    gap: 6px;
+  }
+
+  .music-track-actions .command-button {
+    padding: 8px 6px;
+    font-size: 10px;
   }
 
   .bot-detail-panel {
     border-left: 0;
     border-top: 1px solid rgba(148, 163, 184, 0.18);
     padding-left: 0;
-    padding-top: 14px;
+    padding-top: 12px;
+  }
+
+  .bot-detail-title h4 {
+    font-size: 18px;
+  }
+
+  .bot-detail-title p,
+  .bot-summary,
+  .bot-quirk,
+  .bot-persona {
+    font-size: 12px;
+  }
+
+  .bot-summary {
+    margin-top: 10px;
+  }
+
+  .bot-strengths,
+  .trait-grid,
+  .bot-quirk {
+    margin-top: 10px;
   }
 
   .trait-grid {

@@ -371,10 +371,20 @@ export function GameShell() {
               <div className="admin-panel">
                 <div className="admin-panel-header">
                   <h3 id="bot-lab-title">Bot Lab</h3>
-                  <span>Roster setup</span>
+                  <div className="admin-panel-header-actions">
+                    <span>Roster setup</span>
+                    <button
+                      aria-label="Close Bot Lab"
+                      className="dialog-icon-button"
+                      onClick={() => setIsBotLabOpen(false)}
+                      type="button"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
 
-                <div className="bot-lab-grid">
+                <div className="bot-lab-grid dialog-scroll-region">
                   <section className="bot-setup-panel" aria-label="Bot slot selection">
                     <div className="bot-slot-grid">
                       {BOT_SLOTS.map((slot) => {
