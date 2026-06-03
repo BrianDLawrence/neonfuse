@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import type { AudioDirector, AudioEventName, MusicIntensity } from "@/audio";
-import type { GameEvents, TouchInputState } from "../createGame";
+import type { GameEvents, TouchControlsLayoutState, TouchInputState } from "../createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
 import {
   ARENA_COLS,
@@ -480,8 +480,16 @@ export class ArenaScene extends Phaser.Scene {
     return computeReservedBands(
       this.scale.width,
       this.scale.height,
-      this.currentMode === "player-vs-bot"
+      {
+        isPlayer: this.currentMode === "player-vs-bot",
+        touchControlsVisible: this.getTouchControlsVisible()
+      }
     );
+  }
+
+  private getTouchControlsVisible() {
+    const layout = this.registry.get("touchControlsLayout") as TouchControlsLayoutState | undefined;
+    return layout?.enabled ?? false;
   }
 
   private redrawBlocks() {

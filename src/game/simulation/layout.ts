@@ -51,7 +51,9 @@ export type ReservedBandsConfig = {
   // Space the HUD chrome / touch controls occupy (must mirror the CSS sizes).
   hudTopPx: number;
   touchBandPx: number;
+  touchTabletBandPx: number;
   touchSidePx: number;
+  touchTabletSidePx: number;
 };
 
 export const DEFAULT_RESERVED_BANDS_CONFIG: ReservedBandsConfig = {
@@ -59,7 +61,14 @@ export const DEFAULT_RESERVED_BANDS_CONFIG: ReservedBandsConfig = {
   landscapeMaxHeight: 520,
   hudTopPx: 120,
   touchBandPx: 176,
-  touchSidePx: 150
+  touchTabletBandPx: 224,
+  touchSidePx: 150,
+  touchTabletSidePx: 210
+};
+
+export type ReservedBandsOptions = {
+  isPlayer: boolean;
+  touchControlsVisible: boolean;
 };
 
 // How much room the HUD + on-screen touch controls need so the camera can keep the
@@ -73,24 +82,30 @@ export const DEFAULT_RESERVED_BANDS_CONFIG: ReservedBandsConfig = {
 export function computeReservedBands(
   viewportWidth: number,
   viewportHeight: number,
-  isPlayer: boolean,
+  { isPlayer, touchControlsVisible }: ReservedBandsOptions,
   config: ReservedBandsConfig = DEFAULT_RESERVED_BANDS_CONFIG
 ): ReservedBands {
   const isPortrait = viewportHeight >= viewportWidth;
 
-  if (isPortrait && viewportWidth <= config.mobileBreakpoint) {
+  if (isPortrait && (viewportWidth <= config.mobileBreakpoint || touchControlsVisible)) {
+    const touchBandPx =
+      viewportWidth <= config.mobileBreakpoint ? config.touchBandPx : config.touchTabletBandPx;
+
     return {
       reservedTop: config.hudTopPx,
-      reservedBottom: isPlayer ? config.touchBandPx : 0,
+      reservedBottom: isPlayer && touchControlsVisible ? touchBandPx : 0,
       reservedSides: 0
     };
   }
 
-  if (!isPortrait && viewportHeight <= config.landscapeMaxHeight) {
+  if (!isPortrait && (viewportHeight <= config.landscapeMaxHeight || touchControlsVisible)) {
+    const touchSidePx =
+      viewportHeight <= config.landscapeMaxHeight ? config.touchSidePx : config.touchTabletSidePx;
+
     return {
       reservedTop: 0,
       reservedBottom: 0,
-      reservedSides: isPlayer ? config.touchSidePx * 2 : 0
+      reservedSides: isPlayer && touchControlsVisible ? touchSidePx * 2 : 0
     };
   }
 

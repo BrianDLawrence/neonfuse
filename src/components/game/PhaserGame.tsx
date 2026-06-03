@@ -3,7 +3,12 @@
 import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
 import type { MusicTrack } from "@/audio";
-import type { BotHudState, RoundCompletePayload, TouchInputState } from "@/game/createGame";
+import type {
+  BotHudState,
+  RoundCompletePayload,
+  TouchControlsLayoutState,
+  TouchInputState
+} from "@/game/createGame";
 import type { GameMode } from "@/game/modes";
 import type { Direction } from "@/game/simulation/arena";
 import type { BotSelection } from "@/game/simulation/bots";
@@ -35,6 +40,7 @@ type PhaserGameProps = {
   };
   botSelection: BotSelection;
   powerupDropRates: PowerupDropRates;
+  touchControlsEnabled?: boolean;
   onRoundStatusChange?: (status: string) => void;
   onLoadoutChange?: (loadout: Loadout) => void;
   onBotHudChange?: (bots: BotHudState[]) => void;
@@ -47,6 +53,7 @@ export function PhaserGame({
   modeCommand,
   botSelection,
   powerupDropRates,
+  touchControlsEnabled = false,
   onRoundStatusChange,
   onLoadoutChange,
   onBotHudChange,
@@ -65,10 +72,12 @@ export function PhaserGame({
   const registerTouchControlsRef = useRef(onRegisterTouchControls);
   const powerupDropRatesRef = useRef(powerupDropRates);
   const botSelectionRef = useRef(botSelection);
+  const touchControlsEnabledRef = useRef(touchControlsEnabled);
 
   useEffect(() => {
     botSelectionRef.current = botSelection;
     powerupDropRatesRef.current = powerupDropRates;
+    touchControlsEnabledRef.current = touchControlsEnabled;
     roundStatusChangeRef.current = onRoundStatusChange;
     loadoutChangeRef.current = onLoadoutChange;
     botHudChangeRef.current = onBotHudChange;
@@ -83,7 +92,8 @@ export function PhaserGame({
     onRoundComplete,
     onRegisterTouchControls,
     onRoundStatusChange,
-    powerupDropRates
+    powerupDropRates,
+    touchControlsEnabled
   ]);
 
   useEffect(() => {
@@ -108,6 +118,7 @@ export function PhaserGame({
       const game = createGame({
         parent: hostRef.current,
         initialMode: initialModeRef.current,
+        touchControlsEnabled: touchControlsEnabledRef.current,
         events: {
           onRoundStatusChange: (status) => roundStatusChangeRef.current?.(status),
           onLoadoutChange: (loadout) => loadoutChangeRef.current?.(loadout),
@@ -173,6 +184,27 @@ export function PhaserGame({
       gameRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const game = gameRef.current;
+    const host = hostRef.current;
+
+    if (!game || !host) {
+      return;
+    }
+
+    const layout = game.registry.get("touchControlsLayout") as TouchControlsLayoutState | undefined;
+    if (layout) {
+      layout.enabled = touchControlsEnabled;
+    } else {
+      game.registry.set("touchControlsLayout", {
+        enabled: touchControlsEnabled
+      } satisfies TouchControlsLayoutState);
+    }
+
+    const visibleHeight = window.visualViewport?.height ?? window.innerHeight;
+    game.scale.resize(host.clientWidth, visibleHeight);
+  }, [touchControlsEnabled]);
 
   // Keep the layout + Phaser canvas sized to the VISIBLE viewport. iOS Safari's
   // 100vh includes the area behind the dynamic toolbars and does not fire a

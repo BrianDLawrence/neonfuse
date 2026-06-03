@@ -83,6 +83,26 @@ function readOrCreateVisitorId() {
   }
 }
 
+function useTouchControlsEnabled() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.("(hover: none) and (pointer: coarse)");
+
+    if (!mediaQuery) {
+      return;
+    }
+
+    const syncTouchControls = () => setEnabled(mediaQuery.matches);
+    syncTouchControls();
+
+    mediaQuery.addEventListener("change", syncTouchControls);
+    return () => mediaQuery.removeEventListener("change", syncTouchControls);
+  }, []);
+
+  return enabled;
+}
+
 export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
@@ -115,6 +135,7 @@ export function GameShell() {
   const selectedTrackRef = useRef(selectedTrack);
   const visitorIdRef = useRef<string | null>(null);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
+  const touchControlsEnabled = useTouchControlsEnabled();
 
   useEffect(() => {
     visitorIdRef.current = visitorId;
@@ -383,12 +404,13 @@ export function GameShell() {
   }, []);
 
   return (
-    <main className="app-frame">
+    <main className="app-frame" data-touch-controls={touchControlsEnabled ? "true" : "false"}>
       <section className="game-stage" aria-label="Neon Fuse game prototype">
         <PhaserGame
           botSelection={botSelection}
           modeCommand={modeCommand}
           powerupDropRates={powerupDropRates}
+          touchControlsEnabled={touchControlsEnabled}
           onRoundStatusChange={setRoundStatus}
           onLoadoutChange={handleLoadoutChange}
           onBotHudChange={setBotHud}
