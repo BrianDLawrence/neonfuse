@@ -1,8 +1,11 @@
 import { z } from "zod";
 
+export const matchWinnerSchema = z.enum(["player", "bot", "bot-a", "bot-b", "draw"]);
+
 export const matchResultSchema = z.object({
+  visitorId: z.string().uuid(),
   mode: z.enum(["player-vs-bot", "bot-skirmish"]).default("player-vs-bot"),
-  winner: z.enum(["player", "bot", "bot-a", "bot-b", "draw"]).default("draw"),
+  winner: matchWinnerSchema.default("draw"),
   durationMs: z.number().int().min(0).max(1000 * 60 * 60).default(0),
   blocksCleared: z.number().int().min(0).max(500).default(0)
 }).superRefine((match, context) => {
