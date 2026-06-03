@@ -7,7 +7,10 @@ const BOARD_H = 528;
 // Assert the full board (all rows/cols) fits inside the play area left after the
 // reserved bands are removed — i.e. nothing is clipped at the bottom/sides.
 function expectBoardFullyVisible(viewportW: number, viewportH: number, isPlayer: boolean) {
-  const bands = computeReservedBands(viewportW, viewportH, isPlayer);
+  const bands = computeReservedBands(viewportW, viewportH, {
+    isPlayer,
+    touchControlsVisible: true
+  });
   const fit = computeBoardFit(viewportW, viewportH, BOARD_W, BOARD_H, {
     reservedWidth: bands.reservedSides,
     reservedHeight: bands.reservedTop + bands.reservedBottom
@@ -85,7 +88,12 @@ describe("computeBoardFit", () => {
 
 describe("computeReservedBands", () => {
   it("reserves a top HUD band + bottom D-pad band on a portrait phone (playing)", () => {
-    expect(computeReservedBands(390, 640, true)).toEqual({
+    expect(
+      computeReservedBands(390, 640, {
+        isPlayer: true,
+        touchControlsVisible: true
+      })
+    ).toEqual({
       reservedTop: 120,
       reservedBottom: 176,
       reservedSides: 0
@@ -93,7 +101,12 @@ describe("computeReservedBands", () => {
   });
 
   it("reserves only the top HUD band in portrait when watching (bot-skirmish)", () => {
-    expect(computeReservedBands(390, 640, false)).toEqual({
+    expect(
+      computeReservedBands(390, 640, {
+        isPlayer: false,
+        touchControlsVisible: true
+      })
+    ).toEqual({
       reservedTop: 120,
       reservedBottom: 0,
       reservedSides: 0
@@ -101,15 +114,90 @@ describe("computeReservedBands", () => {
   });
 
   it("reserves side bands on a landscape phone (playing)", () => {
-    expect(computeReservedBands(844, 340, true)).toEqual({
+    expect(
+      computeReservedBands(844, 340, {
+        isPlayer: true,
+        touchControlsVisible: true
+      })
+    ).toEqual({
       reservedTop: 0,
       reservedBottom: 0,
       reservedSides: 300
     });
   });
 
-  it("reserves nothing on desktop", () => {
-    expect(computeReservedBands(1280, 800, true)).toEqual({
+  it("reserves a tablet bottom band on an iPad portrait viewport (playing)", () => {
+    expect(
+      computeReservedBands(834, 1112, {
+        isPlayer: true,
+        touchControlsVisible: true
+      })
+    ).toEqual({
+      reservedTop: 120,
+      reservedBottom: 224,
+      reservedSides: 0
+    });
+  });
+
+  it("reserves tablet side bands on an iPad landscape viewport (playing)", () => {
+    expect(
+      computeReservedBands(1112, 834, {
+        isPlayer: true,
+        touchControlsVisible: true
+      })
+    ).toEqual({
+      reservedTop: 0,
+      reservedBottom: 0,
+      reservedSides: 420
+    });
+  });
+
+  it("reserves a tablet bottom band on an iPad Pro portrait viewport (playing)", () => {
+    expect(
+      computeReservedBands(1024, 1366, {
+        isPlayer: true,
+        touchControlsVisible: true
+      })
+    ).toEqual({
+      reservedTop: 120,
+      reservedBottom: 224,
+      reservedSides: 0
+    });
+  });
+
+  it("reserves tablet side bands on an iPad Pro landscape viewport (playing)", () => {
+    expect(
+      computeReservedBands(1366, 1024, {
+        isPlayer: true,
+        touchControlsVisible: true
+      })
+    ).toEqual({
+      reservedTop: 0,
+      reservedBottom: 0,
+      reservedSides: 420
+    });
+  });
+
+  it("reserves nothing on desktop when touch controls are not visible", () => {
+    expect(
+      computeReservedBands(1280, 800, {
+        isPlayer: true,
+        touchControlsVisible: false
+      })
+    ).toEqual({
+      reservedTop: 0,
+      reservedBottom: 0,
+      reservedSides: 0
+    });
+  });
+
+  it("does not reserve player controls in bot-skirmish on touch tablets", () => {
+    expect(
+      computeReservedBands(1112, 834, {
+        isPlayer: false,
+        touchControlsVisible: true
+      })
+    ).toEqual({
       reservedTop: 0,
       reservedBottom: 0,
       reservedSides: 0
@@ -133,5 +221,25 @@ describe("board fits at reduced iOS visible viewports", () => {
   it("landscape 844x340 — full board height visible, not cut at the bottom", () => {
     const { bands } = expectBoardFullyVisible(844, 340, true);
     expect(bands.reservedSides).toBe(300);
+  });
+
+  it("iPad portrait 834x1112 — full board visible above tablet controls", () => {
+    const { bands } = expectBoardFullyVisible(834, 1112, true);
+    expect(bands.reservedBottom).toBe(224);
+  });
+
+  it("iPad landscape 1112x834 — full board visible between tablet controls", () => {
+    const { bands } = expectBoardFullyVisible(1112, 834, true);
+    expect(bands.reservedSides).toBe(420);
+  });
+
+  it("iPad Pro portrait 1024x1366 — full board visible above tablet controls", () => {
+    const { bands } = expectBoardFullyVisible(1024, 1366, true);
+    expect(bands.reservedBottom).toBe(224);
+  });
+
+  it("iPad Pro landscape 1366x1024 — full board visible between tablet controls", () => {
+    const { bands } = expectBoardFullyVisible(1366, 1024, true);
+    expect(bands.reservedSides).toBe(420);
   });
 });

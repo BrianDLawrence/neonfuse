@@ -13,6 +13,10 @@ export type TouchInputState = {
   dir: Direction | null;
 };
 
+export type TouchControlsLayoutState = {
+  enabled: boolean;
+};
+
 export type BotHudState = {
   id: BotId;
   name: string;
@@ -42,10 +46,16 @@ export type GameEvents = {
 type CreateGameOptions = {
   parent: HTMLElement;
   initialMode?: GameMode;
+  touchControlsEnabled?: boolean;
   events?: GameEvents;
 };
 
-export function createGame({ parent, initialMode = DEFAULT_GAME_MODE, events }: CreateGameOptions) {
+export function createGame({
+  parent,
+  initialMode = DEFAULT_GAME_MODE,
+  touchControlsEnabled = false,
+  events
+}: CreateGameOptions) {
   const audio = new AudioDirector();
   const game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -72,6 +82,9 @@ export function createGame({ parent, initialMode = DEFAULT_GAME_MODE, events }: 
   // Shared, mutable-in-place touch input state. React writes `.dir` on the same
   // object; ArenaScene polls it each frame (mirrors how it polls the keyboard).
   game.registry.set("touchInput", { dir: null } satisfies TouchInputState);
+  game.registry.set("touchControlsLayout", {
+    enabled: touchControlsEnabled
+  } satisfies TouchControlsLayoutState);
 
   return game;
 }
