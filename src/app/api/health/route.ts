@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
-import { getMongoDb } from "@/lib/mongodb";
+import { tryGetMongoDb } from "@/lib/mongodb";
 
 export async function GET() {
-  if (!process.env.MONGODB_URI) {
-    return NextResponse.json({
-      ok: true,
-      mongo: "not-configured"
-    });
+  const { db, error, mongo } = await tryGetMongoDb();
+
+  if (!db) {
+    return NextResponse.json(
+      {
+        ok: mongo === "not-configured",
+        mongo,
+        error
+      },
+      { status: mongo === "not-configured" ? 200 : 503 }
+    );
   }
 
-  const db = await getMongoDb();
   await db.command({ ping: 1 });
 
-  return NextResponse.json({
-    ok: true,
-    mongo: "connected"
-  });
+  return NextResponse.json({ ok: true, mongo });
 }

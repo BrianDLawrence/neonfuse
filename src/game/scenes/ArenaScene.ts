@@ -670,26 +670,12 @@ export class ArenaScene extends Phaser.Scene {
       this.emitAudio("wave.completed");
     }
 
-    void this.recordMatch(winner);
-  }
-
-  private async recordMatch(winner: RoundWinner) {
-    try {
-      await fetch("/api/matches", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          mode: this.currentMode,
-          winner,
-          durationMs: Math.round(this.time.now - this.matchStartedAt),
-          blocksCleared: this.blocksCleared
-        })
-      });
-    } catch {
-      // Match history should never interrupt active play.
-    }
+    this.shellEvents?.onRoundComplete?.({
+      mode: this.currentMode,
+      winner,
+      durationMs: Math.round(this.time.now - this.matchStartedAt),
+      blocksCleared: this.blocksCleared
+    });
   }
 
   private spawnActor(id: ActorId, tile: GridPoint, profile?: BotProfile) {

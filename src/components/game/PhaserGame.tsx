@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type * as Phaser from "phaser";
 import type { MusicTrack } from "@/audio";
-import type { BotHudState, TouchInputState } from "@/game/createGame";
+import type { BotHudState, RoundCompletePayload, TouchInputState } from "@/game/createGame";
 import type { GameMode } from "@/game/modes";
 import type { Direction } from "@/game/simulation/arena";
 import type { BotSelection } from "@/game/simulation/bots";
@@ -39,6 +39,7 @@ type PhaserGameProps = {
   onLoadoutChange?: (loadout: Loadout) => void;
   onBotHudChange?: (bots: BotHudState[]) => void;
   onMatchStatsChange?: (stats: { wins: number; losses: number }) => void;
+  onRoundComplete?: (payload: RoundCompletePayload) => void;
   onRegisterTouchControls?: (api: TouchControlsApi | null) => void;
 };
 
@@ -50,6 +51,7 @@ export function PhaserGame({
   onLoadoutChange,
   onBotHudChange,
   onMatchStatsChange,
+  onRoundComplete,
   onRegisterTouchControls
 }: PhaserGameProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -59,6 +61,7 @@ export function PhaserGame({
   const loadoutChangeRef = useRef(onLoadoutChange);
   const botHudChangeRef = useRef(onBotHudChange);
   const matchStatsChangeRef = useRef(onMatchStatsChange);
+  const roundCompleteRef = useRef(onRoundComplete);
   const registerTouchControlsRef = useRef(onRegisterTouchControls);
   const powerupDropRatesRef = useRef(powerupDropRates);
   const botSelectionRef = useRef(botSelection);
@@ -70,12 +73,14 @@ export function PhaserGame({
     loadoutChangeRef.current = onLoadoutChange;
     botHudChangeRef.current = onBotHudChange;
     matchStatsChangeRef.current = onMatchStatsChange;
+    roundCompleteRef.current = onRoundComplete;
     registerTouchControlsRef.current = onRegisterTouchControls;
   }, [
     botSelection,
     onBotHudChange,
     onLoadoutChange,
     onMatchStatsChange,
+    onRoundComplete,
     onRegisterTouchControls,
     onRoundStatusChange,
     powerupDropRates
@@ -108,6 +113,7 @@ export function PhaserGame({
           onLoadoutChange: (loadout) => loadoutChangeRef.current?.(loadout),
           onBotHudChange: (bots) => botHudChangeRef.current?.(bots),
           onMatchStatsChange: (stats) => matchStatsChangeRef.current?.(stats),
+          onRoundComplete: (payload) => roundCompleteRef.current?.(payload),
           getPowerupDropRates: () => powerupDropRatesRef.current,
           getBotSelection: () => botSelectionRef.current
         }

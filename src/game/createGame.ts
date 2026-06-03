@@ -7,6 +7,7 @@ import { DEFAULT_GAME_MODE, type GameMode } from "./modes";
 import type { Direction } from "./simulation/arena";
 import type { BotId, BotSelection } from "./simulation/bots";
 import type { PowerupDropRates } from "./simulation/powerups";
+import type { ScoreWinner } from "./simulation/scoring";
 
 export type TouchInputState = {
   dir: Direction | null;
@@ -21,11 +22,19 @@ export type BotHudState = {
   speed: number;
 };
 
+export type RoundCompletePayload = {
+  mode: GameMode;
+  winner: ScoreWinner;
+  durationMs: number;
+  blocksCleared: number;
+};
+
 export type GameEvents = {
   onRoundStatusChange?: (status: string) => void;
   onLoadoutChange?: (loadout: { bombs: number; blast: number; speed: number }) => void;
   onBotHudChange?: (bots: BotHudState[]) => void;
   onMatchStatsChange?: (stats: { wins: number; losses: number }) => void;
+  onRoundComplete?: (payload: RoundCompletePayload) => void;
   getPowerupDropRates?: () => PowerupDropRates;
   getBotSelection?: () => BotSelection;
 };

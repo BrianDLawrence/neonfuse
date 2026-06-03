@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
+import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
 import type { MusicTrack } from "@/audio/types";
-import type { BotHudState } from "@/game/createGame";
+import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
+import { calculateRoundScore } from "@/game/simulation/scoring";
+import type { HighScoreEntry } from "@/lib/leaderboard";
 import type { Direction } from "@/game/simulation/arena";
 import {
   BOT_PROFILE_ORDER,
@@ -54,6 +57,32 @@ const AUDIO_CONTROLS: Array<{
   { type: "sfx", label: "SFX", iconClass: "stat-icon-sfx" }
 ];
 
+const VISITOR_STORAGE_KEY = "neon-fuse:visitor-id";
+
+function createVisitorId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+
+  const tail = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`.slice(0, 12).padEnd(12, "0");
+  return `00000000-0000-4000-8000-${tail}`;
+}
+
+function readOrCreateVisitorId() {
+  try {
+    const stored = window.localStorage.getItem(VISITOR_STORAGE_KEY);
+    if (stored) {
+      return stored;
+    }
+
+    const visitorId = createVisitorId();
+    window.localStorage.setItem(VISITOR_STORAGE_KEY, visitorId);
+    return visitorId;
+  } catch {
+    return createVisitorId();
+  }
+}
+
 export function GameShell() {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
@@ -72,6 +101,9 @@ export function GameShell() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isBotLabOpen, setIsBotLabOpen] = useState(false);
   const [isMusicOpen, setIsMusicOpen] = useState(false);
+  const [isHighScoresOpen, setIsHighScoresOpen] = useState(false);
+  const [visitorId, setVisitorId] = useState<string | null>(null);
+  const [scoreResult, setScoreResult] = useState<RoundScoreResult | null>(null);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [musicVolume, setMusicVolume] = useState(8);
   const [sfxVolume, setSfxVolume] = useState(9);
@@ -81,7 +113,12 @@ export function GameShell() {
   const musicVolumeRef = useRef(musicVolume);
   const sfxVolumeRef = useRef(sfxVolume);
   const selectedTrackRef = useRef(selectedTrack);
+  const visitorIdRef = useRef<string | null>(null);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
+
+  useEffect(() => {
+    visitorIdRef.current = visitorId;
+  }, [visitorId]);
 
   useEffect(() => {
     musicEnabledRef.current = musicEnabled;
@@ -115,7 +152,7 @@ export function GameShell() {
   }, []);
 
   useEffect(() => {
-    if (!isAdminOpen && !isBotLabOpen && !isMusicOpen) {
+    if (!isAdminOpen && !isBotLabOpen && !isHighScoresOpen && !isMusicOpen) {
       return undefined;
     }
 
@@ -124,12 +161,42 @@ export function GameShell() {
         setIsAdminOpen(false);
         setIsBotLabOpen(false);
         setIsMusicOpen(false);
+        setIsHighScoresOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdminOpen, isBotLabOpen, isMusicOpen]);
+  }, [isAdminOpen, isBotLabOpen, isHighScoresOpen, isMusicOpen]);
+
+  useEffect(() => {
+    const nextVisitorId = readOrCreateVisitorId();
+    setVisitorId(nextVisitorId);
+    visitorIdRef.current = nextVisitorId;
+
+    async function registerVisitor() {
+      try {
+        const response = await fetch("/api/visitors", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ visitorId: nextVisitorId })
+        });
+        const payload = (await response.json()) as { visitorId?: string };
+
+        if (payload.visitorId && payload.visitorId !== nextVisitorId) {
+          setVisitorId(payload.visitorId);
+          visitorIdRef.current = payload.visitorId;
+          window.localStorage.setItem(VISITOR_STORAGE_KEY, payload.visitorId);
+        }
+      } catch {
+        // Anonymous tracking should never block local play.
+      }
+    }
+
+    void registerVisitor();
+  }, []);
 
   const handleLoadoutChange = useCallback(
     ({
@@ -172,6 +239,10 @@ export function GameShell() {
     event.preventDefault();
     setIsMusicOpen(true);
   }, []);
+  const handleHighScoresLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    setIsHighScoresOpen(true);
+  }, []);
   const handleBotSelectionChange = useCallback((slot: BotId, profileId: BotProfileId) => {
     setBotSelection((currentSelection) => ({
       ...currentSelection,
@@ -185,6 +256,74 @@ export function GameShell() {
       sequence: currentCommand.sequence + 1
     }));
     setRoundStatus("Warmup");
+  }, []);
+  const handleRoundComplete = useCallback((payload: RoundCompletePayload) => {
+    const nextVisitorId = visitorIdRef.current ?? readOrCreateVisitorId();
+    visitorIdRef.current = nextVisitorId;
+    setVisitorId(nextVisitorId);
+
+    const localScore = calculateRoundScore(payload);
+    setScoreResult({
+      ...payload,
+      matchId: null,
+      score: localScore,
+      stored: false,
+      qualifiesForLeaderboard: true,
+      topScores: [],
+      status: "saving"
+    });
+    setIsHighScoresOpen(true);
+
+    async function saveMatch() {
+      try {
+        const response = await fetch("/api/matches", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ...payload,
+            visitorId: nextVisitorId
+          })
+        });
+        const result = (await response.json()) as {
+          ok?: boolean;
+          stored?: boolean;
+          matchId?: string;
+          score?: number;
+          qualifiesForLeaderboard?: boolean;
+          topScores?: HighScoreEntry[];
+          error?: string;
+        };
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error ?? "Unable to save match");
+        }
+
+        setScoreResult({
+          ...payload,
+          matchId: result.matchId ?? null,
+          score: result.score ?? localScore,
+          stored: result.stored ?? false,
+          qualifiesForLeaderboard: result.qualifiesForLeaderboard ?? true,
+          topScores: result.topScores ?? [],
+          status: result.stored === false ? "offline" : "ready"
+        });
+      } catch (error) {
+        setScoreResult({
+          ...payload,
+          matchId: null,
+          score: localScore,
+          stored: false,
+          qualifiesForLeaderboard: false,
+          topScores: [],
+          status: "error",
+          error: error instanceof Error ? error.message : "Unable to save match"
+        });
+      }
+    }
+
+    void saveMatch();
   }, []);
   const handleRegisterTouchControls = useCallback((api: TouchControlsApi | null) => {
     touchApiRef.current = api;
@@ -254,6 +393,7 @@ export function GameShell() {
           onLoadoutChange={handleLoadoutChange}
           onBotHudChange={setBotHud}
           onMatchStatsChange={handleMatchStatsChange}
+          onRoundComplete={handleRoundComplete}
           onRegisterTouchControls={handleRegisterTouchControls}
         />
       </section>
@@ -348,6 +488,9 @@ export function GameShell() {
             </button>
             <a className="admin-link" href="#music" onClick={handleMusicLinkClick}>
               Tracks
+            </a>
+            <a className="admin-link" href="#high-scores" onClick={handleHighScoresLinkClick}>
+              High Scores
             </a>
             <a className="admin-link" href="#bot-lab" onClick={handleBotLabLinkClick}>
               Bots
@@ -558,6 +701,14 @@ export function GameShell() {
             onPreview={handlePreviewTrack}
             onStopPreview={handleStopPreviewTrack}
             onClose={() => setIsMusicOpen(false)}
+          />
+        ) : null}
+
+        {isHighScoresOpen ? (
+          <HighScoresScreen
+            visitorId={visitorId}
+            result={scoreResult}
+            onClose={() => setIsHighScoresOpen(false)}
           />
         ) : null}
 
