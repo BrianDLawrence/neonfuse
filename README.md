@@ -36,6 +36,9 @@ simulation state into sprites, camera movement, particles, and effects.
 
 React owns text-heavy UI. Phaser owns the playfield.
 
+- [Capability map](docs/capability-map.html) — interactive view of implemented functionality, planned systems, and current code-review findings.
+- [Architecture guide](docs/ARCHITECTURE.md) — ownership boundaries, data flow, testing, security, and AI constraints.
+
 ## License
 
 MIT License. Copyright (c) 2026 Spero Autem LLC.
