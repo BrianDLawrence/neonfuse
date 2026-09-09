@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="An interactive map of implemented and planned Neon Fuse capabilities."
+    />
+    <title>Neon Fuse Capability Map</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #101217;
+        --background-deep: #07080d;
+        --panel: rgba(17, 20, 30, 0.88);
+        --panel-strong: rgba(8, 10, 18, 0.96);
+        --line: rgba(34, 211, 238, 0.38);
+        --line-strong: rgba(34, 211, 238, 0.82);
+        --cyan: #22d3ee;
+        --pink: #f43f5e;
+        --green: #a3e635;
+        --amber: #f59e0b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --danger: #fb7185;
+        --purple: #8b5cf6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--background-deep);
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background: var(--background-deep);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+      }
+
+      .capability-page {
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      .capability-header,
+      .capability-main,
+      .capability-footer {
+        width: min(1180px, calc(100% - 32px));
+        margin-inline: auto;
+      }
+
+      .capability-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 34px 0 22px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand-block {
+        min-width: 0;
+      }
+
+      .brand-kicker,
+      .section-kicker,
+      .lane-heading,
+      .detail-status,
+      .review-label,
+      .flow-node span {
+        margin: 0;
+        color: var(--cyan);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 2.65rem;
+        line-height: 0.95;
+        text-transform: uppercase;
+        text-shadow: 0 0 22px rgba(34, 211, 238, 0.52);
+      }
+
+      .brand-block > p:last-child {
+        max-width: 650px;
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 0.98rem;
+        line-height: 1.55;
+      }
+
+      .status-summary {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(92px, 1fr));
+        gap: 8px;
+        flex: 0 0 auto;
+      }
+
+      .status-summary div {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 10px 12px;
+      }
+
+      .status-summary span,
+      .status-summary strong {
+        display: block;
+      }
+
+      .status-summary span {
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .status-summary strong {
+        margin-top: 3px;
+        color: var(--text);
+        font-size: 1.4rem;
+      }
+
+      .status-summary .implemented-count strong {
+        color: var(--green);
+      }
+
+      .status-summary .planned-count strong {
+        color: var(--pink);
+      }
+
+      .capability-main {
+        padding: 28px 0 40px;
+      }
+
+      .core-loop {
+        padding-bottom: 30px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 15px;
+      }
+
+      .section-heading h2 {
+        margin: 4px 0 0;
+        font-size: 1.3rem;
+        text-transform: uppercase;
+      }
+
+      .section-note {
+        max-width: 470px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
+        text-align: right;
+      }
+
+      .flow-track {
+        display: grid;
+        grid-template-columns: repeat(9, minmax(0, auto));
+        align-items: stretch;
+        gap: 7px;
+      }
+
+      .flow-node {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+      }
+
+      .flow-node strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.88rem;
+        line-height: 1.25;
+      }
+
+      .flow-arrow {
+        display: grid;
+        place-items: center;
+        color: var(--cyan);
+        font-size: 1.1rem;
+      }
+
+      .flow-node.server-boundary {
+        border-style: dashed;
+        border-color: rgba(244, 63, 94, 0.7);
+      }
+
+      .flow-node.server-boundary span {
+        color: var(--pink);
+      }
+
+      .map-section {
+        padding-top: 30px;
+      }
+
+      .map-toolbar {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .map-toolbar h2 {
+        margin: 4px 0 0;
+        font-size: 1.3rem;
+        text-transform: uppercase;
+      }
+
+      .filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .filter-button {
+        min-height: 38px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 0.75rem;
+        font-weight: 800;
+        padding: 8px 12px;
+        text-transform: uppercase;
+      }
+
+      .filter-button[aria-pressed="true"] {
+        border-color: var(--green);
+        background: rgba(163, 230, 53, 0.1);
+        color: var(--text);
+        box-shadow: 0 0 16px rgba(163, 230, 53, 0.12);
+      }
+
+      .map-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.75fr);
+        align-items: start;
+        gap: 22px;
+      }
+
+      .capability-lanes {
+        display: grid;
+        gap: 20px;
+      }
+
+      .capability-lane {
+        min-width: 0;
+      }
+
+      .lane-heading {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 9px;
+        color: var(--muted);
+      }
+
+      .lane-heading::before {
+        width: 16px;
+        height: 2px;
+        background: var(--cyan);
+        content: "";
+        box-shadow: 0 0 9px rgba(34, 211, 238, 0.5);
+      }
+
+      .capability-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 9px;
+      }
+
+      .capability-node {
+        position: relative;
+        min-height: 98px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 12px;
+        text-align: left;
+      }
+
+      .capability-node::after {
+        position: absolute;
+        right: 9px;
+        top: 9px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 10px rgba(163, 230, 53, 0.55);
+        content: "";
+      }
+
+      .capability-node[data-status="planned"] {
+        border-style: dashed;
+        border-color: rgba(244, 63, 94, 0.58);
+        background: rgba(43, 16, 32, 0.24);
+      }
+
+      .capability-node[data-status="planned"]::after {
+        border: 1px solid var(--pink);
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .capability-node[aria-pressed="true"] {
+        border-color: var(--cyan);
+        box-shadow:
+          0 0 18px rgba(34, 211, 238, 0.16),
+          inset 0 0 18px rgba(34, 211, 238, 0.07);
+      }
+
+      .capability-node strong,
+      .capability-node span {
+        display: block;
+        padding-right: 12px;
+      }
+
+      .capability-node strong {
+        font-size: 0.86rem;
+        line-height: 1.25;
+        text-transform: uppercase;
+      }
+
+      .capability-node span {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 0.73rem;
+        line-height: 1.35;
+      }
+
+      .capability-node[hidden],
+      .capability-lane[hidden] {
+        display: none;
+      }
+
+      .bot-icons {
+        display: flex;
+        gap: 4px;
+        margin-top: 9px;
+      }
+
+      .bot-face {
+        position: relative;
+        width: 22px;
+        height: 22px;
+        border: 1px solid currentColor;
+        border-radius: 6px;
+      }
+
+      .bot-face::before,
+      .bot-face::after {
+        position: absolute;
+        top: 7px;
+        width: 4px;
+        height: 4px;
+        background: var(--background-deep);
+        content: "";
+      }
+
+      .bot-face::before {
+        left: 4px;
+      }
+
+      .bot-face::after {
+        right: 4px;
+      }
+
+      .bot-fuse {
+        background: var(--pink);
+        color: var(--amber);
+      }
+
+      .bot-shade {
+        background: var(--purple);
+        color: var(--cyan);
+      }
+
+      .bot-warden {
+        background: var(--cyan);
+        color: var(--green);
+      }
+
+      .bot-bloom {
+        background: var(--green);
+        color: var(--pink);
+      }
+
+      .detail-panel {
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel-strong);
+        box-shadow:
+          0 20px 64px rgba(0, 0, 0, 0.4),
+          0 0 28px rgba(34, 211, 238, 0.1);
+        padding: 18px;
+      }
+
+      .detail-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .detail-status::before {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 10px rgba(163, 230, 53, 0.55);
+        content: "";
+      }
+
+      .detail-panel[data-status="planned"] .detail-status {
+        color: var(--pink);
+      }
+
+      .detail-panel[data-status="planned"] .detail-status::before {
+        border: 1px solid var(--pink);
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .detail-panel h3 {
+        margin: 8px 0 10px;
+        font-size: 1.3rem;
+        text-transform: uppercase;
+      }
+
+      .detail-summary {
+        margin-bottom: 18px;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+
+      .detail-block {
+        padding: 13px 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .detail-block strong,
+      .detail-block span {
+        display: block;
+      }
+
+      .detail-block strong {
+        color: var(--cyan);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+      }
+
+      .detail-block span {
+        margin-top: 5px;
+        color: var(--text);
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+
+      .detail-block code {
+        color: var(--amber);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .review-section {
+        margin-top: 34px;
+        padding-top: 28px;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+      }
+
+      .review-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .review-column {
+        min-width: 0;
+      }
+
+      .review-column h3 {
+        margin: 4px 0 11px;
+        font-size: 1rem;
+        text-transform: uppercase;
+      }
+
+      .review-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .review-list li {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+        padding: 0 0 10px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .review-index {
+        color: var(--green);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-weight: 800;
+      }
+
+      .review-column.next .review-index {
+        color: var(--pink);
+      }
+
+      .review-list strong {
+        color: var(--text);
+      }
+
+      .capability-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 18px 0 26px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .capability-footer p {
+        margin: 0;
+      }
+
+      @media (max-width: 900px) {
+        .capability-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .flow-track {
+          grid-template-columns: 1fr;
+        }
+
+        .flow-arrow {
+          transform: rotate(90deg);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .capability-header,
+        .section-heading,
+        .map-toolbar,
+        .capability-footer {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .capability-header {
+          padding-top: 24px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        .status-summary {
+          width: 100%;
+        }
+
+        .section-note {
+          max-width: none;
+          text-align: left;
+        }
+
+        .map-layout,
+        .review-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-panel {
+          order: -1;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .capability-header,
+        .capability-main,
+        .capability-footer {
+          width: min(100% - 24px, 1180px);
+        }
+
+        .capability-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .filter-group {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .filter-button {
+          padding-inline: 6px;
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .capability-node,
+        .filter-button {
+          transition:
+            border-color 140ms ease,
+            background-color 140ms ease,
+            box-shadow 140ms ease;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="capability-page">
+      <header class="capability-header">
+        <div class="brand-block">
+          <p class="brand-kicker">Neon Fuse / Product + Architecture</p>
+          <h1>Capability Map</h1>
+          <p>
+            A code-reviewed view of the playable product, its supporting systems, and the next
+            bounded steps toward generated bots and competitive play.
+          </p>
+        </div>
+        <div class="status-summary" aria-label="Capability totals">
+          <div class="implemented-count">
+            <span>Implemented</span>
+            <strong>15</strong>
+          </div>
+          <div class="planned-count">
+            <span>Planned</span>
+            <strong>7</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="capability-main">
+        <section class="core-loop" aria-labelledby="core-loop-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Implemented runtime path</p>
+              <h2 id="core-loop-title">From input to durable score</h2>
+            </div>
+            <p class="section-note">
+              Gameplay remains available without MongoDB; persistence degrades to an explicit
+              offline state instead of blocking a round.
+            </p>
+          </div>
+          <div class="flow-track" role="img" aria-label="Input flows through React and Phaser into pure simulation, then validated API routes and MongoDB">
+            <div class="flow-node">
+              <span>Input</span>
+              <strong>Keyboard + touch</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <span>Presentation</span>
+              <strong>React HUD + Phaser</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <span>Rules</span>
+              <strong>Pure simulation</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node server-boundary">
+              <span>Trust boundary</span>
+              <strong>Zod API validation</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <span>Persistence</span>
+              <strong>MongoDB</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="map-section" aria-labelledby="capability-map-title">
+          <div class="map-toolbar">
+            <div>
+              <p class="section-kicker">Select a capability for evidence</p>
+              <h2 id="capability-map-title">Functionality by owner</h2>
+            </div>
+            <div class="filter-group" role="group" aria-label="Filter capabilities by status">
+              <button class="filter-button" type="button" aria-pressed="true" data-filter="all">All</button>
+              <button class="filter-button" type="button" aria-pressed="false" data-filter="implemented">Implemented</button>
+              <button class="filter-button" type="button" aria-pressed="false" data-filter="planned">Planned</button>
+            </div>
+          </div>
+
+          <div class="map-layout">
+            <div class="capability-lanes">
+              <section class="capability-lane" data-lane>
+                <h3 class="lane-heading">Player experience / React</h3>
+                <div class="capability-grid">
+                  <button class="capability-node" type="button" aria-pressed="true" data-capability="match-modes" data-status="implemented">
+                    <strong>Two match modes</strong>
+                    <span>Local player vs bot + spectator bot skirmish.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="bot-lab" data-status="implemented">
+                    <strong>Bot Lab</strong>
+                    <span>Roster selection, personality details, bounded traits.</span>
+                    <span class="bot-icons" aria-hidden="true">
+                      <i class="bot-face bot-fuse"></i><i class="bot-face bot-shade"></i><i class="bot-face bot-warden"></i><i class="bot-face bot-bloom"></i>
+                    </span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="powerups" data-status="implemented">
+                    <strong>Powerups + admin</strong>
+                    <span>Bomb, blast, speed, caps, and tunable drop rates.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="touch" data-status="implemented">
+                    <strong>Responsive controls</strong>
+                    <span>Keyboard, D-pad, bomb/reset actions, fitted arena.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="scores" data-status="implemented">
+                    <strong>High scores</strong>
+                    <span>Round score, qualification, initials, mode tabs.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="music-screen" data-status="implemented">
+                    <strong>Music screen</strong>
+                    <span>Track selection, preview, music/SFX controls.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="coaching" data-status="planned">
+                    <strong>Post-match coaching</strong>
+                    <span>LLM-authored recap and tactical guidance.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="profiles" data-status="planned">
+                    <strong>Persistent profiles</strong>
+                    <span>Player identity, progression, saved preferences.</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="capability-lane" data-lane>
+                <h3 class="lane-heading">Game runtime / Simulation + Phaser</h3>
+                <div class="capability-grid">
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="arena-rules" data-status="implemented">
+                    <strong>Arena rules</strong>
+                    <span>Grid, walkability, blast propagation, danger.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="bot-brain" data-status="implemented">
+                    <strong>Utility bot brain</strong>
+                    <span>Escape, wait, seek, pressure, plant with exits.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="score-rule" data-status="implemented">
+                    <strong>Deterministic scoring</strong>
+                    <span>Mode, winner, blocks, and speed bonuses.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="audio" data-status="implemented">
+                    <strong>Semantic audio engine</strong>
+                    <span>Events, buses, intensity, procedural fallback.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="bridge" data-status="implemented">
+                    <strong>React ↔ Phaser bridge</strong>
+                    <span>Typed callbacks, selectors, touch input state.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="maps" data-status="planned">
+                    <strong>Generated maps</strong>
+                    <span>Validated layouts and challenge metadata.</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="capability-lane" data-lane>
+                <h3 class="lane-heading">Services / Next.js + MongoDB</h3>
+                <div class="capability-grid">
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="matches-api" data-status="implemented">
+                    <strong>Match persistence</strong>
+                    <span>Validated results, server score, visitor stats.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="leaderboard-api" data-status="implemented">
+                    <strong>Leaderboard API</strong>
+                    <span>Read by mode, match-bound initials, indexes.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="music-api" data-status="implemented">
+                    <strong>Custom track API</strong>
+                    <span>Bounded synth definitions stored in MongoDB.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="offline" data-status="implemented">
+                    <strong>Graceful offline mode</strong>
+                    <span>Play continues when Mongo is absent/unavailable.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="authoritative" data-status="planned">
+                    <strong>Authoritative results</strong>
+                    <span>Server-trusted events for competitive scores.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="multiplayer" data-status="planned">
+                    <strong>Realtime multiplayer</strong>
+                    <span>Dedicated authoritative session service.</span>
+                  </button>
+                </div>
+              </section>
+
+              <section class="capability-lane" data-lane>
+                <h3 class="lane-heading">Future intelligence / Server only</h3>
+                <div class="capability-grid">
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="llm-bots" data-status="planned">
+                    <strong>Generated bot profiles</strong>
+                    <span>Structured persona patches within known bounds.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="llm-challenges" data-status="planned">
+                    <strong>Generated challenges</strong>
+                    <span>Flavor and rule IDs, validated before use.</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <aside class="detail-panel" data-status="implemented" aria-live="polite" aria-labelledby="detail-title">
+              <p class="detail-status" id="detail-status">Implemented</p>
+              <h3 id="detail-title">Two match modes</h3>
+              <p class="detail-summary" id="detail-summary">
+                The same arena runtime supports direct local play and a watch-only contest between two selected bot profiles.
+              </p>
+              <div class="detail-block">
+                <strong>Owner</strong>
+                <span id="detail-owner">React setup + Phaser round orchestration</span>
+              </div>
+              <div class="detail-block">
+                <strong>Code evidence</strong>
+                <span id="detail-code"><code>src/game/modes.ts</code> · <code>src/game/scenes/ArenaScene.ts</code></span>
+              </div>
+              <div class="detail-block">
+                <strong>Boundary / next condition</strong>
+                <span id="detail-boundary">Player input is disabled in Bot Skirmish; resetting preserves the active mode.</span>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="review-section" aria-labelledby="review-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Code + design review</p>
+              <h2 id="review-title">What is strong, what should move next</h2>
+            </div>
+            <p class="section-note">
+              The product boundaries are sound; the next gains come from reducing concentration in the two largest orchestration files and hardening trust.
+            </p>
+          </div>
+          <div class="review-grid">
+            <section class="review-column">
+              <p class="review-label">Strong now</p>
+              <h3>Architecture worth preserving</h3>
+              <ol class="review-list">
+                <li><span class="review-index">01</span><span><strong>Pure, deterministic rules.</strong> Arena, blast, danger, bots, powerups, layout, and scoring run without Phaser and carry focused unit tests.</span></li>
+                <li><span class="review-index">02</span><span><strong>Explicit UI/engine bridge.</strong> React and Phaser exchange typed data through <code>GameEvents</code> and registry state.</span></li>
+                <li><span class="review-index">03</span><span><strong>Validated server inputs.</strong> Match, leaderboard, visitor, and music payloads are checked before MongoDB writes.</span></li>
+                <li><span class="review-index">04</span><span><strong>Coherent product language.</strong> HUD, dialogs, bots, audio, scores, and responsive controls share one neon arcade system.</span></li>
+              </ol>
+            </section>
+            <section class="review-column next">
+              <p class="review-label">Next hardening</p>
+              <h3>Review findings to address</h3>
+              <ol class="review-list">
+                <li><span class="review-index">01</span><span><strong>Decompose orchestration.</strong> <code>ArenaScene.ts</code> is 1,019 lines and <code>GameShell.tsx</code> is 888; extract round/bomb actor systems and individual dialogs/hooks.</span></li>
+                <li><span class="review-index">02</span><span><strong>Protect competitive scores.</strong> Schema validation prevents malformed payloads, but the browser still reports winner, duration, and blocks cleared.</span></li>
+                <li><span class="review-index">03</span><span><strong>Add browser regression coverage.</strong> Unit coverage is healthy; the documented load/move/bomb/post flows still need automated end-to-end checks.</span></li>
+                <li><span class="review-index">04</span><span><strong>Remove layout drift risk.</strong> Reserved HUD/control dimensions duplicate CSS values; measure rendered bands and pass them across the existing bridge.</span></li>
+                <li><span class="review-index">05</span><span><strong>Protect public write routes.</strong> Custom music creation is validated but has no authentication or rate limit; gate or disable that endpoint before broad public use.</span></li>
+              </ol>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <footer class="capability-footer">
+        <p>Reviewed against repository code · 16 August 2026</p>
+        <p>Solid = implemented · Dashed = planned</p>
+      </footer>
+    </div>
+
+    <script>
+      const capabilityDetails = {
+        "match-modes": {
+          status: "implemented",
+          title: "Two match modes",
+          summary: "The same arena runtime supports direct local play and a watch-only contest between two selected bot profiles.",
+          owner: "React setup + Phaser round orchestration",
+          code: ["src/game/modes.ts", "src/game/scenes/ArenaScene.ts"],
+          boundary: "Player input is disabled in Bot Skirmish; resetting preserves the active mode."
+        },
+        "bot-lab": {
+          status: "implemented",
+          title: "Bot Lab",
+          summary: "Four selectable personalities expose their play style, strengths, quirks, visual identity, and bounded utility traits.",
+          owner: "React roster UI + pure bot profile data",
+          code: ["src/components/game/GameShell.tsx", "src/game/simulation/bots.ts"],
+          boundary: "Bot actor slots are separate from profile IDs, preparing the roster for validated generated profiles."
+        },
+        powerups: {
+          status: "implemented",
+          title: "Powerups + admin",
+          summary: "Players and bots collect bomb capacity, blast range, and speed upgrades, with capped loadouts and adjustable drop weights.",
+          owner: "Pure simulation rules + React settings + Phaser rendering",
+          code: ["src/game/simulation/powerups.ts", "src/components/game/GameShell.tsx"],
+          boundary: "Drop selection is deterministic and bounded before the scene renders the result."
+        },
+        touch: {
+          status: "implemented",
+          title: "Responsive controls",
+          summary: "Coarse-pointer devices receive a D-pad and action controls while pure layout geometry keeps the fixed arena visible.",
+          owner: "React input surface + pure layout calculation + Phaser adapter",
+          code: ["src/game/simulation/layout.ts", "src/components/game/PhaserGame.tsx"],
+          boundary: "Reserved band dimensions currently mirror CSS constants and should eventually be measured from the DOM."
+        },
+        scores: {
+          status: "implemented",
+          title: "High scores",
+          summary: "A completed round receives a deterministic server-recomputed score, qualification check, and optional three-letter leaderboard entry.",
+          owner: "Pure scoring rule + React score screen + Next API",
+          code: ["src/game/simulation/scoring.ts", "src/components/game/HighScoresScreen.tsx"],
+          boundary: "Initials are bound to an existing match and anonymous visitor ID, but the match facts remain client-reported."
+        },
+        "music-screen": {
+          status: "implemented",
+          title: "Music screen",
+          summary: "Players can preview and select built-in or custom procedural tracks and independently control music and sound effects.",
+          owner: "React audio controls + AudioDirector runtime",
+          code: ["src/components/game/MusicScreen.tsx", "src/audio/AudioDirector.ts"],
+          boundary: "Selected track persists locally; custom track definitions are validated before storage."
+        },
+        coaching: {
+          status: "planned",
+          title: "Post-match coaching",
+          summary: "A server-side model can turn structured match facts into concise tactical feedback and flavor after a round.",
+          owner: "Future server route + React result surface",
+          code: ["docs/ARCHITECTURE.md"],
+          boundary: "Generated text may explain or recommend; it must not rewrite live rules or claim authoritative game state."
+        },
+        profiles: {
+          status: "planned",
+          title: "Persistent profiles",
+          summary: "Durable player identity can unify progression, preferences, match history, and future unlocks beyond the anonymous visitor record.",
+          owner: "Future React profile UI + server-only MongoDB routes",
+          code: ["docs/ARCHITECTURE.md", "src/app/api/visitors/route.ts"],
+          boundary: "Private identifiers and profile writes remain server-side; browser data is always untrusted."
+        },
+        "arena-rules": {
+          status: "implemented",
+          title: "Arena rules",
+          summary: "The fixed grid, hard and soft blocks, blast propagation, danger tiles, and movement rules are modeled as engine-independent data.",
+          owner: "Pure simulation modules",
+          code: ["src/game/simulation/arena.ts", "src/game/simulation/blast.ts", "src/game/simulation/danger.ts"],
+          boundary: "Simulation modules do not import React, Phaser, MongoDB, or browser I/O."
+        },
+        "bot-brain": {
+          status: "implemented",
+          title: "Utility bot brain",
+          summary: "Bots escape active danger, wait in safe pockets, seek useful upgrades, plant only with an exit, and pressure opponents with seeded variation.",
+          owner: "Pure deterministic simulation",
+          code: ["src/game/simulation/bots.ts", "src/game/simulation/bots.test.ts"],
+          boundary: "The brain returns intents only; Phaser owns movement, bombs, sprites, and timing."
+        },
+        "score-rule": {
+          status: "implemented",
+          title: "Deterministic scoring",
+          summary: "Round score combines mode, winner, cleared blocks, and completion speed in one pure function shared by client preview and server persistence.",
+          owner: "Pure simulation + server route",
+          code: ["src/game/simulation/scoring.ts", "src/app/api/matches/route.ts"],
+          boundary: "The server recomputes the formula, but it cannot yet verify the facts supplied by the browser."
+        },
+        audio: {
+          status: "implemented",
+          title: "Semantic audio engine",
+          summary: "Gameplay emits named events that route through buses, cooldowns, variants, music intensity, ducking, and procedural synthesis fallbacks.",
+          owner: "AudioDirector + MusicManager + SfxManager + Mixer",
+          code: ["src/audio/AudioDirector.ts", "src/audio/audioEvents.ts"],
+          boundary: "Gameplay refers to semantic events and stable asset keys, not individual audio files."
+        },
+        bridge: {
+          status: "implemented",
+          title: "React ↔ Phaser bridge",
+          summary: "A narrow typed contract carries UI callbacks and selections while shared registry state handles touch input and audio control.",
+          owner: "PhaserGame mount + createGame boundary",
+          code: ["src/components/game/PhaserGame.tsx", "src/game/createGame.ts"],
+          boundary: "New cross-layer state should extend this contract rather than introduce ad hoc globals."
+        },
+        maps: {
+          status: "planned",
+          title: "Generated maps",
+          summary: "Future map and challenge generation can select known cells, layouts, and rule IDs from a validated schema.",
+          owner: "Future server generator + pure layout validation",
+          code: ["docs/ARCHITECTURE.md", "src/game/simulation/arena.ts"],
+          boundary: "A model proposes structured metadata; deterministic code validates and constructs the playable arena."
+        },
+        "matches-api": {
+          status: "implemented",
+          title: "Match persistence",
+          summary: "The match endpoint validates payloads, recomputes score, records history, and updates anonymous visitor statistics when MongoDB is available.",
+          owner: "Next.js route + MongoDB infrastructure",
+          code: ["src/app/api/matches/route.ts", "src/lib/schemas/match.ts"],
+          boundary: "MONGODB_URI is read only by server modules and is never sent to the client."
+        },
+        "leaderboard-api": {
+          status: "implemented",
+          title: "Leaderboard API",
+          summary: "Scores can be read by match mode and initials can be attached only to a match owned by the same visitor ID.",
+          owner: "Next.js route + leaderboard query helpers",
+          code: ["src/app/api/high-scores/route.ts", "src/lib/leaderboard.ts"],
+          boundary: "Indexes and bounded query limits protect the current prototype data path."
+        },
+        "music-api": {
+          status: "implemented",
+          title: "Custom track API",
+          summary: "The server accepts bounded procedural track definitions and merges stored tracks with the built-in catalog in the Music screen.",
+          owner: "Next.js route + Zod music schema + MongoDB",
+          code: ["src/app/api/music/tracks/route.ts", "src/lib/schemas/music.ts"],
+          boundary: "Notes, layers, gains, tempo, filters, detune, and intensity profiles all have explicit limits."
+        },
+        offline: {
+          status: "implemented",
+          title: "Graceful offline mode",
+          summary: "Match play, local score display, visitor identity, and built-in music continue when MongoDB is not configured or temporarily unavailable.",
+          owner: "Server infrastructure + resilient React effects",
+          code: ["src/lib/mongodb.ts", "src/components/game/GameShell.tsx"],
+          boundary: "The UI reports offline persistence status without interrupting the active game."
+        },
+        authoritative: {
+          status: "planned",
+          title: "Authoritative results",
+          summary: "Competitive rankings need a trusted event stream or server simulation that derives winner, timing, blocks, and score independently.",
+          owner: "Future authoritative game service",
+          code: ["docs/ARCHITECTURE.md", "AGENTS.md"],
+          boundary: "Schema-valid does not mean truthful; client-submitted outcomes remain explicitly untrusted."
+        },
+        multiplayer: {
+          status: "planned",
+          title: "Realtime multiplayer",
+          summary: "Online matches require synchronized sessions, latency handling, and a separate authoritative runtime beyond Vercel request/response routes.",
+          owner: "Future realtime provider or dedicated game server",
+          code: ["docs/ARCHITECTURE.md"],
+          boundary: "MongoDB remains durable storage, not the realtime simulation transport."
+        },
+        "llm-bots": {
+          status: "planned",
+          title: "Generated bot profiles",
+          summary: "A server-side OpenAI call can create or patch persona copy and bounded trait values for a known BotProfile schema.",
+          owner: "Future server-only AI route + profile validator",
+          code: ["src/game/simulation/bots.ts", "docs/ARCHITECTURE.md"],
+          boundary: "The model never emits executable game logic and cannot call Phaser, MongoDB, or the live simulation directly."
+        },
+        "llm-challenges": {
+          status: "planned",
+          title: "Generated challenges",
+          summary: "Models can author flavor, objectives, recommendations, and challenge metadata that map to known rule identifiers.",
+          owner: "Future server-only AI route + deterministic rule mapping",
+          code: ["docs/ARCHITECTURE.md"],
+          boundary: "Every response uses structured JSON, server validation, known IDs, and bounded numeric values."
+        }
+      };
+
+      const nodes = Array.from(document.querySelectorAll("[data-capability]"));
+      const lanes = Array.from(document.querySelectorAll("[data-lane]"));
+      const filterButtons = Array.from(document.querySelectorAll("[data-filter]"));
+      const detailPanel = document.querySelector(".detail-panel");
+      const detailStatus = document.getElementById("detail-status");
+      const detailTitle = document.getElementById("detail-title");
+      const detailSummary = document.getElementById("detail-summary");
+      const detailOwner = document.getElementById("detail-owner");
+      const detailCode = document.getElementById("detail-code");
+      const detailBoundary = document.getElementById("detail-boundary");
+
+      function renderDetail(id) {
+        const detail = capabilityDetails[id];
+        if (!detail) return;
+
+        detailPanel.dataset.status = detail.status;
+        detailStatus.textContent = detail.status === "implemented" ? "Implemented" : "Planned";
+        detailTitle.textContent = detail.title;
+        detailSummary.textContent = detail.summary;
+        detailOwner.textContent = detail.owner;
+        detailCode.replaceChildren();
+        detail.code.forEach((path, index) => {
+          if (index > 0) detailCode.append(" · ");
+          const code = document.createElement("code");
+          code.textContent = path;
+          detailCode.append(code);
+        });
+        detailBoundary.textContent = detail.boundary;
+
+        nodes.forEach((node) => {
+          node.setAttribute("aria-pressed", String(node.dataset.capability === id));
+        });
+      }
+
+      nodes.forEach((node) => {
+        node.addEventListener("click", () => renderDetail(node.dataset.capability));
+      });
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const filter = button.dataset.filter;
+
+          filterButtons.forEach((candidate) => {
+            candidate.setAttribute("aria-pressed", String(candidate === button));
+          });
+
+          nodes.forEach((node) => {
+            node.hidden = filter !== "all" && node.dataset.status !== filter;
+          });
+
+          lanes.forEach((lane) => {
+            lane.hidden = !lane.querySelector("[data-capability]:not([hidden])");
+          });
+
+          const selectedNode = nodes.find((node) => node.getAttribute("aria-pressed") === "true" && !node.hidden);
+          const firstVisibleNode = nodes.find((node) => !node.hidden);
+          const nextNode = selectedNode || firstVisibleNode;
+          if (nextNode) renderDetail(nextNode.dataset.capability);
+        });
+      });
+    </script>
+  </body>
+</html>
