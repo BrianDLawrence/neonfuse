@@ -1,9 +1,9 @@
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
-import { getAuthSession } from "@/lib/auth";
 import { fetchHighScores, wouldQualifyForLeaderboard } from "@/lib/leaderboard";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
+import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { highScoreModeSchema, highScoreSubmitSchema } from "@/lib/schemas/high-score";
 
 const DEFAULT_LIMIT = 10;
@@ -57,9 +57,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await getAuthSession(request);
+  const player = await getAuthenticatedPlayer(request);
 
-  if (!session) {
+  if (!player) {
     return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
   }
 
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 
   const match = await db.collection("matches").findOne({
     _id: new ObjectId(parsed.data.matchId),
-    accountId: session.user.id
+    accountId: player.legacyId ? { $in: [player.id, player.legacyId] } : player.id
   });
 
   if (!match) {
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
   }
 
   const entry = {
-    accountId: session.user.id,
+    accountId: player.id,
     matchId: parsed.data.matchId,
     visitorId: String(match.visitorId),
     initials: parsed.data.initials,

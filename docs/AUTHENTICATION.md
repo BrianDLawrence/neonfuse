@@ -27,19 +27,24 @@ BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
+NEXT_PUBLIC_DISCORD_CLIENT_ID=
 ```
 
 Generate `BETTER_AUTH_SECRET` with `openssl rand -base64 32`. Keep it and the
 Discord client secret server-side. Neither value may use a `NEXT_PUBLIC_` prefix.
+The Discord Client ID is public, so the same value is intentionally supplied as
+`NEXT_PUBLIC_DISCORD_CLIENT_ID` for the Embedded App SDK.
 
 ## Runtime behavior
 
 - Better Auth owns its `user`, `session`, `account`, and verification collections.
 - `/api/auth/*` is disabled with a 503 response when configuration is incomplete.
-- Match, visitor, and high-score writes require an authenticated server session.
-- Match and high-score documents receive the Better Auth user ID as `accountId`.
+- Match, visitor, and high-score writes require an authenticated web or Activity session.
+- Web OAuth and Activity auth derive the same stable player ID from Discord's verified user ID.
 - Public leaderboard reads remain available without authentication.
 - `/api/health` reports `authentication` as `configured` or `not-configured`.
 
 The game still keeps its local visitor UUID for compatibility with existing
 leaderboard records, but that UUID is not accepted as proof of identity.
+
+See [Discord Activity setup](DISCORD_ACTIVITY.md) for embedded launch configuration.
