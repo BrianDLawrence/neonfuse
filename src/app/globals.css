@@ -502,6 +502,10 @@ button {
   white-space: nowrap;
 }
 
+.account-context {
+  color: var(--cyan);
+}
+
 .admin-link:hover,
 .admin-link:focus-visible {
   color: var(--cyan);

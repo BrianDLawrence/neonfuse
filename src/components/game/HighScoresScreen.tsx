@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GameMode } from "@/game/modes";
 import type { ScoreWinner } from "@/game/simulation/scoring";
+import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import type { HighScoreMode } from "@/lib/schemas/high-score";
 
@@ -21,6 +22,7 @@ export type RoundScoreResult = {
 };
 
 type HighScoresScreenProps = {
+  authToken?: string;
   visitorId: string | null;
   result: RoundScoreResult | null;
   onClose: () => void;
@@ -48,7 +50,7 @@ function describeWinner(winner: ScoreWinner) {
   return winner.charAt(0).toUpperCase() + winner.slice(1);
 }
 
-export function HighScoresScreen({ visitorId, result, onClose }: HighScoresScreenProps) {
+export function HighScoresScreen({ authToken, visitorId, result, onClose }: HighScoresScreenProps) {
   const [mode, setMode] = useState<HighScoreMode>("all");
   const [scores, setScores] = useState<HighScoreEntry[]>(result?.topScores ?? []);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,9 +161,9 @@ export function HighScoresScreen({ visitorId, result, onClose }: HighScoresScree
     try {
       const response = await fetch("/api/high-scores", {
         method: "POST",
-        headers: {
+        headers: authenticatedHeaders(authToken, {
           "Content-Type": "application/json"
-        },
+        }),
         body: JSON.stringify({
           matchId: result.matchId,
           visitorId,
@@ -198,7 +200,7 @@ export function HighScoresScreen({ visitorId, result, onClose }: HighScoresScree
       setSubmitStatus("error");
       setMessage(error instanceof Error ? error.message : "Unable to submit initials");
     }
-  }, [initials, mode, result, visitorId]);
+  }, [authToken, initials, mode, result, visitorId]);
 
   return (
     <div className="admin-dialog-backdrop high-score-backdrop" onClick={onClose}>

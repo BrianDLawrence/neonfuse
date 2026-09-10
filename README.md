@@ -29,6 +29,7 @@ BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
+NEXT_PUBLIC_DISCORD_CLIENT_ID=
 ```
 
 Create the auth secret with `openssl rand -base64 32`. In the Discord developer
@@ -48,6 +49,7 @@ React owns text-heavy UI. Phaser owns the playfield.
 - [Capability map](docs/capability-map.html) — interactive view of implemented functionality, planned systems, and current code-review findings.
 - [Architecture guide](docs/ARCHITECTURE.md) — ownership boundaries, data flow, testing, security, and AI constraints.
 - [Authentication guide](docs/AUTHENTICATION.md) — Discord OAuth setup, environment variables, and server-side session boundaries.
+- [Discord Activity guide](docs/DISCORD_ACTIVITY.md) — embedded launch setup, URL mapping, and Activity session security.
 
 ## License
 

@@ -9,6 +9,7 @@ import type { MusicTrack } from "@/audio/types";
 import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import { calculateRoundScore } from "@/game/simulation/scoring";
+import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import type { Direction } from "@/game/simulation/arena";
 import {
@@ -105,9 +106,13 @@ function useTouchControlsEnabled() {
 
 export function GameShell({
   accountName,
+  authToken,
+  connectionLabel,
   onSignOut
 }: Readonly<{
   accountName: string;
+  authToken?: string;
+  connectionLabel?: string;
   onSignOut: () => Promise<void>;
 }>) {
   const [roundStatus, setRoundStatus] = useState("Warmup");
@@ -205,9 +210,9 @@ export function GameShell({
       try {
         const response = await fetch("/api/visitors", {
           method: "POST",
-          headers: {
+          headers: authenticatedHeaders(authToken, {
             "Content-Type": "application/json"
-          },
+          }),
           body: JSON.stringify({ visitorId: nextVisitorId })
         });
         const payload = (await response.json()) as { visitorId?: string };
@@ -223,7 +228,7 @@ export function GameShell({
     }
 
     void registerVisitor();
-  }, []);
+  }, [authToken]);
 
   const handleLoadoutChange = useCallback(
     ({
@@ -305,9 +310,9 @@ export function GameShell({
       try {
         const response = await fetch("/api/matches", {
           method: "POST",
-          headers: {
+          headers: authenticatedHeaders(authToken, {
             "Content-Type": "application/json"
-          },
+          }),
           body: JSON.stringify({
             ...payload,
             visitorId: nextVisitorId
@@ -351,7 +356,7 @@ export function GameShell({
     }
 
     void saveMatch();
-  }, []);
+  }, [authToken]);
   const handleRegisterTouchControls = useCallback((api: TouchControlsApi | null) => {
     touchApiRef.current = api;
     api?.setMusicEnabled(musicEnabledRef.current, musicVolumeRef.current / 10);
@@ -529,6 +534,9 @@ export function GameShell({
             <span className="account-name" title={accountName}>
               {accountName}
             </span>
+            {connectionLabel ? (
+              <span className="account-name account-context">{connectionLabel}</span>
+            ) : null}
             <button
               className="admin-link hud-link-button"
               onClick={() => void onSignOut()}
@@ -744,6 +752,7 @@ export function GameShell({
 
         {isHighScoresOpen ? (
           <HighScoresScreen
+            authToken={authToken}
             visitorId={visitorId}
             result={scoreResult}
             onClose={() => setIsHighScoresOpen(false)}
