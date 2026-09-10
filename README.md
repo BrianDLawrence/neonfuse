@@ -25,9 +25,18 @@ Copy `.env.example` to `.env.local` and set:
 ```bash
 MONGODB_URI=
 MONGODB_DB=neon-fuse
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:3000
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
 ```
 
-The health endpoint is available at `/api/health`.
+Create the auth secret with `openssl rand -base64 32`. In the Discord developer
+portal, authorize `http://localhost:3000/api/auth/callback/discord` as an OAuth2
+redirect. Production needs the equivalent callback on its public domain.
+
+The health endpoint is available at `/api/health` and reports whether Discord
+authentication is configured.
 
 ## Architecture Notes
 
@@ -38,6 +47,7 @@ React owns text-heavy UI. Phaser owns the playfield.
 
 - [Capability map](docs/capability-map.html) — interactive view of implemented functionality, planned systems, and current code-review findings.
 - [Architecture guide](docs/ARCHITECTURE.md) — ownership boundaries, data flow, testing, security, and AI constraints.
+- [Authentication guide](docs/AUTHENTICATION.md) — Discord OAuth setup, environment variables, and server-side session boundaries.
 
 ## License
 

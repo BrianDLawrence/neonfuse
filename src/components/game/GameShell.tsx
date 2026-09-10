@@ -103,7 +103,13 @@ function useTouchControlsEnabled() {
   return enabled;
 }
 
-export function GameShell() {
+export function GameShell({
+  accountName,
+  onSignOut
+}: Readonly<{
+  accountName: string;
+  onSignOut: () => Promise<void>;
+}>) {
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
   const [blast, setBlast] = useState(2);
@@ -520,6 +526,16 @@ export function GameShell() {
             <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
               Admin
             </a>
+            <span className="account-name" title={accountName}>
+              {accountName}
+            </span>
+            <button
+              className="admin-link hud-link-button"
+              onClick={() => void onSignOut()}
+              type="button"
+            >
+              Sign Out
+            </button>
           </div>
         </aside>
 

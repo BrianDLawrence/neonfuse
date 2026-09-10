@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAuthConfigured } from "@/lib/auth";
 import { tryGetMongoDb } from "@/lib/mongodb";
 
 export async function GET() {
@@ -9,6 +10,7 @@ export async function GET() {
       {
         ok: mongo === "not-configured",
         mongo,
+        authentication: isAuthConfigured() ? "configured" : "not-configured",
         error
       },
       { status: mongo === "not-configured" ? 200 : 503 }
@@ -17,5 +19,9 @@ export async function GET() {
 
   await db.command({ ping: 1 });
 
-  return NextResponse.json({ ok: true, mongo });
+  return NextResponse.json({
+    ok: true,
+    mongo,
+    authentication: isAuthConfigured() ? "configured" : "not-configured"
+  });
 }
