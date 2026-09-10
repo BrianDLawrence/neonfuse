@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { calculateRoundScore } from "@/game/simulation/scoring";
+import { getAuthSession } from "@/lib/auth";
 import { fetchHighScores, wouldQualifyForLeaderboard } from "@/lib/leaderboard";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { matchResultSchema } from "@/lib/schemas/match";
 
 export async function POST(request: Request) {
+  const session = await getAuthSession(request);
+
+  if (!session) {
+    return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+  }
+
   let body: unknown;
 
   try {
@@ -36,6 +43,7 @@ export async function POST(request: Request) {
   const score = calculateRoundScore(payload);
 
   const match = {
+    accountId: session.user.id,
     visitorId: payload.visitorId,
     mode: payload.mode,
     winner: payload.winner,

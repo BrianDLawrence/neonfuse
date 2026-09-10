@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthSession } from "@/lib/auth";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { visitorRequestSchema } from "@/lib/schemas/visitor";
@@ -7,6 +8,12 @@ const VISITOR_COOKIE = "nf_vid";
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 export async function POST(request: Request) {
+  const session = await getAuthSession(request);
+
+  if (!session) {
+    return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+  }
+
   let body: unknown = {};
 
   try {
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
     await db.collection("visitors").updateOne(
       { visitorId },
       {
-        $set: { lastSeenAt: now },
+        $set: { accountId: session.user.id, lastSeenAt: now },
         $setOnInsert: {
           visitorId,
           createdAt: now,
