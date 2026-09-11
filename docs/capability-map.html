@@ -759,7 +759,7 @@
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="scores" data-status="implemented">
                     <strong>High scores</strong>
-                    <span>Round score, qualification, initials, mode tabs.</span>
+                    <span>Round score, qualification, signed-in names, mode tabs.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="music-screen" data-status="implemented">
                     <strong>Music screen</strong>
@@ -815,7 +815,7 @@
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="leaderboard-api" data-status="implemented">
                     <strong>Leaderboard API</strong>
-                    <span>Read by mode, match-bound initials, indexes.</span>
+                    <span>Read by mode, verified player names, indexes.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="music-api" data-status="implemented">
                     <strong>Custom track API</strong>
@@ -1040,10 +1040,10 @@
         "leaderboard-api": {
           status: "implemented",
           title: "Leaderboard API",
-          summary: "Scores can be read by match mode and initials can be attached only to a match owned by the same visitor ID.",
+          summary: "Scores can be read by match mode, while writes use the verified Discord name for the authenticated owner of the match.",
           owner: "Next.js route + leaderboard query helpers",
           code: ["src/app/api/high-scores/route.ts", "src/lib/leaderboard.ts"],
-          boundary: "Indexes and bounded query limits protect the current prototype data path."
+          boundary: "Clients submit only the match ID; player identity and display name come from the authenticated server session."
         },
         "music-api": {
           status: "implemented",

@@ -753,7 +753,7 @@ export function GameShell({
         {isHighScoresOpen ? (
           <HighScoresScreen
             authToken={authToken}
-            visitorId={visitorId}
+            playerName={accountName}
             result={scoreResult}
             onClose={() => setIsHighScoresOpen(false)}
           />
