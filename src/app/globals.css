@@ -1437,7 +1437,72 @@ button {
   line-height: 1.45;
 }
 
+/* Friend matches reuse the existing arcade tokens and button system. */
+.duel-shell {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--background-deep);
+}
+.duel-canvas { position: absolute; inset: 0; }
+.duel-canvas canvas { display: block; }
+.duel-header, .duel-scoreboard, .duel-controls { position: absolute; z-index: 10; }
+.duel-header { top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 24px; }
+.duel-header h1 { margin: 0; font-size: clamp(22px, 3vw, 36px); font-weight: 900; text-transform: uppercase; text-shadow: 0 0 22px var(--line); }
+.duel-header p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.duel-header-actions { display: flex; align-items: center; gap: 12px; }
+.duel-scoreboard { top: 100px; left: 24px; right: 24px; display: flex; justify-content: space-between; gap: 24px; pointer-events: none; }
+.duel-player-label { display: grid; gap: 4px; max-width: 40%; }
+.duel-player-label strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--cyan); }
+.duel-player-label[data-seat="1"] { text-align: right; }
+.duel-player-label[data-seat="1"] strong { color: var(--pink); }
+.duel-player-label small { color: var(--muted); font-size: 11px; }
+.duel-lobby { position: absolute; z-index: 20; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(580px, calc(100% - 32px)); max-height: calc(100% - 190px); overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 8px; padding: clamp(20px, 3vw, 32px); background: var(--panel-strong); box-shadow: 0 0 42px var(--line); }
+.duel-lobby h2 { margin: 10px 0 0; font-size: clamp(25px, 4vw, 36px); line-height: 1.1; text-transform: uppercase; }
+.duel-copy { color: var(--muted); line-height: 1.5; font-size: 14px; }
+.duel-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+.duel-slot { display: grid; gap: 10px; border: 1px solid var(--cyan); border-radius: 8px; padding: 18px; background: var(--panel); }
+.duel-slot[data-seat="1"] { border-color: var(--pink); }
+.duel-slot span { color: var(--cyan); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.duel-slot[data-seat="1"] span { color: var(--pink); }
+.duel-slot strong { overflow-wrap: anywhere; }
+.duel-slot small { color: var(--muted); }
+.duel-notice { color: var(--muted); font-size: 12px; line-height: 1.5; min-height: 18px; }
+.duel-lobby-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.duel-shell .command-button { flex: initial; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); color: var(--text); padding: 11px 14px; min-height: 44px; }
+.duel-shell .command-button[aria-pressed="true"] { border-color: var(--green); color: var(--green); }
+.duel-shell .command-button.secondary { border-color: var(--line); }
+.duel-shell button:disabled { opacity: 0.5; cursor: default; }
+.duel-shell button:focus-visible, .command-row button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.duel-countdown { position: absolute; z-index: 20; top: 45%; left: 50%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 900; color: var(--green); text-align: center; text-shadow: 0 0 28px var(--line); }
+.duel-countdown span { display: block; font-size: 16px; text-transform: uppercase; }
+.duel-connection-banner { position: absolute; z-index: 20; top: 155px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); padding: 10px 14px; border: 1px solid var(--amber); border-radius: 8px; background: var(--panel-strong); color: var(--amber); text-align: center; }
+.duel-controls { left: 24px; right: 24px; bottom: calc(14px + env(safe-area-inset-bottom)); pointer-events: none; }
+.duel-help { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-align: center; }
+.duel-touch-row { display: none; align-items: center; justify-content: space-between; }
+.duel-pad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 4px; touch-action: none; }
+.duel-pad .touch-pad-button { border-radius: 8px; }
+.duel-touch-row .touch-button { min-width: 76px; min-height: 76px; border-radius: 8px; }
+@media (hover: none) and (pointer: coarse) {
+  .duel-touch-row { display: flex; }
+}
+
 @media (max-width: 760px) {
+  .command-row .command-button { min-width: 0; padding: 8px 6px; font-size: 10px; }
+  .duel-header { padding: 12px; align-items: flex-start; }
+  .duel-header-actions { align-items: flex-end; flex-direction: column-reverse; gap: 6px; }
+  .duel-header .hud-chip { max-width: 155px; }
+  .duel-header .hud-chip strong { font-size: 11px; }
+  .duel-scoreboard { top: 105px; left: 12px; right: 12px; }
+  .duel-slots { grid-template-columns: 1fr; gap: 8px; margin-top: 16px; }
+  .duel-slot { padding: 12px; gap: 5px; }
+  .duel-lobby { top: 155px; transform: translateX(-50%); max-height: calc(100% - 195px); padding: 20px; }
+  .duel-lobby-actions { gap: 8px; margin-top: 12px; }
+  .duel-shell .command-button { font-size: 11px; }
+  .duel-controls { left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .duel-help { font-size: 10px; }
+
   .auth-gate {
     padding: 14px;
   }
@@ -2104,6 +2169,17 @@ button {
    are detected by height. Flank the board with controls at the sides (vertically
    centered) and drop the desktop chrome that would overlap the arena. */
 @media (orientation: landscape) and (max-height: 520px) {
+  .duel-header { padding: 8px 16px; }
+  .duel-header h1 { font-size: 20px; }
+  .duel-header-actions { flex-direction: row; }
+  .duel-scoreboard { top: 70px; }
+  .duel-lobby { top: 70px; transform: translateX(-50%); max-height: calc(100% - 80px); }
+  .duel-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
+  .duel-controls { top: 140px; bottom: 12px; display: flex; flex-direction: column-reverse; justify-content: space-between; }
+  .duel-touch-row { flex: 1; }
+  .duel-help { margin: 0; }
+  .duel-connection-banner { top: 70px; }
+
   .brand-lockup {
     display: none;
   }

@@ -167,7 +167,8 @@ Do not call OpenAI APIs from Phaser scenes or React client components.
 
 Vercel hosts the Next.js app and API routes.
 
-Realtime multiplayer should use a separate realtime provider or dedicated game server.
+Two-player Discord matches use the dedicated Node/WebSocket service in `server/`.
+See [multiplayer setup and architecture](MULTIPLAYER.md).
 
 ## Merge Checks
 
