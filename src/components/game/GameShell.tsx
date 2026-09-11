@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+import { DuelGame } from "./DuelGame";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
@@ -115,6 +116,7 @@ export function GameShell({
   connectionLabel?: string;
   onSignOut: () => Promise<void>;
 }>) {
+  const [isDuelOpen, setIsDuelOpen] = useState(false);
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
   const [blast, setBlast] = useState(2);
@@ -414,6 +416,8 @@ export function GameShell({
     touchApiRef.current?.requestReset();
   }, []);
 
+  if (isDuelOpen) return <DuelGame authToken={authToken} onLeave={() => setIsDuelOpen(false)} />;
+
   return (
     <main className="app-frame" data-touch-controls={touchControlsEnabled ? "true" : "false"}>
       <section className="game-stage" aria-label="Neon Fuse game prototype">
@@ -508,6 +512,15 @@ export function GameShell({
             >
               <span className="label-full">Bot Skirmish</span>
               <span className="label-compact">Skirmish</span>
+            </button>
+            <button
+              aria-pressed={false}
+              className="command-button secondary"
+              onClick={() => setIsDuelOpen(true)}
+              type="button"
+            >
+              <span className="label-full">Play with a friend</span>
+              <span className="label-compact">Friend</span>
             </button>
           </div>
           <div className="match-links">

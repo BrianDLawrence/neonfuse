@@ -13,6 +13,9 @@ depend on third-party cookies inside Discord's iframe.
 4. The server stores only a SHA-256 hash of the opaque Neon Fuse session token. MongoDB expires it after at most one hour.
 5. Web OAuth and Activity login derive the same internal player ID from the verified Discord user ID.
 6. The HUD displays the current Activity instance participant count.
+7. **Play with a friend** opens a two-player lobby with server-authoritative matches.
+   See [multiplayer setup](MULTIPLAYER.md) for its additional server, credentials,
+   and Discord URL mapping.
 
 ## Vercel environment
 
