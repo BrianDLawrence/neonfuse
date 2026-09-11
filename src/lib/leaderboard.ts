@@ -5,7 +5,7 @@ export type HighScoreEntry = {
   rank: number;
   matchId: string;
   visitorId: string;
-  initials: string;
+  playerName: string;
   score: number;
   mode: "player-vs-bot" | "bot-skirmish";
   winner: "player" | "bot" | "bot-a" | "bot-b" | "draw";
@@ -18,6 +18,7 @@ const SCORE_PROJECTION = {
   _id: 0,
   matchId: 1,
   visitorId: 1,
+  playerName: 1,
   initials: 1,
   score: 1,
   mode: 1,
@@ -27,14 +28,15 @@ const SCORE_PROJECTION = {
   createdAt: 1
 };
 
-function toHighScoreEntry(score: Document, index: number): HighScoreEntry {
+export function toHighScoreEntry(score: Document, index: number): HighScoreEntry {
   const createdAt = score.createdAt instanceof Date ? score.createdAt.toISOString() : String(score.createdAt);
+  const playerName = String(score.playerName || score.initials || "Unknown Player");
 
   return {
     rank: index + 1,
     matchId: String(score.matchId),
     visitorId: String(score.visitorId),
-    initials: String(score.initials),
+    playerName,
     score: Number(score.score),
     mode: score.mode === "bot-skirmish" ? "bot-skirmish" : "player-vs-bot",
     winner: ["player", "bot", "bot-a", "bot-b", "draw"].includes(String(score.winner))

@@ -1292,7 +1292,7 @@ button {
 .scoreboard-row,
 .scoreboard-empty {
   display: grid;
-  grid-template-columns: 40px 56px 46px minmax(82px, 1fr) minmax(82px, auto);
+  grid-template-columns: 40px minmax(110px, 1.2fr) 46px minmax(82px, 0.8fr) minmax(82px, auto);
   align-items: center;
   gap: 10px;
   min-height: 42px;
@@ -1312,6 +1312,14 @@ button {
 
 .scoreboard-row strong {
   color: var(--green);
+}
+
+.scoreboard-player {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .scoreboard-row b {
@@ -1384,53 +1392,41 @@ button {
   text-transform: uppercase;
 }
 
-.initials-form {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: end;
-}
-
-.initials-form label {
-  grid-column: 1 / -1;
-  color: var(--amber);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.initials-form input {
-  width: 100%;
+.score-player-card {
   min-width: 0;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(8, 10, 18, 0.92);
-  color: var(--green);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 32px;
-  font-weight: 950;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  padding: 10px 12px;
-  text-align: center;
-  text-transform: uppercase;
+  background: var(--panel);
+  box-shadow: inset 0 0 18px rgba(34, 211, 238, 0.06);
+  padding: 12px;
 }
 
-.initials-form button {
-  border: 1px solid rgba(163, 230, 53, 0.62);
-  border-radius: 8px;
-  background: rgba(163, 230, 53, 0.16);
-  color: var(--text);
-  font-size: 12px;
+.score-player-card span,
+.score-player-card strong,
+.score-player-card small {
+  display: block;
+}
+
+.score-player-card span {
+  color: var(--muted);
+  font-size: 10px;
   font-weight: 900;
-  padding: 14px 12px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.initials-form button:disabled {
-  cursor: not-allowed;
-  opacity: 0.46;
+.score-player-card strong {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: var(--green);
+  font-size: 18px;
+}
+
+.score-player-card small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .score-message {
@@ -1713,7 +1709,7 @@ button {
 
   .scoreboard-row,
   .scoreboard-empty {
-    grid-template-columns: 30px 42px 34px minmax(58px, 1fr) minmax(68px, auto);
+    grid-template-columns: 30px minmax(78px, 1fr) 34px minmax(58px, 0.7fr) minmax(68px, auto);
     gap: 6px;
     font-size: 11px;
     min-height: 36px;
@@ -1735,10 +1731,6 @@ button {
 
   .score-facts {
     grid-template-columns: 1fr;
-  }
-
-  .initials-form input {
-    font-size: 28px;
   }
 
   .music-intro {

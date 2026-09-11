@@ -108,8 +108,7 @@ export async function POST(request: Request) {
       mongo,
       entry: {
         matchId: parsed.data.matchId,
-        visitorId: parsed.data.visitorId,
-        initials: parsed.data.initials
+        playerName: player.displayName
       },
       scores: []
     });
@@ -136,7 +135,7 @@ export async function POST(request: Request) {
     accountId: player.id,
     matchId: parsed.data.matchId,
     visitorId: String(match.visitorId),
-    initials: parsed.data.initials,
+    playerName: player.displayName,
     score: Number(match.score),
     mode: match.mode,
     winner: match.winner,
@@ -153,12 +152,9 @@ export async function POST(request: Request) {
     { upsert: true }
   );
   await db.collection("visitors").updateOne(
-    { visitorId: parsed.data.visitorId },
+    { visitorId: String(match.visitorId) },
     {
-      $set: {
-        lastSeenAt: new Date(),
-        lastInitials: parsed.data.initials
-      },
+      $set: { lastSeenAt: new Date() },
       $max: { bestScore: entry.score }
     }
   );

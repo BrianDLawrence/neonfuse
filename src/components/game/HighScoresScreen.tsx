@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameMode } from "@/game/modes";
 import type { ScoreWinner } from "@/game/simulation/scoring";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
@@ -23,7 +23,7 @@ export type RoundScoreResult = {
 
 type HighScoresScreenProps = {
   authToken?: string;
-  visitorId: string | null;
+  playerName: string;
   result: RoundScoreResult | null;
   onClose: () => void;
 };
@@ -50,24 +50,18 @@ function describeWinner(winner: ScoreWinner) {
   return winner.charAt(0).toUpperCase() + winner.slice(1);
 }
 
-export function HighScoresScreen({ authToken, visitorId, result, onClose }: HighScoresScreenProps) {
+export function HighScoresScreen({
+  authToken,
+  playerName,
+  result,
+  onClose
+}: HighScoresScreenProps) {
   const [mode, setMode] = useState<HighScoreMode>("all");
   const [scores, setScores] = useState<HighScoreEntry[]>(result?.topScores ?? []);
   const [isLoading, setIsLoading] = useState(false);
-  const [initials, setInitials] = useState("AAA");
   const [submitStatus, setSubmitStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("neon-fuse:last-initials");
-      if (stored && /^[A-Z]{3}$/.test(stored)) {
-        setInitials(stored);
-      }
-    } catch {
-      // Initials are a convenience only.
-    }
-  }, []);
+  const submittedMatchIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (mode === "all" && result?.topScores.length) {
@@ -117,14 +111,6 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
     };
   }, [mode]);
 
-  const canSubmitInitials = Boolean(
-    result?.matchId &&
-      visitorId &&
-      result.qualifiesForLeaderboard &&
-      result.status === "ready" &&
-      submitStatus !== "saved"
-  );
-
   const statusText = useMemo(() => {
     if (!result) {
       return "Leaderboard";
@@ -142,19 +128,31 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
       return "Score not stored";
     }
 
-    return result.qualifiesForLeaderboard ? "Enter initials" : "Score recorded";
-  }, [result]);
+    if (!result.qualifiesForLeaderboard || submitStatus === "saved") {
+      return "Score recorded";
+    }
 
-  const handleInitialsChange = useCallback((value: string) => {
-    const normalized = value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
-    setInitials(normalized);
-  }, []);
+    if (submitStatus === "saving") {
+      return "Saving player score";
+    }
 
-  const handleSubmitInitials = useCallback(async () => {
-    if (!result?.matchId || !visitorId || initials.length !== 3) {
+    if (submitStatus === "error") {
+      return "Save interrupted";
+    }
+
+    return "Qualifying score";
+  }, [result, submitStatus]);
+
+  const submitCurrentScore = useCallback(async () => {
+    if (
+      !result?.matchId ||
+      !result.qualifiesForLeaderboard ||
+      result.status !== "ready"
+    ) {
       return;
     }
 
+    submittedMatchIdRef.current = result.matchId;
     setSubmitStatus("saving");
     setMessage(null);
 
@@ -165,9 +163,7 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
           "Content-Type": "application/json"
         }),
         body: JSON.stringify({
-          matchId: result.matchId,
-          visitorId,
-          initials
+          matchId: result.matchId
         })
       });
       const payload = (await response.json()) as {
@@ -178,7 +174,7 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
       };
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "Unable to submit initials");
+        throw new Error(payload.error ?? "Unable to save your leaderboard score");
       }
 
       if (mode === "all") {
@@ -189,18 +185,23 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
         setScores(scoresPayload.scores ?? []);
       }
       setSubmitStatus("saved");
-      setMessage(payload.stored === false ? "MongoDB is offline; initials were not stored." : "Initials locked.");
-
-      try {
-        window.localStorage.setItem("neon-fuse:last-initials", initials);
-      } catch {
-        // Optional convenience.
-      }
+      setMessage(
+        payload.stored === false
+          ? "MongoDB is offline; your leaderboard score was not stored."
+          : `Score saved as ${playerName}.`
+      );
     } catch (error) {
+      submittedMatchIdRef.current = null;
       setSubmitStatus("error");
-      setMessage(error instanceof Error ? error.message : "Unable to submit initials");
+      setMessage(error instanceof Error ? error.message : "Unable to save your leaderboard score");
     }
-  }, [authToken, initials, mode, result, visitorId]);
+  }, [authToken, mode, playerName, result]);
+
+  useEffect(() => {
+    if (result?.matchId && submittedMatchIdRef.current !== result.matchId) {
+      void submitCurrentScore();
+    }
+  }, [result?.matchId, submitCurrentScore]);
 
   return (
     <div className="admin-dialog-backdrop high-score-backdrop" onClick={onClose}>
@@ -239,7 +240,9 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
                 scores.map((score) => (
                   <li className="scoreboard-row" key={score.matchId}>
                     <span className="score-rank">{String(score.rank).padStart(2, "0")}</span>
-                    <strong>{score.initials}</strong>
+                    <strong className="scoreboard-player" title={score.playerName}>
+                      {score.playerName}
+                    </strong>
                     <span>{score.mode === "bot-skirmish" ? "BOT" : "LOC"}</span>
                     <span>{describeWinner(score.winner)}</span>
                     <b>{score.score.toLocaleString()}</b>
@@ -266,42 +269,52 @@ export function HighScoresScreen({ authToken, visitorId, result, onClose }: High
               </div>
             ) : null}
 
-            {canSubmitInitials ? (
-              <form
-                className="initials-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void handleSubmitInitials();
-                }}
-              >
-                <label htmlFor="initials-input">Initials</label>
-                <input
-                  aria-label="Three letter initials"
-                  autoComplete="off"
-                  id="initials-input"
-                  inputMode="text"
-                  maxLength={3}
-                  onChange={(event) => handleInitialsChange(event.target.value)}
-                  value={initials}
-                />
-                <button disabled={initials.length !== 3 || submitStatus === "saving"} type="submit">
-                  {submitStatus === "saving" ? "Saving" : "Submit"}
-                </button>
-              </form>
-            ) : null}
+            <div className="score-player-card">
+              <span>Signed-in player</span>
+              <strong title={playerName}>{playerName}</strong>
+              <small>Qualifying scores save automatically.</small>
+            </div>
 
             {result && !result.qualifiesForLeaderboard && result.status === "ready" ? (
-              <p className="score-message">Score saved. It did not crack the top board.</p>
+              <p className="score-message" aria-live="polite">
+                Score saved. It did not crack the top board.
+              </p>
             ) : null}
 
-            {result?.status === "saving" ? <p className="score-message">Saving match...</p> : null}
+            {result?.status === "saving" ? (
+              <p className="score-message" aria-live="polite">
+                Saving match...
+              </p>
+            ) : null}
             {result?.status === "offline" ? (
-              <p className="score-message">MongoDB is not configured. This score stays local to this screen.</p>
+              <p className="score-message" aria-live="polite">
+                MongoDB is not configured. This score stays local to this screen.
+              </p>
             ) : null}
             {result?.status === "error" ? (
-              <p className="score-message">{result.error ?? "The match result could not be stored."}</p>
+              <p className="score-message" aria-live="polite">
+                {result.error ?? "The match result could not be stored."}
+              </p>
             ) : null}
-            {message ? <p className="score-message">{message}</p> : null}
+            {submitStatus === "saving" ? (
+              <p className="score-message" aria-live="polite">
+                Adding {playerName} to the leaderboard...
+              </p>
+            ) : null}
+            {message ? (
+              <p className="score-message" aria-live="polite">
+                {message}
+              </p>
+            ) : null}
+            {submitStatus === "error" ? (
+              <button
+                className="dialog-icon-button"
+                onClick={() => void submitCurrentScore()}
+                type="button"
+              >
+                Retry leaderboard save
+              </button>
+            ) : null}
 
             <button className="dialog-close-button" onClick={onClose} type="button">
               Close

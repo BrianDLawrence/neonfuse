@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { highScoreInitialsSchema, highScoreModeSchema, highScoreSubmitSchema } from "./high-score";
-
-const visitorId = "00000000-0000-4000-8000-000000000001";
+import { highScoreModeSchema, highScoreSubmitSchema } from "./high-score";
 
 describe("highScoreModeSchema", () => {
   it("accepts all supported filters", () => {
@@ -15,34 +13,23 @@ describe("highScoreModeSchema", () => {
   });
 });
 
-describe("highScoreInitialsSchema", () => {
-  it("normalizes lowercase initials", () => {
-    expect(highScoreInitialsSchema.parse("abc")).toBe("ABC");
-  });
-
-  it("rejects non-letter or non-3-character initials", () => {
-    expect(highScoreInitialsSchema.safeParse("AB1").success).toBe(false);
-    expect(highScoreInitialsSchema.safeParse("ABCD").success).toBe(false);
-  });
-});
-
 describe("highScoreSubmitSchema", () => {
-  it("accepts a valid submission", () => {
+  it("accepts a match ID while discarding client-submitted identity fields", () => {
     const result = highScoreSubmitSchema.safeParse({
       matchId: "665f0d4d9b95f84a0b0f0001",
-      visitorId,
-      initials: "nfx"
+      visitorId: "00000000-0000-4000-8000-000000000001",
+      playerName: "Spoofed Player"
     });
 
     expect(result.success).toBe(true);
-    expect(result.success ? result.data.initials : "").toBe("NFX");
+    expect(result.success ? result.data : null).toEqual({
+      matchId: "665f0d4d9b95f84a0b0f0001"
+    });
   });
 
-  it("rejects invalid visitor ids", () => {
+  it("rejects a missing match ID", () => {
     const result = highScoreSubmitSchema.safeParse({
-      matchId: "665f0d4d9b95f84a0b0f0001",
-      visitorId: "local",
-      initials: "NFX"
+      playerName: "NeonPilot"
     });
 
     expect(result.success).toBe(false);
