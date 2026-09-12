@@ -7,7 +7,6 @@ services:
     buildCommand: npm ci && npm run build:server
     startCommand: npm run start:server
     healthCheckPath: /health
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: MULTIPLAYER_SECRET
         sync: false
