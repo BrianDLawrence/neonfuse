@@ -54,6 +54,9 @@ MONGODB_DB=neon-fuse
 PORT=3001
 ```
 
+`MONGODB_URI` is optional for this unranked mode. Without it, matches still run,
+but completed duel results are not written to MongoDB.
+
 Next.js uses the existing Activity bearer session to issue a signed, single-use
 30-second join ticket. The ticket travels in the first WebSocket message, never
 in a URL. A reconnect obtains a fresh ticket and verifies membership again.
@@ -90,6 +93,15 @@ Keep Next.js on its existing deployment. Deploy the compiled realtime process to
 a host that runs a persistent Node service, terminates TLS, and supports WebSocket
 upgrades. Configure an HTTP health check at `/health`.
 
+The repository includes a Render Blueprint for the initial single-instance host.
+Create a Blueprint from the repository's `render.yaml`, enter the same
+`MULTIPLAYER_SECRET` used by Next.js when prompted, and keep the Free plan for a
+hobby deployment. Render builds only the realtime server, starts it on the
+platform-provided port, and checks `/health`. Free instances can take about a
+minute to wake after 15 minutes without inbound traffic; the client reconnects
+automatically while the instance starts. Use an always-on plan if that delay is
+not acceptable.
+
 **Run one realtime process/replica for this version.** Rooms and nonce replay
 protection live in that process. Do not enable horizontal scaling without shared
 room routing and replay storage. Deployments or process failures abandon active
@@ -105,6 +117,10 @@ Keep the existing `/` mapping to Next.js. The Activity connects through
 `wss://<application-id>.discordsays.com/multiplayer`. The realtime server accepts
 both `/` (when the proxy strips the prefix) and `/multiplayer`. Verify the mapping
 from inside Discord with two accounts after deployment.
+
+For direct browser testing, set the Vercel Production variable
+`NEXT_PUBLIC_MULTIPLAYER_URL` to `wss://<realtime-hostname>/multiplayer` and
+redeploy the Next.js project. This public value contains no credential.
 
 References:
 - [Discord multiplayer and membership verification](https://docs.discord.com/developers/activities/development-guides/multiplayer-experience)

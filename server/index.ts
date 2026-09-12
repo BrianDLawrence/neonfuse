@@ -1,19 +1,24 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, type Collection, type Document } from "mongodb";
 import { createRealtimeServer } from "./realtime";
 import type { DuelResult } from "./rooms";
 
 async function main() {
   const secret = process.env.MULTIPLAYER_SECRET ?? "";
   const mongoUri = process.env.MONGODB_URI;
-  if (!mongoUri) throw new Error("MONGODB_URI is required for multiplayer results");
-  const mongo = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 5000 });
-  await mongo.connect();
-  const results = mongo.db(process.env.MONGODB_DB ?? "neon-fuse").collection("duel_results");
-  await results.createIndex({ roundId: 1 }, { unique: true });
+  let mongo: MongoClient | undefined;
+  let results: Collection<Document> | undefined;
+  if (mongoUri) {
+    mongo = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 5000 });
+    await mongo.connect();
+    results = mongo.db(process.env.MONGODB_DB ?? "neon-fuse").collection("duel_results");
+    await results.createIndex({ roundId: 1 }, { unique: true });
+  } else {
+    console.warn("MONGODB_URI is not set; unranked multiplayer results will not be persisted.");
+  }
   const pending = new Map<string, DuelResult>();
   let writing = false;
   async function flush() {
-    if (writing) return;
+    if (writing || !results) return;
     writing = true;
     try {
       for (const result of pending.values()) {
@@ -23,7 +28,14 @@ async function main() {
     } catch { console.error("Multiplayer result storage unavailable; retrying."); }
     finally { writing = false; }
   }
-  const realtime = createRealtimeServer({ secret, onResult: (result) => { pending.set(result.roundId, result); void flush(); } });
+  const realtime = createRealtimeServer({
+    secret,
+    onResult: (result) => {
+      if (!results) return;
+      pending.set(result.roundId, result);
+      void flush();
+    }
+  });
   const retry = setInterval(() => void flush(), 5000);
   const port = Number(process.env.PORT ?? 3001);
   realtime.http.listen(port, "0.0.0.0", () => console.info(`Neon Fuse multiplayer listening on port ${port}`));
@@ -31,7 +43,7 @@ async function main() {
     clearInterval(retry);
     await realtime.close();
     await flush();
-    await mongo.close();
+    await mongo?.close();
     process.exit(0);
   };
   process.once("SIGINT", () => void stop());
