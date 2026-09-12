@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: neon-fuse-realtime
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build:server
+    startCommand: npm run start:server
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: MULTIPLAYER_SECRET
+        sync: false

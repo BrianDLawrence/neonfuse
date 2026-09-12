@@ -30,6 +30,9 @@ BETTER_AUTH_URL=http://localhost:3000
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 NEXT_PUBLIC_DISCORD_CLIENT_ID=
+MULTIPLAYER_SECRET=
+DISCORD_BOT_TOKEN=
+NEXT_PUBLIC_MULTIPLAYER_URL=ws://localhost:3001/multiplayer
 ```
 
 Create the auth secret with `openssl rand -base64 32`. In the Discord developer
@@ -38,6 +41,10 @@ redirect. Production needs the equivalent callback on its public domain.
 
 The health endpoint is available at `/api/health` and reports whether Discord
 authentication is configured.
+
+Friend matches also need the persistent realtime service described in
+[`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md). A Render Blueprint is included for
+the repository's single-instance WebSocket server.
 
 ## Architecture Notes
 
