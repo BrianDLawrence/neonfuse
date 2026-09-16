@@ -5,7 +5,16 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true
   },
   outputFileTracingRoot: __dirname,
-  reactStrictMode: true
+  reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn.discordapp.com",
+        pathname: "/**"
+      }
+    ]
+  }
 };
 
 export default nextConfig;

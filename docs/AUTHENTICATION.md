@@ -39,9 +39,13 @@ The Discord Client ID is public, so the same value is intentionally supplied as
 
 - Better Auth owns its `user`, `session`, `account`, and verification collections.
 - `/api/auth/*` is disabled with a 503 response when configuration is incomplete.
-- Match, visitor, and high-score writes require an authenticated web or Activity session.
+- Match, visitor, high-score, and profile writes require an authenticated web or Activity session.
 - Web OAuth and Activity auth derive the same stable player ID from Discord's verified user ID.
 - Leaderboard names come from the verified Discord profile and cannot be supplied by the client.
+- Better Auth does not store game progression. Neon Fuse keeps a separate
+  `player_profiles` collection keyed by the stable player ID.
+- Profile identity fields are refreshed from verified Discord data. Clients may
+  update only allowlisted arena preferences; statistics and progression remain server-owned.
 - Public leaderboard reads remain available without authentication.
 - `/api/health` reports `authentication` as `configured` or `not-configured`.
 

@@ -506,6 +506,63 @@ button {
   color: var(--cyan);
 }
 
+.profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 190px;
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  padding: 0;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profile-trigger > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-trigger:hover,
+.profile-trigger:focus-visible {
+  color: var(--cyan);
+}
+
+.profile-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--cyan);
+  font-size: 20px;
+  font-weight: 950;
+  box-shadow:
+    0 0 22px rgba(34, 211, 238, 0.16),
+    inset 0 0 18px rgba(34, 211, 238, 0.08);
+}
+
+.profile-avatar[data-size="small"] {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 9px;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .admin-link:hover,
 .admin-link:focus-visible {
   color: var(--cyan);
@@ -541,6 +598,10 @@ button {
 
 .bot-lab-dialog {
   width: min(860px, calc(100vw - 32px));
+}
+
+.profile-dialog {
+  width: min(680px, calc(100vw - 32px));
 }
 
 .admin-panel {
@@ -604,6 +665,119 @@ button {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 2px;
+}
+
+.profile-sync-status[data-status="saved"] {
+  color: var(--green);
+}
+
+.profile-sync-status[data-status="saving"],
+.profile-sync-status[data-status="loading"] {
+  color: var(--cyan);
+}
+
+.profile-sync-status[data-status="offline"] {
+  color: var(--amber);
+}
+
+.profile-dialog-content {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(300px, 1.3fr);
+  gap: 16px;
+}
+
+.profile-identity,
+.profile-preferences {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.profile-identity > div {
+  min-width: 0;
+}
+
+.profile-identity h4,
+.profile-section-heading h4 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.profile-identity h4 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-identity p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.profile-identity .profile-source,
+.profile-section-heading span {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.profile-preferences {
+  padding: 16px;
+}
+
+.profile-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.profile-music-toggle {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 10px;
+}
+
+.profile-setting-grid,
+.profile-bot-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-setting-grid {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-setting-grid .slider-row {
+  margin-top: 0;
+}
+
+.profile-bot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 14px;
+}
+
+.profile-bot-grid .bot-slot-row {
+  grid-template-columns: 1fr;
+  gap: 6px;
 }
 
 .slider-row {
@@ -1530,6 +1704,10 @@ button {
     display: none;
   }
 
+  .profile-trigger > span:last-child {
+    display: none;
+  }
+
   .admin-dialog-backdrop {
     align-items: end;
     justify-items: stretch;
@@ -1678,6 +1856,23 @@ button {
   .bot-lab-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .profile-dialog-content {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .profile-identity {
+    padding: 12px;
+  }
+
+  .profile-preferences {
+    padding: 12px;
+  }
+
+  .profile-bot-grid {
+    grid-template-columns: 1fr;
   }
 
   .bot-lab-dialog .dialog-scroll-region {

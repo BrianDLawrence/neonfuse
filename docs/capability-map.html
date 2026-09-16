@@ -664,18 +664,18 @@
           <p class="brand-kicker">Neon Fuse / Product + Architecture</p>
           <h1>Capability Map</h1>
           <p>
-            A code-reviewed view of the playable product, its supporting systems, and the next
-            bounded steps toward generated bots and competitive play.
+            A code-reviewed view of local play, Discord-native identity and parties, authoritative
+            realtime duels, persistent profiles, and the next bounded intelligence systems.
           </p>
         </div>
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>15</strong>
+            <strong>20</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
-            <strong>7</strong>
+            <strong>4</strong>
           </div>
         </div>
       </header>
@@ -684,38 +684,38 @@
         <section class="core-loop" aria-labelledby="core-loop-title">
           <div class="section-heading">
             <div>
-              <p class="section-kicker">Implemented runtime path</p>
-              <h2 id="core-loop-title">From input to durable score</h2>
+              <p class="section-kicker">Implemented connected runtime</p>
+              <h2 id="core-loop-title">From Discord identity to trusted duel</h2>
             </div>
             <p class="section-note">
-              Gameplay remains available without MongoDB; persistence degrades to an explicit
-              offline state instead of blocking a round.
+              Local play still degrades gracefully; Discord duels use a dedicated authoritative
+              process and persist uniquely keyed results in MongoDB.
             </p>
           </div>
-          <div class="flow-track" role="img" aria-label="Input flows through React and Phaser into pure simulation, then validated API routes and MongoDB">
+          <div class="flow-track" role="img" aria-label="Verified Discord identity flows through the Activity and game client into an authoritative WebSocket simulation and MongoDB">
             <div class="flow-node">
-              <span>Input</span>
-              <strong>Keyboard + touch</strong>
+              <span>Identity</span>
+              <strong>Verified Discord user</strong>
             </div>
             <div class="flow-arrow" aria-hidden="true">→</div>
             <div class="flow-node">
-              <span>Presentation</span>
-              <strong>React HUD + Phaser</strong>
+              <span>Discord Activity</span>
+              <strong>Party + React/Phaser</strong>
             </div>
             <div class="flow-arrow" aria-hidden="true">→</div>
             <div class="flow-node">
-              <span>Rules</span>
-              <strong>Pure simulation</strong>
+              <span>Realtime</span>
+              <strong>WebSocket commands</strong>
             </div>
             <div class="flow-arrow" aria-hidden="true">→</div>
             <div class="flow-node server-boundary">
-              <span>Trust boundary</span>
-              <strong>Zod API validation</strong>
+              <span>Authority</span>
+              <strong>Server simulation</strong>
             </div>
             <div class="flow-arrow" aria-hidden="true">→</div>
             <div class="flow-node">
-              <span>Persistence</span>
-              <strong>MongoDB</strong>
+              <span>Durable state</span>
+              <strong>Profiles + duel results</strong>
             </div>
           </div>
         </section>
@@ -739,8 +739,8 @@
                 <h3 class="lane-heading">Player experience / React</h3>
                 <div class="capability-grid">
                   <button class="capability-node" type="button" aria-pressed="true" data-capability="match-modes" data-status="implemented">
-                    <strong>Two match modes</strong>
-                    <span>Local player vs bot + spectator bot skirmish.</span>
+                    <strong>Three match modes</strong>
+                    <span>Local bot match, spectator skirmish, Discord friend duel.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="bot-lab" data-status="implemented">
                     <strong>Bot Lab</strong>
@@ -765,13 +765,17 @@
                     <strong>Music screen</strong>
                     <span>Track selection, preview, music/SFX controls.</span>
                   </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="discord-activity" data-status="implemented">
+                    <strong>Discord Activity</strong>
+                    <span>Embedded sign-in, party context, and two-player launch.</span>
+                  </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="coaching" data-status="planned">
                     <strong>Post-match coaching</strong>
                     <span>LLM-authored recap and tactical guidance.</span>
                   </button>
-                  <button class="capability-node" type="button" aria-pressed="false" data-capability="profiles" data-status="planned">
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="profiles" data-status="implemented">
                     <strong>Persistent profiles</strong>
-                    <span>Player identity, progression, saved preferences.</span>
+                    <span>Verified identity and cloud-synced arena preferences.</span>
                   </button>
                 </div>
               </section>
@@ -825,13 +829,17 @@
                     <strong>Graceful offline mode</strong>
                     <span>Play continues when Mongo is absent/unavailable.</span>
                   </button>
-                  <button class="capability-node" type="button" aria-pressed="false" data-capability="authoritative" data-status="planned">
-                    <strong>Authoritative results</strong>
-                    <span>Server-trusted events for competitive scores.</span>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="discord-auth" data-status="implemented">
+                    <strong>Discord authentication</strong>
+                    <span>Web OAuth and Activity sessions share one stable player ID.</span>
                   </button>
-                  <button class="capability-node" type="button" aria-pressed="false" data-capability="multiplayer" data-status="planned">
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="authoritative" data-status="implemented">
+                    <strong>Authoritative results</strong>
+                    <span>Server simulation writes unique duel outcomes.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="multiplayer" data-status="implemented">
                     <strong>Realtime multiplayer</strong>
-                    <span>Dedicated authoritative session service.</span>
+                    <span>Two seats, ready flow, reconnect grace, and rematch.</span>
                   </button>
                 </div>
               </section>
@@ -853,21 +861,21 @@
 
             <aside class="detail-panel" data-status="implemented" aria-live="polite" aria-labelledby="detail-title">
               <p class="detail-status" id="detail-status">Implemented</p>
-              <h3 id="detail-title">Two match modes</h3>
+              <h3 id="detail-title">Three match modes</h3>
               <p class="detail-summary" id="detail-summary">
-                The same arena runtime supports direct local play and a watch-only contest between two selected bot profiles.
+                Neon Fuse supports local player-versus-bot, watch-only Bot Skirmish, and a server-authoritative Discord friend duel.
               </p>
               <div class="detail-block">
                 <strong>Owner</strong>
-                <span id="detail-owner">React setup + Phaser round orchestration</span>
+                <span id="detail-owner">React setup + local Phaser arena + authoritative duel runtime</span>
               </div>
               <div class="detail-block">
                 <strong>Code evidence</strong>
-                <span id="detail-code"><code>src/game/modes.ts</code> · <code>src/game/scenes/ArenaScene.ts</code></span>
+                <span id="detail-code"><code>src/game/modes.ts</code> · <code>src/components/game/DuelGame.tsx</code> · <code>server/rooms.ts</code></span>
               </div>
               <div class="detail-block">
                 <strong>Boundary / next condition</strong>
-                <span id="detail-boundary">Player input is disabled in Bot Skirmish; resetting preserves the active mode.</span>
+                <span id="detail-boundary">Local modes remain client-run; friend duels accept commands while the server owns state and results.</span>
               </div>
             </aside>
           </div>
@@ -880,7 +888,7 @@
               <h2 id="review-title">What is strong, what should move next</h2>
             </div>
             <p class="section-note">
-              The product boundaries are sound; the next gains come from reducing concentration in the two largest orchestration files and hardening trust.
+              Identity and realtime trust boundaries are now in place; the next gains come from durable career projections, scale hardening, and regression coverage.
             </p>
           </div>
           <div class="review-grid">
@@ -890,19 +898,20 @@
               <ol class="review-list">
                 <li><span class="review-index">01</span><span><strong>Pure, deterministic rules.</strong> Arena, blast, danger, bots, powerups, layout, and scoring run without Phaser and carry focused unit tests.</span></li>
                 <li><span class="review-index">02</span><span><strong>Explicit UI/engine bridge.</strong> React and Phaser exchange typed data through <code>GameEvents</code> and registry state.</span></li>
-                <li><span class="review-index">03</span><span><strong>Validated server inputs.</strong> Match, leaderboard, visitor, and music payloads are checked before MongoDB writes.</span></li>
-                <li><span class="review-index">04</span><span><strong>Coherent product language.</strong> HUD, dialogs, bots, audio, scores, and responsive controls share one neon arcade system.</span></li>
+                <li><span class="review-index">03</span><span><strong>Unified Discord identity.</strong> Web OAuth and short-lived Activity sessions resolve to the same private, stable player ID.</span></li>
+                <li><span class="review-index">04</span><span><strong>Authoritative friend duels.</strong> A dedicated WebSocket service owns rooms, simulation, reconnects, rematches, and result writes.</span></li>
+                <li><span class="review-index">05</span><span><strong>Domain-owned profiles.</strong> Game preferences live outside Better Auth and accept only bounded, player-editable fields.</span></li>
               </ol>
             </section>
             <section class="review-column next">
               <p class="review-label">Next hardening</p>
               <h3>Review findings to address</h3>
               <ol class="review-list">
-                <li><span class="review-index">01</span><span><strong>Decompose orchestration.</strong> <code>ArenaScene.ts</code> is 1,019 lines and <code>GameShell.tsx</code> is 888; extract round/bomb actor systems and individual dialogs/hooks.</span></li>
-                <li><span class="review-index">02</span><span><strong>Protect competitive scores.</strong> Schema validation prevents malformed payloads, but the browser still reports winner, duration, and blocks cleared.</span></li>
-                <li><span class="review-index">03</span><span><strong>Add browser regression coverage.</strong> Unit coverage is healthy; the documented load/move/bomb/post flows still need automated end-to-end checks.</span></li>
-                <li><span class="review-index">04</span><span><strong>Remove layout drift risk.</strong> Reserved HUD/control dimensions duplicate CSS values; measure rendered bands and pass them across the existing bridge.</span></li>
-                <li><span class="review-index">05</span><span><strong>Protect public write routes.</strong> Custom music creation is validated but has no authentication or rate limit; gate or disable that endpoint before broad public use.</span></li>
+                <li><span class="review-index">01</span><span><strong>Project career statistics.</strong> Apply uniquely keyed duel results to profile totals without double-counting retries; keep local results explicitly unranked.</span></li>
+                <li><span class="review-index">02</span><span><strong>Scale room routing.</strong> Realtime rooms currently live in one process; horizontal scale requires shared routing or sticky ownership.</span></li>
+                <li><span class="review-index">03</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, local play, Activity lobby, reconnect, profile sync, and result persistence flows.</span></li>
+                <li><span class="review-index">04</span><span><strong>Add public-edge rate limits.</strong> Protect authentication exchange, profile writes, tickets, and discovery before broader distribution.</span></li>
+                <li><span class="review-index">05</span><span><strong>Decompose orchestration.</strong> Continue extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
               </ol>
             </section>
           </div>
@@ -910,7 +919,7 @@
       </main>
 
       <footer class="capability-footer">
-        <p>Reviewed against repository code · 16 August 2026</p>
+        <p>Reviewed against repository code · 16 September 2026</p>
         <p>Solid = implemented · Dashed = planned</p>
       </footer>
     </div>
@@ -919,11 +928,11 @@
       const capabilityDetails = {
         "match-modes": {
           status: "implemented",
-          title: "Two match modes",
-          summary: "The same arena runtime supports direct local play and a watch-only contest between two selected bot profiles.",
-          owner: "React setup + Phaser round orchestration",
-          code: ["src/game/modes.ts", "src/game/scenes/ArenaScene.ts"],
-          boundary: "Player input is disabled in Bot Skirmish; resetting preserves the active mode."
+          title: "Three match modes",
+          summary: "Neon Fuse supports local player-versus-bot, watch-only Bot Skirmish, and a server-authoritative Discord friend duel.",
+          owner: "React setup + local Phaser arena + authoritative duel runtime",
+          code: ["src/game/modes.ts", "src/components/game/DuelGame.tsx", "server/rooms.ts"],
+          boundary: "Local modes remain client-run; friend duels accept commands while the server owns state and results."
         },
         "bot-lab": {
           status: "implemented",
@@ -965,6 +974,14 @@
           code: ["src/components/game/MusicScreen.tsx", "src/audio/AudioDirector.ts"],
           boundary: "Selected track persists locally; custom track definitions are validated before storage."
         },
+        "discord-activity": {
+          status: "implemented",
+          title: "Discord Activity",
+          summary: "Neon Fuse runs inside Discord with verified identity, connected participant context, and a friend-duel lobby tied to the Activity instance.",
+          owner: "Discord Embedded App SDK + React authentication gate",
+          code: ["src/components/auth/AuthGate.tsx", "src/app/api/activity/session/route.ts"],
+          boundary: "The browser SDK is not trusted as identity; the server exchanges the OAuth code and verifies the Discord user."
+        },
         coaching: {
           status: "planned",
           title: "Post-match coaching",
@@ -974,12 +991,12 @@
           boundary: "Generated text may explain or recommend; it must not rewrite live rules or claim authoritative game state."
         },
         profiles: {
-          status: "planned",
+          status: "implemented",
           title: "Persistent profiles",
-          summary: "Durable player identity can unify progression, preferences, match history, and future unlocks beyond the anonymous visitor record.",
-          owner: "Future React profile UI + server-only MongoDB routes",
-          code: ["docs/ARCHITECTURE.md", "src/app/api/visitors/route.ts"],
-          boundary: "Private identifiers and profile writes remain server-side; browser data is always untrusted."
+          summary: "A game-owned profile links verified Discord identity to cloud-synced audio, track, and bot preferences while reserving progression and statistics for server-owned updates.",
+          owner: "React profile dialog + validated self-service API + MongoDB",
+          code: ["src/components/game/ProfileScreen.tsx", "src/app/api/profile/route.ts", "src/lib/player-profiles.ts"],
+          boundary: "Clients can edit only allowlisted preferences; identity, XP, levels, achievements, and statistics stay server-owned."
         },
         "arena-rules": {
           status: "implemented",
@@ -1061,21 +1078,29 @@
           code: ["src/lib/mongodb.ts", "src/components/game/GameShell.tsx"],
           boundary: "The UI reports offline persistence status without interrupting the active game."
         },
+        "discord-auth": {
+          status: "implemented",
+          title: "Discord authentication",
+          summary: "Browser OAuth and embedded Activity sessions resolve the same Discord account to one private, stable Neon Fuse player ID.",
+          owner: "Better Auth + Discord OAuth exchange + player identity adapter",
+          code: ["src/lib/auth.ts", "src/lib/player-identity.ts", "src/lib/activity-session.ts"],
+          boundary: "Activity tokens are random, stored only as hashes, expire quickly, and never expose Discord or MongoDB secrets to the browser."
+        },
         authoritative: {
-          status: "planned",
+          status: "implemented",
           title: "Authoritative results",
-          summary: "Competitive rankings need a trusted event stream or server simulation that derives winner, timing, blocks, and score independently.",
-          owner: "Future authoritative game service",
-          code: ["docs/ARCHITECTURE.md", "AGENTS.md"],
-          boundary: "Schema-valid does not mean truthful; client-submitted outcomes remain explicitly untrusted."
+          summary: "The duel server advances the simulation, resolves winners and forfeits, and writes each completed result once using its unique round ID.",
+          owner: "Dedicated Node realtime service + pure duel simulation",
+          code: ["server/rooms.ts", "server/index.ts", "src/game/simulation/duel.ts"],
+          boundary: "Authority applies to friend duels; local arena scores remain client-reported and explicitly unranked."
         },
         multiplayer: {
-          status: "planned",
+          status: "implemented",
           title: "Realtime multiplayer",
-          summary: "Online matches require synchronized sessions, latency handling, and a separate authoritative runtime beyond Vercel request/response routes.",
-          owner: "Future realtime provider or dedicated game server",
-          code: ["docs/ARCHITECTURE.md"],
-          boundary: "MongoDB remains durable storage, not the realtime simulation transport."
+          summary: "Two authenticated players share an Activity lobby with seats, ready state, countdown, command sequencing, reconnect grace, and rematches.",
+          owner: "WebSocket service + React connection hook + Phaser duel scene",
+          code: ["server/realtime.ts", "server/rooms.ts", "src/components/game/useDuelConnection.ts"],
+          boundary: "Rooms currently belong to one realtime process; MongoDB stores outcomes but is not the live simulation transport."
         },
         "llm-bots": {
           status: "planned",

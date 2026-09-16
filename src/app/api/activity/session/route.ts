@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createActivitySession } from "@/lib/activity-session";
-import { discordPlayerId } from "@/lib/discord-identity";
+import { discordAvatarUrl, discordPlayerId } from "@/lib/discord-identity";
 import { findBetterAuthUserId } from "@/lib/player-identity";
 
 export const runtime = "nodejs";
@@ -21,7 +21,8 @@ const discordTokenSchema = z.object({
 const discordUserSchema = z.object({
   id: z.string().min(1),
   username: z.string().min(1),
-  global_name: z.string().nullable().optional()
+  global_name: z.string().nullable().optional(),
+  avatar: z.string().max(256).nullable().optional()
 });
 
 function activityServerIsConfigured(): boolean {
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
 
     const displayName = userPayload.data.global_name || userPayload.data.username;
     const playerId = discordPlayerId(userPayload.data.id);
+    const avatarUrl = discordAvatarUrl(userPayload.data.id, userPayload.data.avatar);
     const legacyPlayerId = await findBetterAuthUserId(userPayload.data.id);
     const activitySession = await createActivitySession(
       {
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
         legacyPlayerId,
         discordUserId: userPayload.data.id,
         displayName,
+        avatarUrl,
         instanceId: parsed.data.instanceId
       },
       tokenPayload.data.expires_in
@@ -107,7 +110,7 @@ export async function POST(request: Request) {
       accessToken: tokenPayload.data.access_token,
       sessionToken: activitySession.token,
       expiresIn: activitySession.expiresIn,
-      player: { displayName }
+      player: { displayName, avatarUrl }
     });
   } catch (error) {
     console.error("Discord Activity session creation failed", error);

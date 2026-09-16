@@ -6,12 +6,23 @@ import { DuelGame } from "./DuelGame";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
+import {
+  ProfileAvatar,
+  ProfileScreen,
+  type ProfileSyncStatus
+} from "./ProfileScreen";
+import { BUILTIN_MUSIC_TRACKS } from "@/audio/musicTracks";
 import type { MusicTrack } from "@/audio/types";
 import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import type { HighScoreEntry } from "@/lib/leaderboard";
+import {
+  DEFAULT_PROFILE_PREFERENCES,
+  type PlayerProfile,
+  type ProfilePreferences
+} from "@/lib/player-profile-types";
 import type { Direction } from "@/game/simulation/arena";
 import {
   BOT_PROFILE_ORDER,
@@ -60,6 +71,16 @@ const AUDIO_CONTROLS: Array<{
 ];
 
 const VISITOR_STORAGE_KEY = "neon-fuse:visitor-id";
+const MUSIC_TRACK_STORAGE_KEY = "neon-fuse:music-track";
+
+function readStoredMusicTrack(): MusicTrack | null {
+  try {
+    const stored = window.localStorage.getItem(MUSIC_TRACK_STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as MusicTrack) : null;
+  } catch {
+    return null;
+  }
+}
 
 function createVisitorId() {
   if (window.crypto?.randomUUID) {
@@ -135,11 +156,14 @@ export function GameShell({
   const [isBotLabOpen, setIsBotLabOpen] = useState(false);
   const [isMusicOpen, setIsMusicOpen] = useState(false);
   const [isHighScoresOpen, setIsHighScoresOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<RoundScoreResult | null>(null);
-  const [musicEnabled, setMusicEnabled] = useState(true);
-  const [musicVolume, setMusicVolume] = useState(8);
-  const [sfxVolume, setSfxVolume] = useState(9);
+  const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
+  const [profileSyncStatus, setProfileSyncStatus] = useState<ProfileSyncStatus>("loading");
+  const [musicEnabled, setMusicEnabled] = useState(DEFAULT_PROFILE_PREFERENCES.musicEnabled);
+  const [musicVolume, setMusicVolume] = useState(DEFAULT_PROFILE_PREFERENCES.musicVolume);
+  const [sfxVolume, setSfxVolume] = useState(DEFAULT_PROFILE_PREFERENCES.sfxVolume);
   const [selectedTrack, setSelectedTrack] = useState<MusicTrack | null>(null);
   const touchApiRef = useRef<TouchControlsApi | null>(null);
   const musicEnabledRef = useRef(musicEnabled);
@@ -147,6 +171,7 @@ export function GameShell({
   const sfxVolumeRef = useRef(sfxVolume);
   const selectedTrackRef = useRef(selectedTrack);
   const visitorIdRef = useRef<string | null>(null);
+  const profileSaveSequenceRef = useRef(0);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
   const touchControlsEnabled = useTouchControlsEnabled();
 
@@ -170,23 +195,18 @@ export function GameShell({
     selectedTrackRef.current = selectedTrack;
   }, [selectedTrack]);
 
-  // Restore the last chosen music track (the app's only persisted preference)
-  // so it drives gameplay again after a reload.
+  // Local storage remains the immediate fallback while the signed-in profile loads.
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("neon-fuse:music-track");
-      if (stored) {
-        const parsed = JSON.parse(stored) as MusicTrack;
-        setSelectedTrack(parsed);
-        selectedTrackRef.current = parsed;
-      }
-    } catch {
-      // Ignore unreadable/corrupt storage.
+    const stored = readStoredMusicTrack();
+
+    if (stored) {
+      setSelectedTrack(stored);
+      selectedTrackRef.current = stored;
     }
   }, []);
 
   useEffect(() => {
-    if (!isAdminOpen && !isBotLabOpen && !isHighScoresOpen && !isMusicOpen) {
+    if (!isAdminOpen && !isBotLabOpen && !isHighScoresOpen && !isMusicOpen && !isProfileOpen) {
       return undefined;
     }
 
@@ -196,12 +216,113 @@ export function GameShell({
         setIsBotLabOpen(false);
         setIsMusicOpen(false);
         setIsHighScoresOpen(false);
+        setIsProfileOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdminOpen, isBotLabOpen, isHighScoresOpen, isMusicOpen]);
+  }, [isAdminOpen, isBotLabOpen, isHighScoresOpen, isMusicOpen, isProfileOpen]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      try {
+        const response = await fetch("/api/profile", {
+          headers: authenticatedHeaders(authToken)
+        });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          created?: boolean;
+          profile?: PlayerProfile;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.ok || !payload.profile) {
+          throw new Error(payload.error ?? "Profile sync unavailable");
+        }
+
+        let profile = payload.profile;
+        const localTrack = readStoredMusicTrack();
+
+        if (payload.created && !profile.preferences.selectedTrackId && localTrack) {
+          const migrationResponse = await fetch("/api/profile", {
+            method: "PATCH",
+            headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+            body: JSON.stringify({ preferences: { selectedTrackId: localTrack.id } })
+          });
+          const migrationPayload = (await migrationResponse.json()) as {
+            ok?: boolean;
+            profile?: PlayerProfile;
+          };
+
+          if (migrationResponse.ok && migrationPayload.ok && migrationPayload.profile) {
+            profile = migrationPayload.profile;
+          }
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setPlayerProfile(profile);
+        setProfileSyncStatus("saved");
+        setMusicEnabled(profile.preferences.musicEnabled);
+        setMusicVolume(profile.preferences.musicVolume);
+        setSfxVolume(profile.preferences.sfxVolume);
+        setBotSelection(profile.preferences.botSelection);
+        setSelectedBotInfo(profile.preferences.botSelection["bot-a"]);
+        musicEnabledRef.current = profile.preferences.musicEnabled;
+        musicVolumeRef.current = profile.preferences.musicVolume;
+        sfxVolumeRef.current = profile.preferences.sfxVolume;
+        touchApiRef.current?.setMusicEnabled(
+          profile.preferences.musicEnabled,
+          profile.preferences.musicVolume / 10
+        );
+        touchApiRef.current?.setSfxVolume(profile.preferences.sfxVolume / 10);
+
+        const selectedTrackId = profile.preferences.selectedTrackId;
+
+        if (!selectedTrackId) {
+          return;
+        }
+
+        let track = localTrack?.id === selectedTrackId ? localTrack : null;
+        track ??= BUILTIN_MUSIC_TRACKS.find((candidate) => candidate.id === selectedTrackId) ?? null;
+
+        if (!track) {
+          try {
+            const tracksResponse = await fetch("/api/music/tracks");
+            const tracksPayload = (await tracksResponse.json()) as { tracks?: MusicTrack[] };
+            track = tracksPayload.tracks?.find((candidate) => candidate.id === selectedTrackId) ?? null;
+          } catch {
+            // The profile itself is still synced even if a custom track is unavailable.
+          }
+        }
+
+        if (active && track) {
+          setSelectedTrack(track);
+          selectedTrackRef.current = track;
+          touchApiRef.current?.setMusicTrack(track);
+          try {
+            window.localStorage.setItem(MUSIC_TRACK_STORAGE_KEY, JSON.stringify(track));
+          } catch {
+            // Profile storage remains the source of truth when local storage is unavailable.
+          }
+        }
+      } catch {
+        if (active) {
+          setProfileSyncStatus("offline");
+        }
+      }
+    }
+
+    void loadProfile();
+    return () => {
+      active = false;
+    };
+  }, [authToken]);
 
   useEffect(() => {
     const nextVisitorId = readOrCreateVisitorId();
@@ -231,6 +352,47 @@ export function GameShell({
 
     void registerVisitor();
   }, [authToken]);
+
+  const persistProfilePreferences = useCallback(
+    async (preferences: Partial<ProfilePreferences>) => {
+      const sequence = ++profileSaveSequenceRef.current;
+      setProfileSyncStatus("saving");
+      setPlayerProfile((current) =>
+        current
+          ? {
+              ...current,
+              preferences: { ...current.preferences, ...preferences }
+            }
+          : current
+      );
+
+      try {
+        const response = await fetch("/api/profile", {
+          method: "PATCH",
+          headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+          body: JSON.stringify({ preferences })
+        });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          profile?: PlayerProfile;
+        };
+
+        if (!response.ok || !payload.ok || !payload.profile) {
+          throw new Error("Profile sync failed");
+        }
+
+        if (profileSaveSequenceRef.current === sequence) {
+          setPlayerProfile(payload.profile);
+          setProfileSyncStatus("saved");
+        }
+      } catch {
+        if (profileSaveSequenceRef.current === sequence) {
+          setProfileSyncStatus("offline");
+        }
+      }
+    },
+    [authToken]
+  );
 
   const handleLoadoutChange = useCallback(
     ({
@@ -282,8 +444,10 @@ export function GameShell({
       ...currentSelection,
       [slot]: profileId
     }));
+    const nextSelection = { ...botSelection, [slot]: profileId };
+    void persistProfilePreferences({ botSelection: nextSelection });
     setSelectedBotInfo(profileId);
-  }, []);
+  }, [botSelection, persistProfilePreferences]);
   const handleModeStart = useCallback((mode: GameMode) => {
     setModeCommand((currentCommand) => ({
       mode,
@@ -371,11 +535,13 @@ export function GameShell({
     touchApiRef.current?.setMusicTrack(track);
 
     try {
-      window.localStorage.setItem("neon-fuse:music-track", JSON.stringify(track));
+      window.localStorage.setItem(MUSIC_TRACK_STORAGE_KEY, JSON.stringify(track));
     } catch {
       // Storage may be unavailable (private mode); the choice still applies this session.
     }
-  }, []);
+
+    void persistProfilePreferences({ selectedTrackId: track.id });
+  }, [persistProfilePreferences]);
   const handlePreviewTrack = useCallback((track: MusicTrack) => {
     touchApiRef.current?.previewMusicTrack(track);
   }, []);
@@ -386,9 +552,10 @@ export function GameShell({
     setMusicEnabled((currentEnabled) => {
       const nextEnabled = !currentEnabled;
       touchApiRef.current?.setMusicEnabled(nextEnabled, musicVolumeRef.current / 10);
+      void persistProfilePreferences({ musicEnabled: nextEnabled });
       return nextEnabled;
     });
-  }, []);
+  }, [persistProfilePreferences]);
   const handleAudioVolumeChange = useCallback((type: "music" | "sfx", value: number) => {
     if (type === "music") {
       setMusicVolume(value);
@@ -397,12 +564,47 @@ export function GameShell({
         touchApiRef.current?.setMusicVolume(value / 10);
       }
 
+      void persistProfilePreferences({ musicVolume: value });
+
       return;
     }
 
     setSfxVolume(value);
     touchApiRef.current?.setSfxVolume(value / 10);
-  }, []);
+    void persistProfilePreferences({ sfxVolume: value });
+  }, [persistProfilePreferences]);
+  const handleProfilePreferencesChange = useCallback(
+    (preferences: Partial<ProfilePreferences>) => {
+      if (preferences.musicEnabled !== undefined) {
+        setMusicEnabled(preferences.musicEnabled);
+        musicEnabledRef.current = preferences.musicEnabled;
+        touchApiRef.current?.setMusicEnabled(
+          preferences.musicEnabled,
+          musicVolumeRef.current / 10
+        );
+      }
+
+      if (preferences.musicVolume !== undefined) {
+        setMusicVolume(preferences.musicVolume);
+        musicVolumeRef.current = preferences.musicVolume;
+        touchApiRef.current?.setMusicVolume(preferences.musicVolume / 10);
+      }
+
+      if (preferences.sfxVolume !== undefined) {
+        setSfxVolume(preferences.sfxVolume);
+        sfxVolumeRef.current = preferences.sfxVolume;
+        touchApiRef.current?.setSfxVolume(preferences.sfxVolume / 10);
+      }
+
+      if (preferences.botSelection) {
+        setBotSelection(preferences.botSelection);
+        setSelectedBotInfo(preferences.botSelection["bot-a"]);
+      }
+
+      void persistProfilePreferences(preferences);
+    },
+    [persistProfilePreferences]
+  );
   const handleTouchDirectionStart = useCallback((direction: Direction) => {
     touchApiRef.current?.setDirection(direction);
   }, []);
@@ -415,6 +617,15 @@ export function GameShell({
   const handleTouchReset = useCallback(() => {
     touchApiRef.current?.requestReset();
   }, []);
+
+  const profilePreferences: ProfilePreferences = {
+    musicEnabled,
+    musicVolume,
+    sfxVolume,
+    selectedTrackId: selectedTrack?.id ?? null,
+    botSelection
+  };
+  const profileDisplayName = playerProfile?.identity.displayName ?? accountName;
 
   if (isDuelOpen) return <DuelGame authToken={authToken} onLeave={() => setIsDuelOpen(false)} />;
 
@@ -544,9 +755,20 @@ export function GameShell({
             <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
               Admin
             </a>
-            <span className="account-name" title={accountName}>
-              {accountName}
-            </span>
+            <button
+              aria-haspopup="dialog"
+              className="profile-trigger"
+              onClick={() => setIsProfileOpen(true)}
+              title={`Open ${profileDisplayName}'s profile`}
+              type="button"
+            >
+              <ProfileAvatar
+                avatarUrl={playerProfile?.identity.avatarUrl}
+                name={profileDisplayName}
+                size="small"
+              />
+              <span>{profileDisplayName}</span>
+            </button>
             {connectionLabel ? (
               <span className="account-name account-context">{connectionLabel}</span>
             ) : null}
@@ -559,6 +781,17 @@ export function GameShell({
             </button>
           </div>
         </aside>
+
+        {isProfileOpen ? (
+          <ProfileScreen
+            fallbackName={accountName}
+            onClose={() => setIsProfileOpen(false)}
+            onPreferencesChange={handleProfilePreferencesChange}
+            preferences={profilePreferences}
+            profile={playerProfile}
+            syncStatus={profileSyncStatus}
+          />
+        ) : null}
 
         {isBotLabOpen ? (
           <div className="admin-dialog-backdrop" onClick={() => setIsBotLabOpen(false)}>

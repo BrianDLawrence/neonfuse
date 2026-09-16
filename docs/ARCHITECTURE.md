@@ -104,6 +104,23 @@ Server state:
 - Leaderboards
 - Generated map or challenge metadata
 
+## Player Profiles
+
+Better Auth owns authentication records; Neon Fuse owns gameplay profiles in the
+`player_profiles` collection. The profile key is the stable private player ID
+derived by `getAuthenticatedPlayer`, never a mutable Discord name or avatar URL.
+
+- `GET /api/profile` creates or refreshes the authenticated player's profile.
+- `PATCH /api/profile` accepts only the bounded preference fields defined in
+  `src/lib/schemas/profile.ts`.
+- Verified Discord names and avatars are refreshed from the authenticated
+  identity and cannot be supplied by the browser.
+- Progression, statistics, achievements, and unlocks are server-owned fields.
+- Local match statistics must remain distinguishable from authoritative duel
+  statistics because local match facts are client-reported.
+- Future duel-stat projection must use the unique `roundId` as an idempotency key
+  so retries cannot award a win, streak, or XP twice.
+
 ## Data Flow
 
 ```mermaid
