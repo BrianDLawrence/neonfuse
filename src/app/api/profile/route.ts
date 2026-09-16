@@ -3,6 +3,7 @@ import type { Db } from "mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { getAuthenticatedPlayer, type PlayerIdentity } from "@/lib/player-identity";
+import { loadPlayerCareer } from "@/lib/player-career";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { playerProfilePatchSchema } from "@/lib/schemas/profile";
 
@@ -47,7 +48,12 @@ export async function GET(request: Request) {
   }
 
   const result = await getOrCreatePlayerProfile(context.db, context.player);
-  return NextResponse.json({ ok: true, ...result });
+  const stats = await loadPlayerCareer(context.db, context.player);
+  return NextResponse.json({
+    ok: true,
+    ...result,
+    profile: { ...result.profile, stats }
+  });
 }
 
 export async function PATCH(request: Request) {

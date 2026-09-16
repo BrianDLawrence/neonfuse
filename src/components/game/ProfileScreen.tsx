@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
 import {
   BOT_PROFILE_ORDER,
   BOT_PROFILES,
@@ -9,19 +10,33 @@ import {
   type BotSelection
 } from "@/game/simulation/bots";
 import type {
+  PlayerCareerMatch,
+  PlayerCareerStats,
   PlayerProfile,
   ProfilePreferences
 } from "@/lib/player-profile-types";
+import { EMPTY_PROFILE_MATCH_STATS } from "@/lib/player-profile-types";
+import { authenticatedHeaders } from "@/lib/authenticated-headers";
 
 export type ProfileSyncStatus = "loading" | "saved" | "saving" | "offline";
 
 type ProfileScreenProps = {
+  authToken?: string;
   fallbackName: string;
   profile: PlayerProfile | null;
   preferences: ProfilePreferences;
   syncStatus: ProfileSyncStatus;
   onClose: () => void;
   onPreferencesChange: (preferences: Partial<ProfilePreferences>) => void;
+};
+
+type HistoryStatus = "loading" | "ready" | "loading-more" | "error";
+
+const EMPTY_CAREER: PlayerCareerStats = {
+  local: { ...EMPTY_PROFILE_MATCH_STATS },
+  duel: { ...EMPTY_PROFILE_MATCH_STATS },
+  bestScore: 0,
+  bestWinStreak: 0
 };
 
 const BOT_SLOTS: Array<{ id: BotId; label: string }> = [
@@ -43,6 +58,22 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "NF";
+}
+
+function formatDuration(durationMs: number) {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatPlayedAt(playedAt: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(new Date(playedAt));
 }
 
 export function ProfileAvatar({
@@ -68,6 +99,7 @@ export function ProfileAvatar({
 }
 
 export function ProfileScreen({
+  authToken,
   fallbackName,
   profile,
   preferences,
@@ -75,6 +107,10 @@ export function ProfileScreen({
   onClose,
   onPreferencesChange
 }: Readonly<ProfileScreenProps>) {
+  const [career, setCareer] = useState<PlayerCareerStats>(profile?.stats ?? EMPTY_CAREER);
+  const [history, setHistory] = useState<PlayerCareerMatch[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<HistoryStatus>("loading");
   const displayName = profile?.identity.displayName ?? fallbackName;
   const sourceLabel = profile?.identity.source === "discord-activity" ? "Discord Activity" : "Discord Web";
   const joinedLabel = profile
@@ -82,6 +118,43 @@ export function ProfileScreen({
         new Date(profile.createdAt)
       )
     : "Current session";
+
+  const loadHistory = useCallback(
+    async (before?: string) => {
+      setHistoryStatus(before ? "loading-more" : "loading");
+
+      try {
+        const query = new URLSearchParams({ limit: "6" });
+        if (before) query.set("before", before);
+        const response = await fetch(`/api/profile/history?${query}`, {
+          headers: authenticatedHeaders(authToken)
+        });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          stats?: PlayerCareerStats;
+          matches?: PlayerCareerMatch[];
+          nextCursor?: string | null;
+        };
+
+        if (!response.ok || !payload.ok || !payload.stats || !payload.matches) {
+          throw new Error("Career history unavailable");
+        }
+
+        const matches = payload.matches;
+        setCareer(payload.stats);
+        setHistory((current) => (before ? [...current, ...matches] : matches));
+        setNextCursor(payload.nextCursor ?? null);
+        setHistoryStatus("ready");
+      } catch {
+        setHistoryStatus("error");
+      }
+    },
+    [authToken]
+  );
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   function updateBotSelection(slot: BotId, profileId: BotProfileId) {
     const nextSelection: BotSelection = {
@@ -126,6 +199,31 @@ export function ProfileScreen({
                 <p className="profile-source">{sourceLabel}</p>
                 <h4>{displayName}</h4>
                 <p>Level {profile?.progression.level ?? 1} · Joined {joinedLabel}</p>
+              </div>
+            </section>
+
+            <section className="profile-career" aria-labelledby="profile-career-title">
+              <div className="profile-section-heading">
+                <div>
+                  <span>Career signal</span>
+                  <h4 id="profile-career-title">Match Record</h4>
+                </div>
+                <div className="profile-career-metrics">
+                  <span>Best score <strong>{career.bestScore.toLocaleString()}</strong></span>
+                  <span>Win streak <strong>{career.bestWinStreak}</strong></span>
+                </div>
+              </div>
+              <div className="profile-record-grid">
+                <div className="profile-record" data-kind="duel">
+                  <span>Verified duels</span>
+                  <strong>{career.duel.wins}-{career.duel.losses}-{career.duel.draws}</strong>
+                  <small>{career.duel.played} played</small>
+                </div>
+                <div className="profile-record" data-kind="local">
+                  <span>Local arena</span>
+                  <strong>{career.local.wins}-{career.local.losses}-{career.local.draws}</strong>
+                  <small>{career.local.played} unranked</small>
+                </div>
               </div>
             </section>
 
@@ -210,6 +308,57 @@ export function ProfileScreen({
                   );
                 })}
               </div>
+            </section>
+
+            <section className="profile-history" aria-labelledby="profile-history-title" aria-live="polite">
+              <div className="profile-section-heading">
+                <div>
+                  <span>Latest rounds</span>
+                  <h4 id="profile-history-title">Match History</h4>
+                </div>
+              </div>
+
+              {history.length ? (
+                <div className="profile-history-list">
+                  {history.map((match) => (
+                    <article className="profile-history-row" data-result={match.result} key={match.id}>
+                      <span className="profile-match-kind" data-kind={match.kind}>
+                        {match.kind === "duel" ? "Verified duel" : "Local unranked"}
+                      </span>
+                      <span className="profile-match-opponent">
+                        <strong>{match.result}</strong>
+                        <span>vs {match.opponentName}</span>
+                      </span>
+                      <span className="profile-match-meta">
+                        {match.score === null
+                          ? formatDuration(match.durationMs)
+                          : `${match.score.toLocaleString()} pts`}
+                        <small>{formatPlayedAt(match.playedAt)}</small>
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="profile-history-empty">
+                  {historyStatus === "loading" ? "Loading rounds…" : "No completed matches yet."}
+                </p>
+              )}
+
+              {historyStatus === "error" ? (
+                <p className="profile-history-error" role="status">
+                  Career history is temporarily unavailable.
+                </p>
+              ) : null}
+              {nextCursor ? (
+                <button
+                  className="command-button secondary profile-history-more"
+                  disabled={historyStatus === "loading-more"}
+                  onClick={() => void loadHistory(nextCursor)}
+                  type="button"
+                >
+                  {historyStatus === "loading-more" ? "Loading" : "Load more"}
+                </button>
+              ) : null}
             </section>
           </div>
 

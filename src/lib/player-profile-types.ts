@@ -15,6 +15,24 @@ export type ProfileMatchStats = {
   draws: number;
 };
 
+export type PlayerCareerStats = {
+  local: ProfileMatchStats;
+  duel: ProfileMatchStats;
+  bestScore: number;
+  bestWinStreak: number;
+};
+
+export type PlayerCareerMatch = {
+  id: string;
+  kind: "local" | "duel";
+  result: "win" | "loss" | "draw";
+  opponentName: string;
+  durationMs: number;
+  score: number | null;
+  reason: string | null;
+  playedAt: string;
+};
+
 export type PlayerProfile = {
   playerId: string;
   identity: {
@@ -31,12 +49,7 @@ export type PlayerProfile = {
     unlockedTitles: string[];
     equippedTitle: string | null;
   };
-  stats: {
-    local: ProfileMatchStats;
-    duel: ProfileMatchStats;
-    bestScore: number;
-    bestWinStreak: number;
-  };
+  stats: PlayerCareerStats;
   createdAt: string;
   updatedAt: string;
   lastSeenAt: string;

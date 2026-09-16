@@ -376,13 +376,17 @@ export function GameShell({
           ok?: boolean;
           profile?: PlayerProfile;
         };
+        const savedProfile = payload.profile;
 
-        if (!response.ok || !payload.ok || !payload.profile) {
+        if (!response.ok || !payload.ok || !savedProfile) {
           throw new Error("Profile sync failed");
         }
 
         if (profileSaveSequenceRef.current === sequence) {
-          setPlayerProfile(payload.profile);
+          setPlayerProfile((current) => ({
+            ...savedProfile,
+            stats: current?.stats ?? savedProfile.stats
+          }));
           setProfileSyncStatus("saved");
         }
       } catch {
@@ -784,6 +788,7 @@ export function GameShell({
 
         {isProfileOpen ? (
           <ProfileScreen
+            authToken={authToken}
             fallbackName={accountName}
             onClose={() => setIsProfileOpen(false)}
             onPreferencesChange={handleProfilePreferencesChange}

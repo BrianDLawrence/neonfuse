@@ -671,7 +671,7 @@
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>20</strong>
+            <strong>21</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
@@ -776,6 +776,10 @@
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="profiles" data-status="implemented">
                     <strong>Persistent profiles</strong>
                     <span>Verified identity and cloud-synced arena preferences.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="career" data-status="implemented">
+                    <strong>Career statistics</strong>
+                    <span>Verified duels, unranked local record, recent history.</span>
                   </button>
                 </div>
               </section>
@@ -900,14 +904,14 @@
                 <li><span class="review-index">02</span><span><strong>Explicit UI/engine bridge.</strong> React and Phaser exchange typed data through <code>GameEvents</code> and registry state.</span></li>
                 <li><span class="review-index">03</span><span><strong>Unified Discord identity.</strong> Web OAuth and short-lived Activity sessions resolve to the same private, stable player ID.</span></li>
                 <li><span class="review-index">04</span><span><strong>Authoritative friend duels.</strong> A dedicated WebSocket service owns rooms, simulation, reconnects, rematches, and result writes.</span></li>
-                <li><span class="review-index">05</span><span><strong>Domain-owned profiles.</strong> Game preferences live outside Better Auth and accept only bounded, player-editable fields.</span></li>
+                <li><span class="review-index">05</span><span><strong>Domain-owned profiles.</strong> Game preferences live outside Better Auth; career totals derive from durable source records instead of client-editable counters.</span></li>
               </ol>
             </section>
             <section class="review-column next">
               <p class="review-label">Next hardening</p>
               <h3>Review findings to address</h3>
               <ol class="review-list">
-                <li><span class="review-index">01</span><span><strong>Project career statistics.</strong> Apply uniquely keyed duel results to profile totals without double-counting retries; keep local results explicitly unranked.</span></li>
+                <li><span class="review-index">01</span><span><strong>Add progression rules.</strong> Award XP, levels, titles, and achievements from known server-owned event sources without letting the browser mutate unlocks.</span></li>
                 <li><span class="review-index">02</span><span><strong>Scale room routing.</strong> Realtime rooms currently live in one process; horizontal scale requires shared routing or sticky ownership.</span></li>
                 <li><span class="review-index">03</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, local play, Activity lobby, reconnect, profile sync, and result persistence flows.</span></li>
                 <li><span class="review-index">04</span><span><strong>Add public-edge rate limits.</strong> Protect authentication exchange, profile writes, tickets, and discovery before broader distribution.</span></li>
@@ -997,6 +1001,14 @@
           owner: "React profile dialog + validated self-service API + MongoDB",
           code: ["src/components/game/ProfileScreen.tsx", "src/app/api/profile/route.ts", "src/lib/player-profiles.ts"],
           boundary: "Clients can edit only allowlisted preferences; identity, XP, levels, achievements, and statistics stay server-owned."
+        },
+        career: {
+          status: "implemented",
+          title: "Career statistics",
+          summary: "Profiles derive separate local and duel records, best local score, authoritative duel streaks, and a paginated recent-match history from durable result documents.",
+          owner: "Pure career summarizer + authenticated history API + React profile UI",
+          code: ["src/lib/player-career.ts", "src/app/api/profile/history/route.ts", "src/components/game/ProfileScreen.tsx"],
+          boundary: "Local results are labeled unranked; verified duel totals come only from unique results written by the authoritative realtime server."
         },
         "arena-rules": {
           status: "implemented",
