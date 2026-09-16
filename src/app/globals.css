@@ -601,7 +601,7 @@ button {
 }
 
 .profile-dialog {
-  width: min(680px, calc(100vw - 32px));
+  width: min(760px, calc(100vw - 32px));
 }
 
 .admin-panel {
@@ -687,7 +687,9 @@ button {
 }
 
 .profile-identity,
-.profile-preferences {
+.profile-career,
+.profile-preferences,
+.profile-history {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -697,6 +699,11 @@ button {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.profile-career {
   min-width: 0;
   padding: 16px;
 }
@@ -737,7 +744,78 @@ button {
 }
 
 .profile-preferences {
+  grid-column: 1 / -1;
   padding: 16px;
+}
+
+.profile-career-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+}
+
+.profile-career-metrics span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-career-metrics strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.profile-record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-record {
+  min-width: 0;
+  border-left: 2px solid var(--line-strong);
+  background: rgba(34, 211, 238, 0.06);
+  padding: 9px 10px;
+}
+
+.profile-record[data-kind="local"] {
+  border-left-color: var(--amber);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.profile-record span,
+.profile-record strong,
+.profile-record small {
+  display: block;
+}
+
+.profile-record span,
+.profile-record small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-record span {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-record strong {
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.profile-record small {
+  margin-top: 2px;
+  font-size: 9px;
 }
 
 .profile-section-heading {
@@ -778,6 +856,110 @@ button {
 .profile-bot-grid .bot-slot-row {
   grid-template-columns: 1fr;
   gap: 6px;
+}
+
+.profile-history {
+  grid-column: 1 / -1;
+  padding: 16px;
+}
+
+.profile-history-list {
+  display: grid;
+}
+
+.profile-history-row {
+  display: grid;
+  grid-template-columns: 105px minmax(150px, 1fr) minmax(105px, auto);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.profile-history-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.profile-match-kind {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-match-kind[data-kind="local"] {
+  color: var(--amber);
+}
+
+.profile-match-opponent,
+.profile-match-meta {
+  min-width: 0;
+}
+
+.profile-match-opponent strong,
+.profile-match-opponent span,
+.profile-match-meta small {
+  display: block;
+}
+
+.profile-match-opponent strong {
+  color: var(--green);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-history-row[data-result="loss"] .profile-match-opponent strong {
+  color: var(--danger);
+}
+
+.profile-history-row[data-result="draw"] .profile-match-opponent strong {
+  color: var(--amber);
+}
+
+.profile-match-opponent span,
+.profile-match-meta small,
+.profile-history-empty,
+.profile-history-error {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.profile-match-opponent span {
+  overflow: hidden;
+  margin-top: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-match-meta {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.profile-match-meta small {
+  margin-top: 2px;
+}
+
+.profile-history-empty,
+.profile-history-error {
+  margin: 8px 0 0;
+}
+
+.profile-history-error {
+  color: var(--danger);
+}
+
+.profile-history-more {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 10px;
 }
 
 .slider-row {
@@ -1867,12 +2049,33 @@ button {
     padding: 12px;
   }
 
-  .profile-preferences {
+  .profile-career,
+  .profile-preferences,
+  .profile-history {
     padding: 12px;
   }
 
   .profile-bot-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-career-metrics {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .profile-career .profile-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profile-history-row {
+    grid-template-columns: 1fr auto;
+    gap: 5px 10px;
+  }
+
+  .profile-match-kind {
+    grid-column: 1 / -1;
   }
 
   .bot-lab-dialog .dialog-scroll-region {

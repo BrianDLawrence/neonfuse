@@ -142,6 +142,8 @@ References:
   reset a shared match.
 - The match server alone writes `duel_results`, with a unique index on `roundId`.
   These results are separate from client-submitted local scores and leaderboards.
+- Player profiles derive verified duel totals and streaks from these unique
+  result documents; the browser cannot submit or increment career statistics.
 - Failed writes retry while the process is alive. A hard process failure during
   a database outage can lose pending results; this is an unranked friend mode.
 - Empty rooms expire. Inputs are limited to 40 messages/second per connection;

@@ -116,10 +116,15 @@ derived by `getAuthenticatedPlayer`, never a mutable Discord name or avatar URL.
 - Verified Discord names and avatars are refreshed from the authenticated
   identity and cannot be supplied by the browser.
 - Progression, statistics, achievements, and unlocks are server-owned fields.
-- Local match statistics must remain distinguishable from authoritative duel
-  statistics because local match facts are client-reported.
-- Future duel-stat projection must use the unique `roundId` as an idempotency key
-  so retries cannot award a win, streak, or XP twice.
+- `GET /api/profile/history` returns bounded, cursor-paginated career history for
+  the authenticated player only.
+- Career totals are derived from stored `matches` and uniquely keyed
+  `duel_results`, so retries cannot increment a counter twice and existing
+  results are included without a migration.
+- Local records remain visibly unranked because their match facts are
+  client-reported. Duel records are marked verified because the realtime server
+  owns their simulation and result write.
+- A future denormalized projection must preserve `roundId` as its idempotency key.
 
 ## Data Flow
 

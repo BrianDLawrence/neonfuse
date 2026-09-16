@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/mongoIndexes", () => ({ ensureGameIndexes: vi.fn() }));
 vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: vi.fn() }));
 vi.mock("@/lib/player-identity", () => ({ getAuthenticatedPlayer: vi.fn() }));
+vi.mock("@/lib/player-career", () => ({ loadPlayerCareer: vi.fn() }));
 vi.mock("@/lib/player-profiles", () => ({
   getOrCreatePlayerProfile: vi.fn(),
   updatePlayerProfile: vi.fn()
@@ -11,6 +12,7 @@ vi.mock("@/lib/player-profiles", () => ({
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
+import { loadPlayerCareer } from "@/lib/player-career";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { GET, PATCH } from "./route";
 
@@ -26,6 +28,12 @@ beforeEach(() => {
   vi.mocked(getAuthenticatedPlayer).mockResolvedValue(player);
   vi.mocked(tryGetMongoDb).mockResolvedValue({ db: db as never, mongo: "connected" });
   vi.mocked(ensureGameIndexes).mockResolvedValue();
+  vi.mocked(loadPlayerCareer).mockResolvedValue({
+    local: { played: 1, wins: 1, losses: 0, draws: 0 },
+    duel: { played: 0, wins: 0, losses: 0, draws: 0 },
+    bestScore: 4500,
+    bestWinStreak: 0
+  });
 });
 
 describe("profile route", () => {
@@ -50,6 +58,20 @@ describe("profile route", () => {
 
     expect(response.status).toBe(400);
     expect(updatePlayerProfile).not.toHaveBeenCalled();
+  });
+
+  it("returns career statistics derived from stored match results", async () => {
+    vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
+      created: false,
+      profile: { playerId: player.id, stats: {} } as never
+    });
+
+    const response = await GET(new Request("http://localhost/api/profile"));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(loadPlayerCareer).toHaveBeenCalledWith(db, player);
+    expect(payload.profile.stats.bestScore).toBe(4500);
   });
 
   it("applies a valid preference patch to the authenticated player only", async () => {
