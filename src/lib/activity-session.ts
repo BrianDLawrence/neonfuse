@@ -10,6 +10,7 @@ interface ActivitySessionDocument {
   legacyPlayerId?: string;
   discordUserId: string;
   displayName: string;
+  avatarUrl?: string;
   instanceId: string;
   createdAt: Date;
   expiresAt: Date;
@@ -20,6 +21,7 @@ export interface ActivitySessionIdentity {
   legacyPlayerId?: string;
   discordUserId: string;
   displayName: string;
+  avatarUrl?: string;
   instanceId: string;
 }
 
@@ -99,6 +101,7 @@ export async function findActivitySession(token: string): Promise<ActivitySessio
     legacyPlayerId: session.legacyPlayerId,
     discordUserId: session.discordUserId,
     displayName: session.displayName,
+    avatarUrl: session.avatarUrl,
     instanceId: session.instanceId
   };
 }

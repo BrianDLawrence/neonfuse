@@ -13,6 +13,7 @@ export interface PlayerIdentity {
   id: string;
   legacyId?: string;
   displayName: string;
+  avatarUrl?: string;
   source: "web" | "discord-activity";
   instanceId?: string;
 }
@@ -47,6 +48,7 @@ export async function getAuthenticatedPlayer(request: Request): Promise<PlayerId
       id: session.playerId,
       legacyId: session.legacyPlayerId,
       displayName: session.displayName,
+      avatarUrl: session.avatarUrl,
       source: "discord-activity",
       instanceId: session.instanceId
     };
@@ -67,6 +69,7 @@ export async function getAuthenticatedPlayer(request: Request): Promise<PlayerId
     id: account ? discordPlayerId(account.accountId) : session.user.id,
     legacyId: account ? session.user.id : undefined,
     displayName: session.user.name || session.user.email,
+    avatarUrl: session.user.image ?? undefined,
     source: "web"
   };
 }
