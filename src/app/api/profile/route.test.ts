@@ -22,6 +22,13 @@ const player = {
   source: "web" as const
 };
 const db = { collection: vi.fn() };
+const storedProgression = {
+  xp: 0,
+  level: 1,
+  badges: [],
+  unlockedTitles: ["fuse-initiate"],
+  equippedTitle: "fuse-initiate"
+} as const;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -63,7 +70,7 @@ describe("profile route", () => {
   it("returns career statistics derived from stored match results", async () => {
     vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
       created: false,
-      profile: { playerId: player.id, stats: {} } as never
+      profile: { playerId: player.id, stats: {}, progression: storedProgression } as never
     });
 
     const response = await GET(new Request("http://localhost/api/profile"));
@@ -72,10 +79,14 @@ describe("profile route", () => {
     expect(response.status).toBe(200);
     expect(loadPlayerCareer).toHaveBeenCalledWith(db, player);
     expect(payload.profile.stats.bestScore).toBe(4500);
+    expect(payload.profile.progression.unlockedTitles).toContain("arena-breaker");
   });
 
   it("applies a valid preference patch to the authenticated player only", async () => {
-    vi.mocked(updatePlayerProfile).mockResolvedValue({ playerId: player.id } as never);
+    vi.mocked(updatePlayerProfile).mockResolvedValue({
+      playerId: player.id,
+      progression: storedProgression
+    } as never);
 
     const response = await PATCH(
       new Request("http://localhost/api/profile", {
@@ -89,5 +100,40 @@ describe("profile route", () => {
     expect(updatePlayerProfile).toHaveBeenCalledWith(db, player, {
       preferences: { musicVolume: 6 }
     });
+  });
+
+  it("rejects a known title until the authenticated player has unlocked it", async () => {
+    const response = await PATCH(
+      new Request("http://localhost/api/profile", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ equippedTitle: "duel-certified" })
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(updatePlayerProfile).not.toHaveBeenCalled();
+  });
+
+  it("persists an equipped title after deriving its unlock from career facts", async () => {
+    vi.mocked(updatePlayerProfile).mockResolvedValue({
+      playerId: player.id,
+      progression: { ...storedProgression, equippedTitle: "arena-breaker" }
+    } as never);
+
+    const response = await PATCH(
+      new Request("http://localhost/api/profile", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ equippedTitle: "arena-breaker" })
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(updatePlayerProfile).toHaveBeenCalledWith(db, player, {
+      equippedTitle: "arena-breaker"
+    });
+    expect(payload.profile.progression.equippedTitle).toBe("arena-breaker");
   });
 });

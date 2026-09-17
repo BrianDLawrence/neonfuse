@@ -17,6 +17,15 @@ import type {
 } from "@/lib/player-profile-types";
 import { EMPTY_PROFILE_MATCH_STATS } from "@/lib/player-profile-types";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
+import {
+  ACHIEVEMENTS,
+  ACHIEVEMENT_IDS,
+  PLAYER_TITLES,
+  calculatePlayerProgression,
+  getLevelProgress,
+  type PlayerProgression,
+  type PlayerTitleId
+} from "@/game/simulation/progression";
 
 export type ProfileSyncStatus = "loading" | "saved" | "saving" | "offline";
 
@@ -28,6 +37,7 @@ type ProfileScreenProps = {
   syncStatus: ProfileSyncStatus;
   onClose: () => void;
   onPreferencesChange: (preferences: Partial<ProfilePreferences>) => void;
+  onEquippedTitleChange: (titleId: PlayerTitleId) => void;
 };
 
 type HistoryStatus = "loading" | "ready" | "loading-more" | "error";
@@ -105,9 +115,13 @@ export function ProfileScreen({
   preferences,
   syncStatus,
   onClose,
-  onPreferencesChange
+  onPreferencesChange,
+  onEquippedTitleChange
 }: Readonly<ProfileScreenProps>) {
   const [career, setCareer] = useState<PlayerCareerStats>(profile?.stats ?? EMPTY_CAREER);
+  const [progression, setProgression] = useState<PlayerProgression>(
+    profile?.progression ?? calculatePlayerProgression(EMPTY_CAREER)
+  );
   const [history, setHistory] = useState<PlayerCareerMatch[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>("loading");
@@ -118,6 +132,7 @@ export function ProfileScreen({
         new Date(profile.createdAt)
       )
     : "Current session";
+  const levelProgress = getLevelProgress(progression.xp);
 
   const loadHistory = useCallback(
     async (before?: string) => {
@@ -132,16 +147,24 @@ export function ProfileScreen({
         const payload = (await response.json()) as {
           ok?: boolean;
           stats?: PlayerCareerStats;
+          progression?: PlayerProgression;
           matches?: PlayerCareerMatch[];
           nextCursor?: string | null;
         };
 
-        if (!response.ok || !payload.ok || !payload.stats || !payload.matches) {
+        if (
+          !response.ok ||
+          !payload.ok ||
+          !payload.stats ||
+          !payload.progression ||
+          !payload.matches
+        ) {
           throw new Error("Career history unavailable");
         }
 
         const matches = payload.matches;
         setCareer(payload.stats);
+        setProgression(payload.progression);
         setHistory((current) => (before ? [...current, ...matches] : matches));
         setNextCursor(payload.nextCursor ?? null);
         setHistoryStatus("ready");
@@ -155,6 +178,12 @@ export function ProfileScreen({
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
+
+  useEffect(() => {
+    if (profile?.progression) {
+      setProgression(profile.progression);
+    }
+  }, [profile?.progression]);
 
   function updateBotSelection(slot: BotId, profileId: BotProfileId) {
     const nextSelection: BotSelection = {
@@ -198,7 +227,8 @@ export function ProfileScreen({
               <div>
                 <p className="profile-source">{sourceLabel}</p>
                 <h4>{displayName}</h4>
-                <p>Level {profile?.progression.level ?? 1} · Joined {joinedLabel}</p>
+                <p>{PLAYER_TITLES[progression.equippedTitle].name}</p>
+                <p>Level {progression.level} · Joined {joinedLabel}</p>
               </div>
             </section>
 
@@ -224,6 +254,73 @@ export function ProfileScreen({
                   <strong>{career.local.wins}-{career.local.losses}-{career.local.draws}</strong>
                   <small>{career.local.played} unranked</small>
                 </div>
+              </div>
+            </section>
+
+            <section className="profile-progression" aria-labelledby="profile-progression-title">
+              <div className="profile-section-heading">
+                <div>
+                  <span>Earned progression</span>
+                  <h4 id="profile-progression-title">Level {progression.level}</h4>
+                </div>
+                <strong className="profile-xp-total">{progression.xp.toLocaleString()} XP</strong>
+              </div>
+
+              <div className="profile-level-meter">
+                <div className="profile-level-meter-label">
+                  <span>{levelProgress.current} / {levelProgress.required} XP</span>
+                  <span>{levelProgress.percent}%</span>
+                </div>
+                <div
+                  aria-label={`Level progress: ${levelProgress.percent}%`}
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={levelProgress.percent}
+                  className="profile-level-track"
+                  role="progressbar"
+                >
+                  <span style={{ width: `${levelProgress.percent}%` }} />
+                </div>
+              </div>
+
+              <label className="profile-title-picker">
+                <span>Equipped title</span>
+                <select
+                  className="bot-select"
+                  onChange={(event) => {
+                    const titleId = event.target.value as PlayerTitleId;
+                    setProgression((current) => ({ ...current, equippedTitle: titleId }));
+                    onEquippedTitleChange(titleId);
+                  }}
+                  value={progression.equippedTitle}
+                >
+                  {progression.unlockedTitles.map((titleId) => (
+                    <option key={titleId} value={titleId}>
+                      {PLAYER_TITLES[titleId].name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="profile-achievement-grid" aria-label="Achievement progress">
+                {ACHIEVEMENT_IDS.map((achievementId) => {
+                  const achievement = ACHIEVEMENTS[achievementId];
+                  const unlocked = progression.badges.includes(achievementId);
+
+                  return (
+                    <article
+                      className="profile-achievement"
+                      data-unlocked={unlocked}
+                      key={achievementId}
+                    >
+                      <span aria-hidden="true">{unlocked ? "ON" : "--"}</span>
+                      <div>
+                        <strong>{achievement.name}</strong>
+                        <small>{achievement.description}</small>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
 

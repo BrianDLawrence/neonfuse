@@ -7,10 +7,12 @@ vi.mock("@/lib/player-career", () => ({
   loadPlayerHistory: vi.fn()
 }));
 vi.mock("@/lib/player-identity", () => ({ getAuthenticatedPlayer: vi.fn() }));
+vi.mock("@/lib/player-profiles", () => ({ getOrCreatePlayerProfile: vi.fn() }));
 
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { loadPlayerCareer, loadPlayerHistory } from "@/lib/player-career";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
+import { getOrCreatePlayerProfile } from "@/lib/player-profiles";
 import { GET } from "./route";
 
 const player = { id: "player-a", displayName: "Alice", source: "web" as const };
@@ -27,6 +29,18 @@ beforeEach(() => {
     bestWinStreak: 1
   });
   vi.mocked(loadPlayerHistory).mockResolvedValue({ matches: [], nextCursor: null });
+  vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
+    created: false,
+    profile: {
+      progression: {
+        xp: 0,
+        level: 1,
+        badges: [],
+        unlockedTitles: ["fuse-initiate"],
+        equippedTitle: "fuse-initiate"
+      }
+    } as never
+  });
 });
 
 describe("profile history route", () => {
@@ -53,5 +67,6 @@ describe("profile history route", () => {
     expect(response.status).toBe(200);
     expect(loadPlayerCareer).toHaveBeenCalledWith(db, player);
     expect(loadPlayerHistory).toHaveBeenCalledWith(db, player, 8, new Date(before));
+    expect((await response.json()).progression.unlockedTitles).toContain("duel-certified");
   });
 });

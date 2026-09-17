@@ -6,6 +6,7 @@ import { getAuthenticatedPlayer, type PlayerIdentity } from "@/lib/player-identi
 import { loadPlayerCareer } from "@/lib/player-career";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { playerProfilePatchSchema } from "@/lib/schemas/profile";
+import { calculatePlayerProgression } from "@/game/simulation/progression";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,10 +50,14 @@ export async function GET(request: Request) {
 
   const result = await getOrCreatePlayerProfile(context.db, context.player);
   const stats = await loadPlayerCareer(context.db, context.player);
+  const progression = calculatePlayerProgression(
+    stats,
+    result.profile.progression.equippedTitle
+  );
   return NextResponse.json({
     ok: true,
     ...result,
-    profile: { ...result.profile, stats }
+    profile: { ...result.profile, stats, progression }
   });
 }
 
@@ -72,6 +77,18 @@ export async function PATCH(request: Request) {
     );
   }
 
+  const stats = await loadPlayerCareer(context.db, context.player);
+  const requestedTitle = parsed.data.equippedTitle;
+
+  if (requestedTitle) {
+    const availableProgression = calculatePlayerProgression(stats, requestedTitle);
+
+    if (availableProgression.equippedTitle !== requestedTitle) {
+      return NextResponse.json({ ok: false, error: "Title is not unlocked" }, { status: 403 });
+    }
+  }
+
   const profile = await updatePlayerProfile(context.db, context.player, parsed.data);
-  return NextResponse.json({ ok: true, profile });
+  const progression = calculatePlayerProgression(stats, profile.progression.equippedTitle);
+  return NextResponse.json({ ok: true, profile: { ...profile, stats, progression } });
 }

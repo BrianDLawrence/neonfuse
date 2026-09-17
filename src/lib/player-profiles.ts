@@ -1,5 +1,6 @@
 import type { Db, WithId } from "mongodb";
 import type { PlayerIdentity } from "@/lib/player-identity";
+import { calculatePlayerProgression } from "@/game/simulation/progression";
 import {
   DEFAULT_PROFILE_PREFERENCES,
   EMPTY_PROFILE_MATCH_STATS,
@@ -26,13 +27,12 @@ function defaultDocument(now: Date): Omit<PlayerProfileDocument, "playerId" | "i
       ...DEFAULT_PROFILE_PREFERENCES,
       botSelection: { ...DEFAULT_PROFILE_PREFERENCES.botSelection }
     },
-    progression: {
-      xp: 0,
-      level: 1,
-      badges: [],
-      unlockedTitles: [],
-      equippedTitle: null
-    },
+    progression: calculatePlayerProgression({
+      local: EMPTY_PROFILE_MATCH_STATS,
+      duel: EMPTY_PROFILE_MATCH_STATS,
+      bestScore: 0,
+      bestWinStreak: 0
+    }),
     stats: {
       local: { ...EMPTY_PROFILE_MATCH_STATS },
       duel: { ...EMPTY_PROFILE_MATCH_STATS },
@@ -121,11 +121,17 @@ export async function updatePlayerProfile(
 ): Promise<PlayerProfile> {
   await getOrCreatePlayerProfile(db, player);
   const now = new Date();
+  const updates = preferenceUpdates(patch.preferences ?? {});
+
+  if (patch.equippedTitle !== undefined) {
+    updates["progression.equippedTitle"] = patch.equippedTitle;
+  }
+
   await db.collection<PlayerProfileDocument>(COLLECTION_NAME).updateOne(
     { playerId: player.id },
     {
       $set: {
-        ...preferenceUpdates(patch.preferences),
+        ...updates,
         identity: identityFields(player, now),
         updatedAt: now,
         lastSeenAt: now
