@@ -61,3 +61,22 @@ React owns text-heavy UI. Phaser owns the playfield.
 ## License
 
 MIT License. Copyright (c) 2026 Spero Autem LLC.
+
+## Discord compliance surfaces
+
+Neon Fuse exposes public, unauthenticated routes for Discord review and App
+Directory setup:
+
+- `/privacy` — data collection, use, sharing, retention, and deletion policy
+- `/terms` — player-facing terms of service
+- `/support` — troubleshooting, privacy controls, and support channels
+
+Set `SUPPORT_EMAIL` and `DISCORD_SUPPORT_URL` in the production environment
+before submitting the App Directory listing. The support server must be a
+Discord Community server.
+
+Signed-in players can permanently remove their account-linked data from
+**Fighter Profile → Data Controls**. The deletion endpoint validates the
+confirmation phrase server-side and removes profiles, matches, high scores,
+visitor records, duel records, Activity sessions, and linked authentication
+records. The client also clears Neon Fuse's visitor cookie and local choices.

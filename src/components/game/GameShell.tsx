@@ -7,6 +7,7 @@ import { DiscordPartyScreen } from "./DiscordPartyScreen";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
+import { LegalLinks } from "@/components/legal/LegalPage";
 import {
   ProfileAvatar,
   ProfileScreen,
@@ -19,6 +20,7 @@ import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
+import { MUSIC_TRACK_STORAGE_KEY, VISITOR_STORAGE_KEY } from "@/lib/client-storage";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import {
   DEFAULT_PROFILE_PREFERENCES,
@@ -71,9 +73,6 @@ const AUDIO_CONTROLS: Array<{
   { type: "music", label: "Music", iconClass: "stat-icon-music" },
   { type: "sfx", label: "SFX", iconClass: "stat-icon-sfx" }
 ];
-
-const VISITOR_STORAGE_KEY = "neon-fuse:visitor-id";
-const MUSIC_TRACK_STORAGE_KEY = "neon-fuse:music-track";
 
 function readStoredMusicTrack(): MusicTrack | null {
   try {
@@ -676,6 +675,17 @@ export function GameShell({
   const handleTouchReset = useCallback(() => {
     touchApiRef.current?.requestReset();
   }, []);
+  const handleAccountDeleted = useCallback(async () => {
+    setPlayerProfile(null);
+
+    try {
+      await onSignOut();
+    } finally {
+      if (!authToken) {
+        window.location.reload();
+      }
+    }
+  }, [authToken, onSignOut]);
 
   const profilePreferences: ProfilePreferences = {
     musicEnabled,
@@ -814,6 +824,7 @@ export function GameShell({
             <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
               Admin
             </a>
+            <LegalLinks className="hud-legal-links" linkClassName="admin-link" />
             <button
               aria-haspopup="dialog"
               className="profile-trigger"
@@ -854,6 +865,7 @@ export function GameShell({
             fallbackName={accountName}
             onClose={() => setIsProfileOpen(false)}
             onEquippedTitleChange={(titleId) => void persistEquippedTitle(titleId)}
+            onAccountDeleted={handleAccountDeleted}
             onPreferencesChange={handleProfilePreferencesChange}
             preferences={profilePreferences}
             profile={playerProfile}
