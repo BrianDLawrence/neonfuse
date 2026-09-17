@@ -12,8 +12,11 @@ depend on third-party cookies inside Discord's iframe.
 3. `/api/activity/session` exchanges that code with Discord on the server and verifies the user through `/users/@me`.
 4. The server stores only a SHA-256 hash of the opaque Neon Fuse session token. MongoDB expires it after at most one hour.
 5. Web OAuth and Activity login derive the same internal player ID from the verified Discord user ID.
-6. The HUD displays the current Activity instance participant count.
-7. **Play with a friend** opens a two-player lobby with server-authoritative matches.
+6. The HUD party link displays the current Activity participant count and opens
+   a private roster with safe profile cards for connected fighters.
+7. The party panel can open Discord's native invite dialog where the current
+   Discord context permits invitations.
+8. **Play with a friend** opens a two-player lobby with server-authoritative matches.
    See [multiplayer setup](MULTIPLAYER.md) for its additional server, credentials,
    and Discord URL mapping.
 
@@ -63,4 +66,7 @@ the Better Auth web flow. Activity behavior must be tested from inside Discord.
 - Activity bearer tokens are random, held only in client memory, stored hashed in MongoDB, and expire after at most one hour.
 - MongoDB TTL cleanup is asynchronous; authorization also checks `expiresAt`, so an expired token stops working before cleanup.
 - `instanceId` and participant data are context, not authorization. Future multiplayer APIs must validate every player action server-side.
+- `/api/social/party` revalidates instance membership with the Discord bot before
+  returning profile cards and never accepts client-supplied member IDs.
+- Party cards omit Discord IDs and private Neon Fuse player IDs.
 - Add rate limiting before public discovery or a large external test.

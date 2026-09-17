@@ -136,6 +136,24 @@ derived by `getAuthenticatedPlayer`, never a mutable Discord name or avatar URL.
   competitive rank, until local match facts become authoritative.
 - A future denormalized projection must preserve `roundId` as its idempotency key.
 
+## Discord Social Layer
+
+The Activity party is a private, instance-scoped social surface rather than a
+global player directory.
+
+- `GET /api/social/party` accepts only a short-lived Activity bearer token.
+- The server rechecks the caller and roster against Discord's Activity Instance
+  API; the browser cannot submit member IDs or inspect arbitrary profiles.
+- Public party cards contain only display name, avatar, equipped title, level,
+  and verified duel record. Discord IDs and internal player IDs never cross the
+  API boundary.
+- Party career and progression values are derived from the same durable match
+  records used by the private profile screen.
+- React owns the party dialog and invokes Discord's native invite command through
+  `AuthGate`; the SDK object is not exposed to game or simulation code.
+- Participant updates trigger a bounded roster refresh, while the authoritative
+  WebSocket service continues to own duel admission and live match state.
+
 ## Data Flow
 
 ```mermaid

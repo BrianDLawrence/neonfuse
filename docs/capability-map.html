@@ -671,7 +671,7 @@
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>22</strong>
+            <strong>23</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
@@ -768,6 +768,10 @@
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="discord-activity" data-status="implemented">
                     <strong>Discord Activity</strong>
                     <span>Embedded sign-in, party context, and two-player launch.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="discord-social" data-status="implemented">
+                    <strong>Discord social layer</strong>
+                    <span>Private party roster, profile cards, invites, duel launch.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="coaching" data-status="planned">
                     <strong>Post-match coaching</strong>
@@ -896,7 +900,7 @@
               <h2 id="review-title">What is strong, what should move next</h2>
             </div>
             <p class="section-note">
-              Identity, career history, and source-derived progression are now in place; the next gains come from scale hardening, abuse protection, and regression coverage.
+              Identity, career history, progression, and a private Discord party surface are now in place; the next gains come from scale hardening, abuse protection, and regression coverage.
             </p>
           </div>
           <div class="review-grid">
@@ -909,6 +913,7 @@
                 <li><span class="review-index">03</span><span><strong>Unified Discord identity.</strong> Web OAuth and short-lived Activity sessions resolve to the same private, stable player ID.</span></li>
                 <li><span class="review-index">04</span><span><strong>Authoritative friend duels.</strong> A dedicated WebSocket service owns rooms, simulation, reconnects, rematches, and result writes.</span></li>
                 <li><span class="review-index">05</span><span><strong>Domain-owned profiles.</strong> Game preferences live outside Better Auth; career totals derive from durable source records instead of client-editable counters.</span></li>
+                <li><span class="review-index">06</span><span><strong>Instance-scoped social data.</strong> Party cards are derived server-side from Discord-verified membership without exposing account identifiers or enabling global discovery.</span></li>
               </ol>
             </section>
             <section class="review-column next">
@@ -916,7 +921,7 @@
               <h3>Review findings to address</h3>
               <ol class="review-list">
                 <li><span class="review-index">01</span><span><strong>Scale room routing.</strong> Realtime rooms currently live in one process; horizontal scale requires shared routing or sticky ownership.</span></li>
-                <li><span class="review-index">02</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, local play, Activity lobby, reconnect, profile sync, progression refresh, and result persistence flows.</span></li>
+                <li><span class="review-index">02</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, party roster/invites, Activity lobby, reconnect, profile sync, progression refresh, and result persistence flows.</span></li>
                 <li><span class="review-index">03</span><span><strong>Add public-edge rate limits.</strong> Protect authentication exchange, profile writes, tickets, and discovery before broader distribution.</span></li>
                 <li><span class="review-index">04</span><span><strong>Separate competitive rewards.</strong> Keep local achievements cosmetic until local match facts have an authoritative source.</span></li>
                 <li><span class="review-index">05</span><span><strong>Decompose orchestration.</strong> Continue extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
@@ -989,6 +994,14 @@
           owner: "Discord Embedded App SDK + React authentication gate",
           code: ["src/components/auth/AuthGate.tsx", "src/app/api/activity/session/route.ts"],
           boundary: "The browser SDK is not trusted as identity; the server exchanges the OAuth code and verifies the Discord user."
+        },
+        "discord-social": {
+          status: "implemented",
+          title: "Discord social layer",
+          summary: "Connected Activity participants appear in a private party roster with safe profile cards, native Discord invites, and a direct path into the authoritative duel lobby.",
+          owner: "Discord SDK command + authenticated social API + React party dialog",
+          code: ["src/components/game/DiscordPartyScreen.tsx", "src/app/api/social/party/route.ts", "src/lib/discord-party.ts"],
+          boundary: "The server verifies current Activity membership and returns no Discord IDs or internal player IDs; there is no global profile search."
         },
         coaching: {
           status: "planned",

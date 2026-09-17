@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { DuelGame } from "./DuelGame";
+import { DiscordPartyScreen } from "./DiscordPartyScreen";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
@@ -130,12 +131,16 @@ function useTouchControlsEnabled() {
 export function GameShell({
   accountName,
   authToken,
+  activityParticipantCount,
   connectionLabel,
+  onInviteFriends,
   onSignOut
 }: Readonly<{
   accountName: string;
   authToken?: string;
+  activityParticipantCount?: number;
   connectionLabel?: string;
+  onInviteFriends?: () => Promise<void>;
   onSignOut: () => Promise<void>;
 }>) {
   const [isDuelOpen, setIsDuelOpen] = useState(false);
@@ -158,6 +163,7 @@ export function GameShell({
   const [isMusicOpen, setIsMusicOpen] = useState(false);
   const [isHighScoresOpen, setIsHighScoresOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isPartyOpen, setIsPartyOpen] = useState(false);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<RoundScoreResult | null>(null);
   const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
@@ -207,7 +213,7 @@ export function GameShell({
   }, []);
 
   useEffect(() => {
-    if (!isAdminOpen && !isBotLabOpen && !isHighScoresOpen && !isMusicOpen && !isProfileOpen) {
+    if (!isAdminOpen && !isBotLabOpen && !isHighScoresOpen && !isMusicOpen && !isProfileOpen && !isPartyOpen) {
       return undefined;
     }
 
@@ -218,12 +224,13 @@ export function GameShell({
         setIsMusicOpen(false);
         setIsHighScoresOpen(false);
         setIsProfileOpen(false);
+        setIsPartyOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdminOpen, isBotLabOpen, isHighScoresOpen, isMusicOpen, isProfileOpen]);
+  }, [isAdminOpen, isBotLabOpen, isHighScoresOpen, isMusicOpen, isPartyOpen, isProfileOpen]);
 
   useEffect(() => {
     let active = true;
@@ -821,8 +828,15 @@ export function GameShell({
               />
               <span>{profileDisplayName}</span>
             </button>
-            {connectionLabel ? (
-              <span className="account-name account-context">{connectionLabel}</span>
+            {connectionLabel && authToken && onInviteFriends ? (
+              <button
+                aria-haspopup="dialog"
+                className="admin-link hud-link-button account-name account-context"
+                onClick={() => setIsPartyOpen(true)}
+                type="button"
+              >
+                {connectionLabel}
+              </button>
             ) : null}
             <button
               className="admin-link hud-link-button"
@@ -844,6 +858,19 @@ export function GameShell({
             preferences={profilePreferences}
             profile={playerProfile}
             syncStatus={profileSyncStatus}
+          />
+        ) : null}
+
+        {isPartyOpen && authToken && onInviteFriends ? (
+          <DiscordPartyScreen
+            authToken={authToken}
+            onClose={() => setIsPartyOpen(false)}
+            onInviteFriends={onInviteFriends}
+            onStartDuel={() => {
+              setIsPartyOpen(false);
+              setIsDuelOpen(true);
+            }}
+            participantCount={activityParticipantCount ?? 1}
           />
         ) : null}
 

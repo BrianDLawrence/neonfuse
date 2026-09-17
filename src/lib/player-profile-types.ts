@@ -34,6 +34,21 @@ export type PlayerCareerMatch = {
   playedAt: string;
 };
 
+export type DiscordPartyMember = {
+  displayName: string;
+  avatarUrl: string | null;
+  title: string;
+  level: number;
+  duel: ProfileMatchStats;
+  isCurrentPlayer: boolean;
+  profileReady: boolean;
+};
+
+export type DiscordPartyRoster = {
+  connectedCount: number;
+  members: DiscordPartyMember[];
+};
+
 export type PlayerProfile = {
   playerId: string;
   identity: {
