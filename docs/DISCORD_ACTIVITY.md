@@ -69,4 +69,8 @@ the Better Auth web flow. Activity behavior must be tested from inside Discord.
 - `/api/social/party` revalidates instance membership with the Discord bot before
   returning profile cards and never accepts client-supplied member IDs.
 - Party cards omit Discord IDs and private Neon Fuse player IDs.
-- Add rate limiting before public discovery or a large external test.
+- Activity session exchange, party lookup, multiplayer tickets, authentication,
+  and game-data writes use layered fixed-window rate limits. A per-instance
+  guard remains active during MongoDB outages, while MongoDB-backed counters
+  provide shared enforcement across serverless instances. Client addresses are
+  HMAC-hashed before storage and expired buckets are removed by TTL.

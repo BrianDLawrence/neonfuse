@@ -150,8 +150,9 @@ References:
   a database outage can lose pending results; this is an unranked friend mode.
 - Empty rooms expire. Inputs are limited to 40 messages/second per connection;
   payloads are bounded to 8 KiB, unauthenticated connections time out, and slow
-  clients are disconnected. Add platform-level connection/request rate limiting
-  before broad public discovery.
+  clients are disconnected. HTTP ticket issuance and party discovery also use
+  shared MongoDB-backed rate limits with a per-instance fallback. Platform-level
+  connection limiting remains a hosting-layer defense for volumetric attacks.
 
 ## Verification
 

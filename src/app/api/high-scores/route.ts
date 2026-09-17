@@ -5,6 +5,7 @@ import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { highScoreModeSchema, highScoreSubmitSchema } from "@/lib/schemas/high-score";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -57,6 +58,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "highScoreWrite");
+
+  if (limited) {
+    return limited;
+  }
+
   const player = await getAuthenticatedPlayer(request);
 
   if (!player) {

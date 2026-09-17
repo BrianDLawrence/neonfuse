@@ -27,6 +27,7 @@ MONGODB_URI=
 MONGODB_DB=neon-fuse
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
+RATE_LIMIT_SECRET=
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 NEXT_PUBLIC_DISCORD_CLIENT_ID=
@@ -41,6 +42,12 @@ redirect. Production needs the equivalent callback on its public domain.
 
 The health endpoint is available at `/api/health` and reports whether Discord
 authentication is configured.
+
+Public API writes and Discord session/ticket routes use layered fixed-window
+rate limits: a fast per-instance guard plus shared MongoDB counters with TTL
+cleanup. Client addresses are HMAC-hashed before storage. `RATE_LIMIT_SECRET`
+is optional and falls back to `BETTER_AUTH_SECRET`; use a separate high-entropy
+value in production when possible.
 
 Friend matches also need the persistent realtime service described in
 [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md). A Render Blueprint is included for

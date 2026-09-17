@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { findActivitySession } from "@/lib/activity-session";
 import { verifyDiscordActivityInstance } from "@/lib/discord-activity-instance";
 import { signJoinTicket } from "@/lib/multiplayer-ticket";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "multiplayerTicket");
+  if (limited) return limited;
+
   const secret = process.env.MULTIPLAYER_SECRET;
   if (!secret || secret.length < 32) {
     return NextResponse.json({ error: "Friend matches are not configured yet." }, { status: 503 });

@@ -5,12 +5,14 @@ vi.mock("@/lib/discord-activity-instance", () => ({ verifyDiscordActivityInstanc
 vi.mock("@/lib/discord-party", () => ({ loadDiscordPartyRoster: vi.fn() }));
 vi.mock("@/lib/mongoIndexes", () => ({ ensureGameIndexes: vi.fn() }));
 vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 
 import { findActivitySession } from "@/lib/activity-session";
 import { verifyDiscordActivityInstance } from "@/lib/discord-activity-instance";
 import { loadDiscordPartyRoster } from "@/lib/discord-party";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { GET } from "./route";
 
 const identity = {
@@ -27,6 +29,7 @@ const request = (token = "activity-session-token-that-is-long-enough") =>
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(enforceRateLimit).mockResolvedValue(null);
   vi.mocked(findActivitySession).mockResolvedValue(identity);
   vi.mocked(verifyDiscordActivityInstance).mockResolvedValue({
     ok: true,

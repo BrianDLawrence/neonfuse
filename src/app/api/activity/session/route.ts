@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createActivitySession } from "@/lib/activity-session";
 import { discordAvatarUrl, discordPlayerId } from "@/lib/discord-identity";
 import { findBetterAuthUserId } from "@/lib/player-identity";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,12 @@ function activityServerIsConfigured(): boolean {
 
 export async function POST(request: Request) {
   try {
+    const limited = await enforceRateLimit(request, "activitySession");
+
+    if (limited) {
+      return limited;
+    }
+
     if (!activityServerIsConfigured()) {
       return NextResponse.json(
         { error: "Discord Activity authentication is not configured." },

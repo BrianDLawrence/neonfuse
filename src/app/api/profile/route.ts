@@ -7,6 +7,7 @@ import { loadPlayerCareer } from "@/lib/player-career";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { playerProfilePatchSchema } from "@/lib/schemas/profile";
 import { calculatePlayerProgression } from "@/game/simulation/progression";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,6 +63,12 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const limited = await enforceRateLimit(request, "profileWrite");
+
+  if (limited) {
+    return limited;
+  }
+
   const context = await authenticatedContext(request);
 
   if (!context.ok) {
