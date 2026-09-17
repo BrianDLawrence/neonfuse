@@ -8,6 +8,7 @@ import {
 } from "@discord/embedded-app-sdk";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { GameShell } from "@/components/game/GameShell";
+import { LegalLinks } from "@/components/legal/LegalPage";
 import { authClient } from "@/lib/auth-client";
 
 type ActivityLoadState =
@@ -38,6 +39,7 @@ function AuthStatus({ message }: Readonly<{ message: string }>) {
         <h1>Syncing fighter profile</h1>
         <p className="auth-copy">{message}</p>
         <div className="auth-scanline" aria-hidden="true" />
+        <LegalLinks className="auth-legal-links" />
       </section>
     </main>
   );
@@ -62,6 +64,7 @@ function ActivityErrorGate({ message }: Readonly<{ message: string }>) {
         >
           Retry connection
         </button>
+        <LegalLinks className="auth-legal-links" />
       </section>
     </main>
   );
@@ -119,6 +122,7 @@ function SignInGate({ error }: Readonly<{ error?: string }>) {
           {working ? "Contacting Discord…" : "Continue with Discord"}
         </button>
         <p className="auth-footnote">Discord confirms your identity. Neon Fuse never receives your password.</p>
+        <LegalLinks className="auth-legal-links" />
       </section>
     </main>
   );

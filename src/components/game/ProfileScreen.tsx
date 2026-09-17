@@ -17,6 +17,8 @@ import type {
 } from "@/lib/player-profile-types";
 import { EMPTY_PROFILE_MATCH_STATS } from "@/lib/player-profile-types";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
+import { ACCOUNT_DELETION_CONFIRMATION } from "@/lib/account-deletion";
+import { clearNeonFuseClientStorage } from "@/lib/client-storage";
 import {
   ACHIEVEMENTS,
   ACHIEVEMENT_IDS,
@@ -36,6 +38,7 @@ type ProfileScreenProps = {
   preferences: ProfilePreferences;
   syncStatus: ProfileSyncStatus;
   onClose: () => void;
+  onAccountDeleted: () => Promise<void>;
   onPreferencesChange: (preferences: Partial<ProfilePreferences>) => void;
   onEquippedTitleChange: (titleId: PlayerTitleId) => void;
 };
@@ -115,6 +118,7 @@ export function ProfileScreen({
   preferences,
   syncStatus,
   onClose,
+  onAccountDeleted,
   onPreferencesChange,
   onEquippedTitleChange
 }: Readonly<ProfileScreenProps>) {
@@ -125,6 +129,10 @@ export function ProfileScreen({
   const [history, setHistory] = useState<PlayerCareerMatch[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>("loading");
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deletionConfirmation, setDeletionConfirmation] = useState("");
+  const [deletionStatus, setDeletionStatus] = useState<"idle" | "deleting" | "deleted">("idle");
+  const [deletionError, setDeletionError] = useState<string | null>(null);
   const displayName = profile?.identity.displayName ?? fallbackName;
   const sourceLabel = profile?.identity.source === "discord-activity" ? "Discord Activity" : "Discord Web";
   const joinedLabel = profile
@@ -191,6 +199,33 @@ export function ProfileScreen({
       [slot]: profileId
     };
     onPreferencesChange({ botSelection: nextSelection });
+  }
+
+  async function deleteAccountData() {
+    setDeletionStatus("deleting");
+    setDeletionError(null);
+
+    try {
+      const response = await fetch("/api/account", {
+        method: "DELETE",
+        headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ confirmation: deletionConfirmation })
+      });
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Account data could not be deleted");
+      }
+
+      clearNeonFuseClientStorage();
+      setDeletionStatus("deleted");
+      await onAccountDeleted();
+    } catch (error) {
+      setDeletionStatus("idle");
+      setDeletionError(
+        error instanceof Error ? error.message : "Account data could not be deleted"
+      );
+    }
   }
 
   return (
@@ -456,6 +491,87 @@ export function ProfileScreen({
                   {historyStatus === "loading-more" ? "Loading" : "Load more"}
                 </button>
               ) : null}
+            </section>
+
+            <section className="profile-data-controls" aria-labelledby="profile-data-controls-title">
+              <div className="profile-section-heading">
+                <div>
+                  <span>Privacy controls</span>
+                  <h4 id="profile-data-controls-title">Data Controls</h4>
+                </div>
+                <div className="profile-data-links">
+                  <a href="/privacy">Privacy</a>
+                  <a href="/support">Support</a>
+                </div>
+              </div>
+              <p>
+                Permanently remove your Neon Fuse profile, match history, scores,
+                visitor record, duel records, Activity sessions, and linked login data.
+              </p>
+
+              {!deletionOpen ? (
+                <button
+                  className="profile-delete-button"
+                  onClick={() => setDeletionOpen(true)}
+                  type="button"
+                >
+                  Delete account data
+                </button>
+              ) : (
+                <div className="profile-delete-confirmation" role="group" aria-labelledby="delete-data-title">
+                  <h5 id="delete-data-title">This cannot be undone</h5>
+                  <p>
+                    Type <strong>{ACCOUNT_DELETION_CONFIRMATION}</strong> to confirm permanent deletion.
+                  </p>
+                  <label>
+                    <span>Confirmation phrase</span>
+                    <input
+                      autoComplete="off"
+                      autoFocus
+                      disabled={deletionStatus === "deleting"}
+                      onChange={(event) => setDeletionConfirmation(event.target.value)}
+                      spellCheck={false}
+                      value={deletionConfirmation}
+                    />
+                  </label>
+                  {deletionError ? (
+                    <p className="profile-delete-error" role="alert">
+                      {deletionError}
+                    </p>
+                  ) : null}
+                  {deletionStatus === "deleted" ? (
+                    <p className="profile-delete-success" role="status">
+                      Your Neon Fuse account data was deleted.
+                    </p>
+                  ) : (
+                    <div className="profile-delete-actions">
+                      <button
+                        className="command-button secondary"
+                        disabled={deletionStatus === "deleting"}
+                        onClick={() => {
+                          setDeletionOpen(false);
+                          setDeletionConfirmation("");
+                          setDeletionError(null);
+                        }}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="profile-delete-button"
+                        disabled={
+                          deletionStatus === "deleting" ||
+                          deletionConfirmation !== ACCOUNT_DELETION_CONFIRMATION
+                        }
+                        onClick={() => void deleteAccountData()}
+                        type="button"
+                      >
+                        {deletionStatus === "deleting" ? "Deleting…" : "Delete permanently"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           </div>
 
