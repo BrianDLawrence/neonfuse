@@ -3,11 +3,18 @@ import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { visitorRequestSchema } from "@/lib/schemas/visitor";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const VISITOR_COOKIE = "nf_vid";
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "visitorWrite");
+
+  if (limited) {
+    return limited;
+  }
+
   const player = await getAuthenticatedPlayer(request);
 
   if (!player) {

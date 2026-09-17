@@ -4,6 +4,7 @@ import { verifyDiscordActivityInstance } from "@/lib/discord-activity-instance";
 import { loadDiscordPartyRoster } from "@/lib/discord-party";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,12 @@ function bearerToken(request: Request): string | null {
 }
 
 export async function GET(request: Request) {
+  const limited = await enforceRateLimit(request, "socialParty");
+
+  if (limited) {
+    return limited;
+  }
+
   const token = bearerToken(request);
 
   if (!token) {

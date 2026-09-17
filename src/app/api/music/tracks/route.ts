@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongodb";
+import { getAuthenticatedPlayer } from "@/lib/player-identity";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { musicTrackSchema } from "@/lib/schemas/music";
 
 // Custom tracks live in the "music-tracks" collection. The built-in tracks are
@@ -20,6 +22,18 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "musicTrackWrite");
+
+  if (limited) {
+    return limited;
+  }
+
+  const player = await getAuthenticatedPlayer(request);
+
+  if (!player) {
+    return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+  }
+
   let body: unknown;
 
   try {
