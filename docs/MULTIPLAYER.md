@@ -144,6 +144,8 @@ References:
   These results are separate from client-submitted local scores and leaderboards.
 - Player profiles derive verified duel totals and streaks from these unique
   result documents; the browser cannot submit or increment career statistics.
+- The Activity party panel uses the same verified instance-membership check as
+  duel admission before returning safe social profile cards.
 - Failed writes retry while the process is alive. A hard process failure during
   a database outage can lose pending results; this is an unranked friend mode.
 - Empty rooms expire. Inputs are limited to 40 messages/second per connection;
@@ -159,4 +161,5 @@ reconnect/forfeit, rematches, membership verification, ticket tampering/replay,
 and two real WebSocket clients receiving the same countdown.
 
 Before release, use two Discord accounts/devices in the same Activity to verify
-admission, mobile controls, shared movement/blasts/results, and reconnection.
+the party roster, native invite behavior, admission, mobile controls, shared
+movement/blasts/results, and reconnection.

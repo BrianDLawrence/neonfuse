@@ -252,8 +252,14 @@ function DiscordActivityAuthGate() {
   return (
     <GameShell
       accountName={activityState.accountName}
+      activityParticipantCount={activityState.participantCount}
       authToken={activityState.sessionToken}
       connectionLabel={partyLabel}
+      onInviteFriends={async () => {
+        const sdk = sdkRef.current;
+        if (!sdk) throw new Error("Discord SDK unavailable");
+        await sdk.commands.openInviteDialog();
+      }}
       onSignOut={async () => {
         sdkRef.current?.close(RPCCloseCodes.CLOSE_NORMAL, "Player exited Neon Fuse");
       }}
