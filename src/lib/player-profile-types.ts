@@ -1,4 +1,5 @@
 import { DEFAULT_BOT_SELECTION, type BotSelection } from "@/game/simulation/bots";
+import type { PlayerProgression } from "@/game/simulation/progression";
 
 export type ProfilePreferences = {
   musicEnabled: boolean;
@@ -42,13 +43,7 @@ export type PlayerProfile = {
     refreshedAt: string;
   };
   preferences: ProfilePreferences;
-  progression: {
-    xp: number;
-    level: number;
-    badges: string[];
-    unlockedTitles: string[];
-    equippedTitle: string | null;
-  };
+  progression: PlayerProgression;
   stats: PlayerCareerStats;
   createdAt: string;
   updatedAt: string;

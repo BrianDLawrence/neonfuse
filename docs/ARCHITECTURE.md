@@ -115,7 +115,15 @@ derived by `getAuthenticatedPlayer`, never a mutable Discord name or avatar URL.
   `src/lib/schemas/profile.ts`.
 - Verified Discord names and avatars are refreshed from the authenticated
   identity and cannot be supplied by the browser.
-- Progression, statistics, achievements, and unlocks are server-owned fields.
+- Progression is derived by the pure rules in `src/game/simulation/progression.ts`
+  from career totals; the browser cannot submit XP, levels, achievements, or
+  unlock arrays.
+- Local matches award modest, unranked XP. Verified Discord duels award more XP
+  and are the only source for duel achievements because their results are owned
+  by the realtime server.
+- `PATCH /api/profile` accepts a known `equippedTitle` ID only after the server
+  re-derives the authenticated player's unlocked titles. All other progression
+  fields remain read-only.
 - `GET /api/profile/history` returns bounded, cursor-paginated career history for
   the authenticated player only.
 - Career totals are derived from stored `matches` and uniquely keyed
@@ -124,6 +132,8 @@ derived by `getAuthenticatedPlayer`, never a mutable Discord name or avatar URL.
 - Local records remain visibly unranked because their match facts are
   client-reported. Duel records are marked verified because the realtime server
   owns their simulation and result write.
+- Local progression is suitable for personal milestones, not scarce rewards or
+  competitive rank, until local match facts become authoritative.
 - A future denormalized projection must preserve `roundId` as its idempotency key.
 
 ## Data Flow

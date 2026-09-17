@@ -28,6 +28,12 @@ describe("playerProfilePatchSchema", () => {
     ).toBe(false);
   });
 
+  it("accepts only known equip requests outside preferences", () => {
+    expect(playerProfilePatchSchema.safeParse({ equippedTitle: "arena-breaker" }).success).toBe(true);
+    expect(playerProfilePatchSchema.safeParse({ equippedTitle: "made-up-title" }).success).toBe(false);
+    expect(playerProfilePatchSchema.safeParse({ equippedTitle: null }).success).toBe(false);
+  });
+
   it("rejects out-of-range audio and unknown preference fields", () => {
     expect(
       playerProfilePatchSchema.safeParse({
@@ -51,5 +57,6 @@ describe("playerProfilePatchSchema", () => {
 
   it("rejects empty patches", () => {
     expect(playerProfilePatchSchema.safeParse({ preferences: {} }).success).toBe(false);
+    expect(playerProfilePatchSchema.safeParse({}).success).toBe(false);
   });
 });

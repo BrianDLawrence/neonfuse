@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PLAYER_TITLE_IDS } from "@/game/simulation/progression";
 
 const botProfileIdSchema = z.enum([
   "fuse-rush",
@@ -38,8 +39,12 @@ export const profilePreferencesPatchSchema = z
 
 export const playerProfilePatchSchema = z
   .object({
-    preferences: profilePreferencesPatchSchema
+    preferences: profilePreferencesPatchSchema.optional(),
+    equippedTitle: z.enum(PLAYER_TITLE_IDS).optional()
   })
-  .strict();
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: "At least one profile field is required"
+  });
 
 export type PlayerProfilePatch = z.infer<typeof playerProfilePatchSchema>;

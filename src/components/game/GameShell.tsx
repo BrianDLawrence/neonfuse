@@ -11,6 +11,7 @@ import {
   ProfileScreen,
   type ProfileSyncStatus
 } from "./ProfileScreen";
+import type { PlayerTitleId } from "@/game/simulation/progression";
 import { BUILTIN_MUSIC_TRACKS } from "@/audio/musicTracks";
 import type { MusicTrack } from "@/audio/types";
 import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
@@ -396,6 +397,53 @@ export function GameShell({
       }
     },
     [authToken]
+  );
+
+  const persistEquippedTitle = useCallback(
+    async (equippedTitle: PlayerTitleId) => {
+      const sequence = ++profileSaveSequenceRef.current;
+      const previousTitle = playerProfile?.progression.equippedTitle;
+      setProfileSyncStatus("saving");
+      setPlayerProfile((current) =>
+        current
+          ? {
+              ...current,
+              progression: { ...current.progression, equippedTitle }
+            }
+          : current
+      );
+
+      try {
+        const response = await fetch("/api/profile", {
+          method: "PATCH",
+          headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+          body: JSON.stringify({ equippedTitle })
+        });
+        const payload = (await response.json()) as { ok?: boolean; profile?: PlayerProfile };
+
+        if (!response.ok || !payload.ok || !payload.profile) {
+          throw new Error("Title sync failed");
+        }
+
+        if (profileSaveSequenceRef.current === sequence) {
+          setPlayerProfile(payload.profile);
+          setProfileSyncStatus("saved");
+        }
+      } catch {
+        if (profileSaveSequenceRef.current === sequence) {
+          setPlayerProfile((current) =>
+            current && previousTitle
+              ? {
+                  ...current,
+                  progression: { ...current.progression, equippedTitle: previousTitle }
+                }
+              : current
+          );
+          setProfileSyncStatus("offline");
+        }
+      }
+    },
+    [authToken, playerProfile?.progression.equippedTitle]
   );
 
   const handleLoadoutChange = useCallback(
@@ -791,6 +839,7 @@ export function GameShell({
             authToken={authToken}
             fallbackName={accountName}
             onClose={() => setIsProfileOpen(false)}
+            onEquippedTitleChange={(titleId) => void persistEquippedTitle(titleId)}
             onPreferencesChange={handleProfilePreferencesChange}
             preferences={profilePreferences}
             profile={playerProfile}

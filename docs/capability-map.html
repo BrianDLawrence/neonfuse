@@ -671,7 +671,7 @@
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>21</strong>
+            <strong>22</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
@@ -780,6 +780,10 @@
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="career" data-status="implemented">
                     <strong>Career statistics</strong>
                     <span>Verified duels, unranked local record, recent history.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="progression" data-status="implemented">
+                    <strong>Player progression</strong>
+                    <span>Derived XP, levels, achievements, and earned titles.</span>
                   </button>
                 </div>
               </section>
@@ -892,7 +896,7 @@
               <h2 id="review-title">What is strong, what should move next</h2>
             </div>
             <p class="section-note">
-              Identity and realtime trust boundaries are now in place; the next gains come from durable career projections, scale hardening, and regression coverage.
+              Identity, career history, and source-derived progression are now in place; the next gains come from scale hardening, abuse protection, and regression coverage.
             </p>
           </div>
           <div class="review-grid">
@@ -911,10 +915,10 @@
               <p class="review-label">Next hardening</p>
               <h3>Review findings to address</h3>
               <ol class="review-list">
-                <li><span class="review-index">01</span><span><strong>Add progression rules.</strong> Award XP, levels, titles, and achievements from known server-owned event sources without letting the browser mutate unlocks.</span></li>
-                <li><span class="review-index">02</span><span><strong>Scale room routing.</strong> Realtime rooms currently live in one process; horizontal scale requires shared routing or sticky ownership.</span></li>
-                <li><span class="review-index">03</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, local play, Activity lobby, reconnect, profile sync, and result persistence flows.</span></li>
-                <li><span class="review-index">04</span><span><strong>Add public-edge rate limits.</strong> Protect authentication exchange, profile writes, tickets, and discovery before broader distribution.</span></li>
+                <li><span class="review-index">01</span><span><strong>Scale room routing.</strong> Realtime rooms currently live in one process; horizontal scale requires shared routing or sticky ownership.</span></li>
+                <li><span class="review-index">02</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, local play, Activity lobby, reconnect, profile sync, progression refresh, and result persistence flows.</span></li>
+                <li><span class="review-index">03</span><span><strong>Add public-edge rate limits.</strong> Protect authentication exchange, profile writes, tickets, and discovery before broader distribution.</span></li>
+                <li><span class="review-index">04</span><span><strong>Separate competitive rewards.</strong> Keep local achievements cosmetic until local match facts have an authoritative source.</span></li>
                 <li><span class="review-index">05</span><span><strong>Decompose orchestration.</strong> Continue extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
               </ol>
             </section>
@@ -923,7 +927,7 @@
       </main>
 
       <footer class="capability-footer">
-        <p>Reviewed against repository code · 16 September 2026</p>
+        <p>Reviewed against repository code · 17 September 2026</p>
         <p>Solid = implemented · Dashed = planned</p>
       </footer>
     </div>
@@ -1009,6 +1013,14 @@
           owner: "Pure career summarizer + authenticated history API + React profile UI",
           code: ["src/lib/player-career.ts", "src/app/api/profile/history/route.ts", "src/components/game/ProfileScreen.tsx"],
           boundary: "Local results are labeled unranked; verified duel totals come only from unique results written by the authoritative realtime server."
+        },
+        progression: {
+          status: "implemented",
+          title: "Player progression",
+          summary: "Profiles derive XP, levels, six achievement milestones, and earned titles from durable career totals, with a clear distinction between local and verified duel rewards.",
+          owner: "Pure progression rules + authenticated profile APIs + React profile UI",
+          code: ["src/game/simulation/progression.ts", "src/app/api/profile/route.ts", "src/components/game/ProfileScreen.tsx"],
+          boundary: "The browser may request an allowlisted title, but the server re-derives unlock eligibility before persisting the equipped choice."
         },
         "arena-rules": {
           status: "implemented",

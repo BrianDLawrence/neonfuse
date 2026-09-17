@@ -4,6 +4,8 @@ import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { loadPlayerCareer, loadPlayerHistory } from "@/lib/player-career";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
+import { getOrCreatePlayerProfile } from "@/lib/player-profiles";
+import { calculatePlayerProgression } from "@/game/simulation/progression";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,15 +42,17 @@ export async function GET(request: Request) {
   }
 
   await ensureGameIndexes(db);
-  const [stats, history] = await Promise.all([
+  const [stats, history, { profile }] = await Promise.all([
     loadPlayerCareer(db, player),
     loadPlayerHistory(
       db,
       player,
       parsed.data.limit,
       parsed.data.before ? new Date(parsed.data.before) : undefined
-    )
+    ),
+    getOrCreatePlayerProfile(db, player)
   ]);
 
-  return NextResponse.json({ ok: true, stats, ...history });
+  const progression = calculatePlayerProgression(stats, profile.progression.equippedTitle);
+  return NextResponse.json({ ok: true, stats, progression, ...history });
 }
