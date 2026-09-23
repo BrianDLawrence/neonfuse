@@ -1,0 +1,33 @@
+name: Production uptime
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-uptime
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      APP_HEALTH_URL: ${{ vars.APP_HEALTH_URL }}
+      REALTIME_HEALTH_URL: ${{ vars.REALTIME_HEALTH_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check production health
+        run: npm run healthcheck:production

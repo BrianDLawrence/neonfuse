@@ -10,3 +10,7 @@ services:
     envVars:
       - key: MULTIPLAYER_SECRET
         sync: false
+      - key: MAX_REALTIME_CONNECTIONS
+        value: 200
+      - key: MAX_REALTIME_ROOMS
+        value: 100

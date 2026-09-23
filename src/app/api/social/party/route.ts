@@ -5,6 +5,7 @@ import { loadDiscordPartyRoster } from "@/lib/discord-party";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { reportOperationalError } from "@/lib/server-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,7 +61,15 @@ export async function GET(request: Request) {
       { ok: true, roster },
       { headers: { "Cache-Control": "no-store" } }
     );
-  } catch {
+  } catch (error) {
+    reportOperationalError(
+      {
+        service: "web",
+        event: "social.party.failed",
+        summary: "Discord party lookup failed"
+      },
+      error
+    );
     return NextResponse.json(
       { ok: false, error: "Discord party is temporarily unavailable" },
       { status: 503 }

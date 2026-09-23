@@ -220,6 +220,10 @@ Vercel hosts the Next.js app and API routes.
 Two-player Discord matches use the dedicated Node/WebSocket service in `server/`.
 See [multiplayer setup and architecture](MULTIPLAYER.md).
 
+The initial release runs one bounded realtime process. Public health contracts,
+sanitized operational events, capacity ceilings, incident response, and the
+future shared-room routing requirements live in [the operations runbook](OPERATIONS.md).
+
 ## Merge Checks
 
 Before merging:

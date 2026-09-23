@@ -3,6 +3,7 @@ import { tryGetMongoDb } from "@/lib/mongodb";
 import { deletePlayerData } from "@/lib/player-data-deletion";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { accountDeletionSchema } from "@/lib/schemas/account-deletion";
+import { reportOperationalError } from "@/lib/server-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,15 @@ export async function DELETE(request: Request) {
 
   try {
     await deletePlayerData(db, player);
-  } catch {
+  } catch (error) {
+    reportOperationalError(
+      {
+        service: "web",
+        event: "account.deletion.failed",
+        summary: "Account data deletion failed"
+      },
+      error
+    );
     return NextResponse.json(
       { ok: false, error: "Account data could not be deleted" },
       { status: 500 }

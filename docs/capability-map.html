@@ -900,7 +900,7 @@
               <h2 id="review-title">What is strong, what should move next</h2>
             </div>
             <p class="section-note">
-              Identity, career history, progression, private Discord parties, and layered HTTP abuse controls are now in place; the next gains come from scale hardening and regression coverage.
+              Identity, private Discord parties, layered abuse controls, and bounded production health monitoring are now in place; the next gains come from multi-process routing and regression coverage.
             </p>
           </div>
           <div class="review-grid">
@@ -915,13 +915,14 @@
                 <li><span class="review-index">05</span><span><strong>Domain-owned profiles.</strong> Game preferences live outside Better Auth; career totals derive from durable source records instead of client-editable counters.</span></li>
                 <li><span class="review-index">06</span><span><strong>Instance-scoped social data.</strong> Party cards are derived server-side from Discord-verified membership without exposing account identifiers or enabling global discovery.</span></li>
                 <li><span class="review-index">07</span><span><strong>Layered HTTP abuse controls.</strong> Authentication, Activity exchange, tickets, party discovery, and game-data writes use local and shared rate-limit buckets without storing raw client addresses.</span></li>
+                <li><span class="review-index">08</span><span><strong>Operational guardrails.</strong> Sanitized health/error telemetry, scheduled probes, graceful restarts, and enforced room/connection ceilings make the single-process launch topology observable.</span></li>
               </ol>
             </section>
             <section class="review-column next">
               <p class="review-label">Next hardening</p>
               <h3>Review findings to address</h3>
               <ol class="review-list">
-                <li><span class="review-index">01</span><span><strong>Scale room routing.</strong> Realtime rooms currently live in one process; horizontal scale requires shared routing or sticky ownership.</span></li>
+                <li><span class="review-index">01</span><span><strong>Implement shared room routing before replica two.</strong> The launch service is explicitly capped at one process; horizontal scale still requires sticky/shared ownership and shared nonce replay storage.</span></li>
                 <li><span class="review-index">02</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, party roster/invites, Activity lobby, reconnect, profile sync, progression refresh, and result persistence flows.</span></li>
                 <li><span class="review-index">03</span><span><strong>Separate competitive rewards.</strong> Keep local achievements cosmetic until local match facts have an authoritative source.</span></li>
                 <li><span class="review-index">04</span><span><strong>Decompose orchestration.</strong> Continue extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
@@ -932,7 +933,7 @@
       </main>
 
       <footer class="capability-footer">
-        <p>Reviewed against repository code · 17 September 2026</p>
+        <p>Reviewed against repository code · 23 September 2026</p>
         <p>Solid = implemented · Dashed = planned</p>
       </footer>
     </div>
