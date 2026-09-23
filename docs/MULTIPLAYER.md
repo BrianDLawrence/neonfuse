@@ -18,7 +18,8 @@ simulation and presentation paths.
 - `server/index.ts`: standalone Node process and server-only MongoDB results.
 - `src/components/game/DuelGame.tsx`: React lobby, status, results, and controls.
 - `src/game/scenes/DuelScene.ts`: Phaser input and rendering with short movement
-  tweens. It never decides the outcome of multiplayer commands.
+  tweens. It shares the canonical board fit and explosion renderer with local
+  modes, and never decides the outcome of multiplayer commands.
 
 The server advances the simulation and broadcasts snapshots every 50 ms. Clients
 send sequenced commands tagged with the current round ID. The server ignores old

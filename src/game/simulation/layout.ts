@@ -71,6 +71,9 @@ export type ReservedBandsOptions = {
   touchControlsVisible: boolean;
 };
 
+export type ArenaBoardFit = BoardFit & ReservedBands;
+export type ArenaBoardFitOptions = Pick<ReservedBandsOptions, "touchControlsVisible">;
+
 // How much room the HUD + on-screen touch controls need so the camera can keep the
 // board fully visible: in portrait a top band for the HUD plus (when playing) a
 // bottom band for the D-pad; in landscape, (when playing) side bands for the
@@ -110,4 +113,31 @@ export function computeReservedBands(
   }
 
   return { reservedTop: 0, reservedBottom: 0, reservedSides: 0 };
+}
+
+/**
+ * Canonical arena fit used by every game mode. Keeping the reserved-band lookup
+ * and board scaling together prevents individual Phaser scenes from drifting to
+ * different board sizes at the same viewport.
+ */
+export function computeArenaBoardFit(
+  viewportWidth: number,
+  viewportHeight: number,
+  boardWidth: number,
+  boardHeight: number,
+  options: ArenaBoardFitOptions
+): ArenaBoardFit {
+  // Reserve the playable mode's full control footprint for every mode. This is
+  // intentionally mode-independent so local, bot-skirmish, and online boards
+  // remain the same size when switching modes on the same device.
+  const bands = computeReservedBands(viewportWidth, viewportHeight, {
+    isPlayer: true,
+    touchControlsVisible: options.touchControlsVisible
+  });
+  const fit = computeBoardFit(viewportWidth, viewportHeight, boardWidth, boardHeight, {
+    reservedWidth: bands.reservedSides,
+    reservedHeight: bands.reservedTop + bands.reservedBottom
+  });
+
+  return { ...fit, ...bands };
 }

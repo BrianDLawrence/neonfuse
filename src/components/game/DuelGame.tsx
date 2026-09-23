@@ -32,6 +32,8 @@ export function DuelGame({ authToken, onLeave }: { authToken?: string; onLeave: 
         snapshot: () => snapshotRef.current,
         direction: () => direction.current,
         input: (command) => { if (liveRef.current) input(command); },
+        touchControlsVisible: () =>
+          window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false,
         loaded: () => { if (!disposed) setLoaded(true); }
       });
       observer = new ResizeObserver(() => {
