@@ -10,12 +10,21 @@ export type DuelResult = { roundId: string; roomId: string; players: string[]; w
 /** The process owns rooms; callers supply clock and IDs for deterministic tests. */
 export class Rooms {
   readonly rooms = new Map<string, Room>();
-  constructor(readonly serverId: string, private readonly newId: () => string, private readonly completed: (result: DuelResult) => void) {}
+  constructor(
+    readonly serverId: string,
+    private readonly newId: () => string,
+    private readonly completed: (result: DuelResult) => void,
+    private readonly maxRooms = 500
+  ) {
+    if (!Number.isInteger(maxRooms) || maxRooms < 1) {
+      throw new Error("maxRooms must be a positive integer");
+    }
+  }
 
   join(ticket: JoinTicket, connection: string, now: number): { room: Room; seat: Seat } {
     let room = this.rooms.get(ticket.roomId);
     if (!room) {
-      if (this.rooms.size >= 500) throw new Error("The arena is busy. Try again shortly.");
+      if (this.rooms.size >= this.maxRooms) throw new Error("The arena is busy. Try again shortly.");
       room = { id: ticket.roomId, roundId: this.newId(), members: [null, null], duel: null, startedAt: 0, emptyAt: null };
       this.rooms.set(room.id, room);
     }

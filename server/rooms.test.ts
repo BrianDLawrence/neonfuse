@@ -14,6 +14,20 @@ function setup() {
 }
 
 describe("two-player rooms", () => {
+  it("enforces the configured per-process room ceiling", () => {
+    const rooms = new Rooms("server", () => "round", () => undefined, 1);
+    const ticket = (roomId: string): JoinTicket => ({
+      playerId: roomId,
+      name: roomId,
+      roomId,
+      expiresAt: 30000,
+      nonce: roomId
+    });
+
+    rooms.join(ticket("first"), "connection-first", 0);
+    expect(() => rooms.join(ticket("second"), "connection-second", 0)).toThrow("busy");
+  });
+
   it("reserves exactly two distinct accounts and starts only with both ready", () => {
     const { rooms, ticket, a } = setup();
     expect(() => rooms.join(ticket("a"), "duplicate", 0)).toThrow("already");

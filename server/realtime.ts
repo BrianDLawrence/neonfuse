@@ -6,25 +6,95 @@ import { verifyJoinTicket } from "../src/lib/multiplayer-ticket";
 import type { Seat } from "../src/game/simulation/duel";
 import { Rooms, type Room, type DuelResult } from "./rooms";
 
-export function createRealtimeServer({ secret, onResult }: { secret: string; onResult: (result: DuelResult) => void }) {
+export type PersistenceState = "connected" | "not-configured" | "unavailable";
+
+type RealtimeServerOptions = {
+  secret: string;
+  onResult: (result: DuelResult) => void;
+  maxConnections?: number;
+  maxRooms?: number;
+  dependencyHealth?: () => {
+    persistence: PersistenceState;
+    pendingResults: number;
+  };
+};
+
+function positiveInteger(value: number, name: string) {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+export function createRealtimeServer({
+  secret,
+  onResult,
+  maxConnections = 1000,
+  maxRooms = 500,
+  dependencyHealth = () => ({ persistence: "not-configured", pendingResults: 0 })
+}: RealtimeServerOptions) {
   if (secret.length < 32) throw new Error("MULTIPLAYER_SECRET must contain at least 32 characters");
-  const http = createServer((request, response) => {
-    response.writeHead(request.url === "/health" ? 200 : 404, { "Content-Type": "application/json" });
-    response.end(JSON.stringify({ ok: request.url === "/health" }));
-  });
+  positiveInteger(maxConnections, "maxConnections");
+  positiveInteger(maxRooms, "maxRooms");
+  const startedAt = Date.now();
+  let draining = false;
+  let closePromise: Promise<void> | undefined;
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
-  const rooms = new Rooms(randomUUID(), randomUUID, onResult);
+  const rooms = new Rooms(randomUUID(), randomUUID, onResult, maxRooms);
   const usedTickets = new Map<string, number>();
   type Connection = { id: string; room?: Room; seat?: Seat; alive: boolean; messages: number; window: number };
   const connections = new Map<WebSocket, Connection>();
+  const http = createServer((request, response) => {
+    const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    if (path !== "/health") {
+      response.writeHead(404, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ ok: false }));
+      return;
+    }
+    const dependencies = dependencyHealth();
+    const ok = !draining && dependencies.persistence !== "unavailable";
+    const status = draining
+      ? "draining"
+      : dependencies.persistence === "unavailable"
+        ? "unready"
+        : dependencies.persistence === "not-configured"
+          ? "degraded"
+          : "ready";
+    response.writeHead(ok ? 200 : 503, {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
+    });
+    response.end(JSON.stringify({
+      ok,
+      service: "neon-fuse-realtime",
+      status,
+      uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      checks: { persistence: dependencies.persistence },
+      capacity: {
+        connections: connections.size,
+        maxConnections,
+        rooms: rooms.rooms.size,
+        maxRooms,
+        pendingResults: dependencies.pendingResults
+      }
+    }));
+  });
   function send(socket: WebSocket, message: ServerMessage) {
     if (socket.readyState !== WebSocket.OPEN) return;
     if (socket.bufferedAmount > 262144) { socket.terminate(); return; }
     socket.send(JSON.stringify(message));
   }
   http.on("upgrade", (request, socket, head) => {
-    if (connections.size >= 1000 || !["/", "/multiplayer"].includes(request.url ?? "")) {
-      socket.destroy(); return;
+    const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    if (!["/", "/multiplayer"].includes(path)) {
+      socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    if (draining || connections.size >= maxConnections) {
+      socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nRetry-After: 5\r\n\r\n");
+      socket.destroy();
+      return;
     }
     sockets.handleUpgrade(request, socket, head, (ws) => sockets.emit("connection", ws));
   });
@@ -86,11 +156,23 @@ export function createRealtimeServer({ secret, onResult }: { secret: string; onR
       socket.ping();
     }
   }, 5000);
-  async function close() {
-    clearInterval(tick); clearInterval(heartbeat);
-    for (const socket of connections.keys()) socket.terminate();
-    await new Promise<void>((resolve) => sockets.close(() => resolve()));
-    if (http.listening) await new Promise<void>((resolve) => http.close(() => resolve()));
+  async function close({ graceMs = 0 }: { graceMs?: number } = {}) {
+    if (closePromise) return closePromise;
+    draining = true;
+    closePromise = (async () => {
+      clearInterval(tick); clearInterval(heartbeat);
+      for (const socket of connections.keys()) socket.close(1012, "Service restarting");
+      if (connections.size && graceMs > 0) {
+        await Promise.race([
+          new Promise<void>((resolve) => sockets.once("close", resolve)),
+          new Promise<void>((resolve) => setTimeout(resolve, graceMs))
+        ]);
+      }
+      for (const socket of connections.keys()) socket.terminate();
+      await new Promise<void>((resolve) => sockets.close(() => resolve()));
+      if (http.listening) await new Promise<void>((resolve) => http.close(() => resolve()));
+    })();
+    return closePromise;
   }
   return { http, close, rooms };
 }

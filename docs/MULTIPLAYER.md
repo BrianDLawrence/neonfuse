@@ -53,6 +53,8 @@ MULTIPLAYER_SECRET=<same secret as Next.js>
 MONGODB_URI=<server-only connection string>
 MONGODB_DB=neon-fuse
 PORT=3001
+MAX_REALTIME_CONNECTIONS=200
+MAX_REALTIME_ROOMS=100
 ```
 
 `MONGODB_URI` is optional for this unranked mode. Without it, matches still run,
@@ -107,6 +109,12 @@ not acceptable.
 protection live in that process. Do not enable horizontal scaling without shared
 room routing and replay storage. Deployments or process failures abandon active
 rounds; reconnecting clients explain that they must ready up again.
+
+The process rejects connections beyond its configured ceiling with a retryable
+HTTP `503`. Graceful shutdown sends WebSocket restart code `1012`, allowing the
+existing client reconnect flow to take over. `/health` exposes only aggregate
+capacity and persistence state; it returns `503` when configured persistence is
+unavailable or the process is draining.
 
 In the Discord Developer Portal, add an Activity URL mapping:
 
@@ -165,3 +173,7 @@ and two real WebSocket clients receiving the same countdown.
 Before release, use two Discord accounts/devices in the same Activity to verify
 the party roster, native invite behavior, admission, mobile controls, shared
 movement/blasts/results, and reconnection.
+
+See [Production operations](OPERATIONS.md) for the scheduled two-service health
+probe, sanitized error event catalog, capacity thresholds, and horizontal-scaling
+requirements.
