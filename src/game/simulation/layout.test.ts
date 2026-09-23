@@ -1,27 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { computeBoardFit, computeReservedBands } from "./layout";
+import { computeArenaBoardFit, computeBoardFit, computeReservedBands } from "./layout";
 
 const BOARD_W = 624;
 const BOARD_H = 528;
 
 // Assert the full board (all rows/cols) fits inside the play area left after the
 // reserved bands are removed — i.e. nothing is clipped at the bottom/sides.
-function expectBoardFullyVisible(viewportW: number, viewportH: number, isPlayer: boolean) {
-  const bands = computeReservedBands(viewportW, viewportH, {
-    isPlayer,
+function expectBoardFullyVisible(viewportW: number, viewportH: number) {
+  const fit = computeArenaBoardFit(viewportW, viewportH, BOARD_W, BOARD_H, {
     touchControlsVisible: true
   });
-  const fit = computeBoardFit(viewportW, viewportH, BOARD_W, BOARD_H, {
-    reservedWidth: bands.reservedSides,
-    reservedHeight: bands.reservedTop + bands.reservedBottom
-  });
-  const availableW = viewportW - bands.reservedSides;
-  const availableH = viewportH - bands.reservedTop - bands.reservedBottom;
+  const availableW = viewportW - fit.reservedSides;
+  const availableH = viewportH - fit.reservedTop - fit.reservedBottom;
 
   expect(BOARD_W * fit.zoom).toBeLessThanOrEqual(availableW + 0.001);
   expect(BOARD_H * fit.zoom).toBeLessThanOrEqual(availableH + 0.001);
   expect(fit.zoom).toBeGreaterThan(0);
-  return { bands, fit };
+  return fit;
 }
 
 describe("computeBoardFit", () => {
@@ -205,41 +200,72 @@ describe("computeReservedBands", () => {
   });
 });
 
+describe("computeArenaBoardFit", () => {
+  it("keeps the board at native size in a compact desktop viewport", () => {
+    const fit = computeArenaBoardFit(800, 600, BOARD_W, BOARD_H, {
+      touchControlsVisible: false
+    });
+
+    expect(fit.zoom).toBe(1);
+    expect(fit.reservedTop).toBe(0);
+    expect(fit.reservedBottom).toBe(0);
+  });
+
+  it("uses the canonical mobile bands and width-bound zoom", () => {
+    const fit = computeArenaBoardFit(390, 640, BOARD_W, BOARD_H, {
+      touchControlsVisible: true
+    });
+
+    expect(fit.zoom).toBeCloseTo(390 / BOARD_W, 5);
+    expect(fit.reservedTop).toBe(120);
+    expect(fit.reservedBottom).toBe(176);
+  });
+
+  it("keeps the full playable control footprint when watching bot-skirmish", () => {
+    const fit = computeArenaBoardFit(800, 800, BOARD_W, BOARD_H, {
+      touchControlsVisible: true
+    });
+
+    expect(fit.zoom).toBeCloseTo((800 - 120 - 224) / BOARD_H, 5);
+    expect(fit.reservedBottom).toBe(224);
+  });
+});
+
 // Regression for the iOS Safari bug: at the REDUCED visible viewport sizes Safari
 // actually exposes (toolbars eat height), the whole board must still be visible and
 // the control bands intact. The prior test used the full 390x844 device size and
 // missed this.
 describe("board fits at reduced iOS visible viewports", () => {
   it("portrait 390x640 — full board visible above the D-pad band", () => {
-    expectBoardFullyVisible(390, 640, true);
+    expectBoardFullyVisible(390, 640);
   });
 
   it("portrait 390x620 (heavy toolbar, tightest case) — full board still visible", () => {
-    expectBoardFullyVisible(390, 620, true);
+    expectBoardFullyVisible(390, 620);
   });
 
   it("landscape 844x340 — full board height visible, not cut at the bottom", () => {
-    const { bands } = expectBoardFullyVisible(844, 340, true);
-    expect(bands.reservedSides).toBe(300);
+    const fit = expectBoardFullyVisible(844, 340);
+    expect(fit.reservedSides).toBe(300);
   });
 
   it("iPad portrait 834x1112 — full board visible above tablet controls", () => {
-    const { bands } = expectBoardFullyVisible(834, 1112, true);
-    expect(bands.reservedBottom).toBe(224);
+    const fit = expectBoardFullyVisible(834, 1112);
+    expect(fit.reservedBottom).toBe(224);
   });
 
   it("iPad landscape 1112x834 — full board visible between tablet controls", () => {
-    const { bands } = expectBoardFullyVisible(1112, 834, true);
-    expect(bands.reservedSides).toBe(420);
+    const fit = expectBoardFullyVisible(1112, 834);
+    expect(fit.reservedSides).toBe(420);
   });
 
   it("iPad Pro portrait 1024x1366 — full board visible above tablet controls", () => {
-    const { bands } = expectBoardFullyVisible(1024, 1366, true);
-    expect(bands.reservedBottom).toBe(224);
+    const fit = expectBoardFullyVisible(1024, 1366);
+    expect(fit.reservedBottom).toBe(224);
   });
 
   it("iPad Pro landscape 1366x1024 — full board visible between tablet controls", () => {
-    const { bands } = expectBoardFullyVisible(1366, 1024, true);
-    expect(bands.reservedSides).toBe(420);
+    const fit = expectBoardFullyVisible(1366, 1024);
+    expect(fit.reservedSides).toBe(420);
   });
 });

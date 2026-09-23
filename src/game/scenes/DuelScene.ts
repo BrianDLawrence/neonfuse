@@ -1,12 +1,15 @@
 import * as Phaser from "phaser";
 import type { RoomSnapshot } from "../multiplayer/protocol";
+import { playExplosionEffect } from "../presentation/explosionEffect";
 import type { DuelCommand } from "../simulation/duel";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, createInitialArena, type Direction, type GridPoint } from "../simulation/arena";
+import { computeArenaBoardFit } from "../simulation/layout";
 
 export type DuelView = {
   snapshot: () => RoomSnapshot | null;
   direction: () => Direction | null;
   input: (command: DuelCommand) => void;
+  touchControlsVisible: () => boolean;
   loaded: () => void;
 };
 
@@ -14,7 +17,7 @@ export type DuelView = {
 export class DuelScene extends Phaser.Scene {
   private board?: Phaser.GameObjects.Container;
   private sprites = new Map<string, Phaser.GameObjects.Image>();
-  private effects = new Map<number, Phaser.GameObjects.Container>();
+  private seenExplosions = new Set<number>();
   private arenaKey = "";
   private roundId = "";
   private keys?: Record<string, Phaser.Input.Keyboard.Key>;
@@ -33,14 +36,23 @@ export class DuelScene extends Phaser.Scene {
   private fit() {
     const width = ARENA_COLS * CELL_SIZE;
     const height = ARENA_ROWS * CELL_SIZE;
-    const mobile = this.scale.width <= 760;
-    const short = this.scale.width > this.scale.height && this.scale.height <= 520;
-    const top = short ? 90 : mobile ? 164 : 150;
-    const bottom = short ? 32 : 188;
-    const available = Math.max(100, this.scale.height - top - bottom);
-    const zoom = Math.min(1, (this.scale.width - (short ? 310 : 24)) / width, available / height);
-    this.cameras.main.setZoom(zoom);
-    this.cameras.main.centerOn(width / 2, height / 2 + (bottom - top) / (2 * zoom));
+    const fit = computeArenaBoardFit(this.scale.width, this.scale.height, width, height, {
+      touchControlsVisible: this.view.touchControlsVisible()
+    });
+    const camera = this.cameras.main;
+    camera.setZoom(fit.zoom);
+
+    if (
+      fit.zoom >= 1 &&
+      fit.reservedSides === 0 &&
+      fit.reservedTop + fit.reservedBottom === 0
+    ) {
+      camera.centerOn(width / 2, height / 2 - 22);
+      return;
+    }
+
+    const verticalNudge = (fit.reservedBottom - fit.reservedTop) / (2 * fit.zoom);
+    camera.centerOn(width / 2, height / 2 + verticalNudge);
   }
 
   update(time: number) {
@@ -59,7 +71,7 @@ export class DuelScene extends Phaser.Scene {
     }
     if (snapshot?.roundId !== this.roundId) {
       this.sprites.forEach((sprite) => sprite.destroy()); this.sprites.clear();
-      this.effects.forEach((effect) => effect.destroy()); this.effects.clear();
+      this.seenExplosions.clear();
       this.roundId = snapshot?.roundId ?? "";
     }
     const wanted = new Set<string>();
@@ -83,16 +95,10 @@ export class DuelScene extends Phaser.Scene {
     for (const [key, sprite] of this.sprites) if (!wanted.has(key)) { sprite.destroy(); this.sprites.delete(key); }
     const explosions = snapshot?.duel?.explosions ?? [];
     for (const blast of explosions) {
-      if (this.effects.has(blast.id)) continue;
-      const effect = this.add.container(0, 0).setDepth(20);
-      for (const tile of blast.tiles) {
-        const world = this.world(tile);
-        effect.add(this.add.rectangle(world.x, world.y, CELL_SIZE - 4, CELL_SIZE - 4, 0x22d3ee, 0.75));
-        effect.add(this.add.rectangle(world.x, world.y, CELL_SIZE - 20, CELL_SIZE - 20, 0xf59e0b, 0.95));
-      }
-      this.effects.set(blast.id, effect);
+      if (this.seenExplosions.has(blast.id)) continue;
+      this.seenExplosions.add(blast.id);
+      playExplosionEffect(this, blast, (tile) => this.world(tile));
     }
-    for (const [id, effect] of this.effects) if (!explosions.some((blast) => blast.id === id)) { effect.destroy(); this.effects.delete(id); }
     if (snapshot?.phase !== "playing" || !this.keys) return;
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(focused.tagName)) return;
