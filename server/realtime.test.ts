@@ -18,9 +18,9 @@ async function connect(url: string) {
   await new Promise<void>((resolve, reject) => { socket.once("open", resolve); socket.once("error", reject); });
   return socket;
 }
-function nextState(socket: WebSocket, predicate: (state: RoomSnapshot) => boolean = () => true) {
+function nextState(socket: WebSocket, predicate: (state: RoomSnapshot) => boolean = () => true, timeoutMs = 2000) {
   return new Promise<RoomSnapshot>((resolve, reject) => {
-    const timeout = setTimeout(() => { socket.off("message", receive); reject(new Error("Timed out waiting for shared state")); }, 2000);
+    const timeout = setTimeout(() => { socket.off("message", receive); reject(new Error("Timed out waiting for shared state")); }, timeoutMs);
     function receive(raw: import("ws").RawData) {
       const state = JSON.parse(raw.toString()) as RoomSnapshot;
       if (state.type === "state" && predicate(state)) { clearTimeout(timeout); socket.off("message", receive); resolve(state); }
@@ -46,6 +46,28 @@ describe("realtime transport", () => {
     expect(one.duel).toEqual(two.duel);
     a.close(); b.close();
   });
+  it("hands a live seat to a newer connection during play and closes the old socket", async () => {
+    const url = await start();
+    const join = (socket: WebSocket, playerId: string) =>
+      socket.send(JSON.stringify({ type: "join", ticket: signJoinTicket({ playerId, name: playerId, roomId: "party" }, secret, Date.now()) }));
+    const a = await connect(url); const b = await connect(url);
+    join(a, "a"); await nextState(a);
+    join(b, "b"); await nextState(b);
+    a.send(JSON.stringify({ type: "ready", ready: true }));
+    b.send(JSON.stringify({ type: "ready", ready: true }));
+    const playing = await nextState(b, (s) => s.phase === "playing", 5000);
+    const oldClosed = new Promise<number>((resolve) => a.once("close", resolve));
+    const replacement = await connect(url);
+    join(replacement, "a");
+    const resumed = await nextState(replacement);
+    expect(resumed).toMatchObject({ seat: 0, roundId: playing.roundId, phase: "playing" });
+    expect(await oldClosed).toBe(4009);
+    // The old socket's close must not mark the new connection as disconnected.
+    const after = await nextState(b, (s) => s.duel !== null && s.duel.time > resumed.duel!.time + 200);
+    expect(after).toMatchObject({ phase: "playing", reconnectSeconds: null });
+    expect(after.players.map((player) => player?.connected)).toEqual([true, true]);
+    replacement.close(); b.close();
+  }, 10000);
   it("rejects commands before authentication and prevents ticket replay", async () => {
     const url = await start();
     const unauthenticated = await connect(url);
