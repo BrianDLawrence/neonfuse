@@ -27,8 +27,8 @@ SfxManager
   -> one-shots, variants, cooldowns, pitch and volume randomization
 Mixer
   -> master, music, sfx, ui, ambient buses
-AudioManifest
-  -> stable asset keys mapped to files
+synthFallback
+  -> Web Audio synthesis for every asset key (no audio files are fetched)
 ```
 
 Game systems should never import individual audio files. They should emit events such as `enemy.exploded`, `weapon.fired`, or `wave.completed`.
@@ -161,34 +161,11 @@ Large and boss explosions should briefly duck the music bus by 20-35% for 150-30
 | `ui.error` | `sfx.ui.error` | Short, non-irritating. |
 | `ui.setting.changed` | `sfx.ui.setting` | Very short tick. |
 
-## Manifest Shape
+## Asset Keys (Synth-Only Runtime)
 
-```ts
-export const audioManifest = {
-  music: {
-    "music.menu.loop": "/audio/music/menu_loop.ogg",
-    "music.gameplay.loop": "/audio/music/gameplay_loop.ogg",
-    "music.gameplay.high": "/audio/music/gameplay_high.ogg",
-    "music.boss.loop": "/audio/music/boss_loop.ogg"
-  },
-  stingers: {
-    "stinger.wave.start": "/audio/stingers/wave_start.ogg",
-    "stinger.wave.complete": "/audio/stingers/wave_complete.ogg",
-    "stinger.boss.enter": "/audio/stingers/boss_enter.ogg",
-    "stinger.player.death": "/audio/stingers/player_death.ogg",
-    "stinger.victory": "/audio/stingers/victory.ogg",
-    "stinger.low.health": "/audio/stingers/low_health.ogg"
-  },
-  sfx: {
-    "sfx.explosion.small.01": "/audio/sfx/explosions/small_01.ogg",
-    "sfx.explosion.small.02": "/audio/sfx/explosions/small_02.ogg",
-    "sfx.explosion.medium.01": "/audio/sfx/explosions/medium_01.ogg",
-    "sfx.explosion.large.01": "/audio/sfx/explosions/large_01.ogg",
-    "sfx.weapon.player.fire.01": "/audio/sfx/weapons/player_fire_01.ogg",
-    "sfx.ui.confirm": "/audio/sfx/ui/confirm.ogg"
-  }
-} as const;
-```
+Shipped audio is synthesized at play time in `src/audio/synthFallback.ts`: `SfxManager` renders one-shots and stingers per `AudioAssetKey`, and `MusicManager` renders procedural or track-driven loops. The app serves no audio files, so a session never fetches (or 404s on) audio through Discord's proxy.
+
+`AudioAssetKey` (in `src/audio/types.ts`) stays as the stable sound-design vocabulary that `audioEvents` routes to. If recorded assets are added later, reintroduce a key→URL map under `public/audio/` and load it in `SfxManager`/`MusicManager`, falling back to the synth for keys without a file.
 
 ## Event Rule Shape
 
@@ -223,19 +200,8 @@ src/audio/
   SfxManager.ts
   Mixer.ts
   audioEvents.ts
-  audioManifest.ts
+  synthFallback.ts
   types.ts
-
-public/audio/
-  music/
-  stingers/
-  sfx/
-    explosions/
-    weapons/
-    enemies/
-    player/
-    pickups/
-    ui/
 ```
 
 ## First Implementation Milestone
