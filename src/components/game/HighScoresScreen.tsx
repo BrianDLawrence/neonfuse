@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameMode } from "@/game/modes";
 import type { ScoreWinner } from "@/game/simulation/scoring";
+import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import type { HighScoreMode } from "@/lib/schemas/high-score";
@@ -22,7 +23,7 @@ export type RoundScoreResult = {
 };
 
 type HighScoresScreenProps = {
-  authToken?: string;
+  activityAuth?: ActivityAuth;
   playerName: string;
   result: RoundScoreResult | null;
   onClose: () => void;
@@ -51,7 +52,7 @@ function describeWinner(winner: ScoreWinner) {
 }
 
 export function HighScoresScreen({
-  authToken,
+  activityAuth,
   playerName,
   result,
   onClose
@@ -159,7 +160,7 @@ export function HighScoresScreen({
     try {
       const response = await fetch("/api/high-scores", {
         method: "POST",
-        headers: authenticatedHeaders(authToken, {
+        headers: authenticatedHeaders(activityAuth?.getToken(), {
           "Content-Type": "application/json"
         }),
         body: JSON.stringify({
@@ -195,7 +196,7 @@ export function HighScoresScreen({
       setSubmitStatus("error");
       setMessage(error instanceof Error ? error.message : "Unable to save your leaderboard score");
     }
-  }, [authToken, mode, playerName, result]);
+  }, [activityAuth, mode, playerName, result]);
 
   useEffect(() => {
     if (result?.matchId && submittedMatchIdRef.current !== result.matchId) {

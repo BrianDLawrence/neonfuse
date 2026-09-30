@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DuelCommand } from "@/game/simulation/duel";
 import type { ClientMessage, RoomSnapshot, ServerMessage } from "@/game/multiplayer/protocol";
+import { fetchWithActivityRenewal, type ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 
-export function useDuelConnection(authToken: string | undefined) {
+export function useDuelConnection(activityAuth: ActivityAuth | undefined) {
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [status, setStatus] = useState<"connecting" | "connected" | "reconnecting" | "error">("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -14,6 +15,10 @@ export function useDuelConnection(authToken: string | undefined) {
   const socketRef = useRef<WebSocket | null>(null);
   const snapshotRef = useRef<RoomSnapshot | null>(null);
   const sequence = useRef(0);
+  // Read auth at request time so a session renewal never re-runs the socket
+  // effect: its cleanup sends "leave", which the server treats as a forfeit.
+  const activityAuthRef = useRef(activityAuth);
+  useEffect(() => { activityAuthRef.current = activityAuth; }, [activityAuth]);
   const send = useCallback((message: ClientMessage) => {
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -31,7 +36,11 @@ export function useDuelConnection(authToken: string | undefined) {
       setStatus(snapshotRef.current ? "reconnecting" : "connecting");
       setError(null);
       try {
-        const response = await fetch("/api/multiplayer/ticket", { method: "POST", headers: authenticatedHeaders(authToken), signal: abort.signal });
+        // A 401 means the bearer session lapsed: renew once and retry before
+        // treating it as fatal.
+        const response = await fetchWithActivityRenewal(activityAuthRef.current, (token) =>
+          fetch("/api/multiplayer/ticket", { method: "POST", headers: authenticatedHeaders(token), signal: abort.signal }));
+        if (cancelled) return;
         const payload = await response.json() as { ticket?: string; error?: string };
         if (!response.ok || !payload.ticket) {
           fatal = true;
@@ -89,7 +98,7 @@ export function useDuelConnection(authToken: string | undefined) {
       socket?.close();
       socketRef.current = null;
     };
-  }, [authToken, attempt]);
+  }, [attempt]);
 
   const input = useCallback((command: DuelCommand) => {
     const current = snapshotRef.current;

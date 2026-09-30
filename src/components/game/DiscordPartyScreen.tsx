@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import type { DiscordPartyRoster } from "@/lib/player-profile-types";
 import { ProfileAvatar } from "./ProfileScreen";
 
 type DiscordPartyScreenProps = {
-  authToken: string;
+  activityAuth: ActivityAuth;
   participantCount: number;
   onClose: () => void;
   onInviteFriends: () => Promise<void>;
@@ -16,7 +17,7 @@ type DiscordPartyScreenProps = {
 type PartyStatus = "loading" | "ready" | "error";
 
 export function DiscordPartyScreen({
-  authToken,
+  activityAuth,
   participantCount,
   onClose,
   onInviteFriends,
@@ -32,7 +33,7 @@ export function DiscordPartyScreen({
 
     try {
       const response = await fetch("/api/social/party", {
-        headers: authenticatedHeaders(authToken),
+        headers: authenticatedHeaders(activityAuth.getToken()),
         cache: "no-store"
       });
       const payload = (await response.json()) as {
@@ -51,7 +52,7 @@ export function DiscordPartyScreen({
       setNotice(error instanceof Error ? error.message : "Party roster unavailable");
       setStatus("error");
     }
-  }, [authToken]);
+  }, [activityAuth]);
 
   useEffect(() => {
     void loadRoster();

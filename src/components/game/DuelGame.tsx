@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/game/simulation/arena";
+import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { useDuelConnection } from "./useDuelConnection";
 
 const DIRECTIONS = [{ dir: "up", glyph: "▲" }, { dir: "left", glyph: "◀" }, { dir: "right", glyph: "▶" }, { dir: "down", glyph: "▼" }] as const;
 
-export function DuelGame({ authToken, onLeave }: { authToken?: string; onLeave: () => void }) {
-  const connection = useDuelConnection(authToken);
+export function DuelGame({ activityAuth, onLeave }: { activityAuth?: ActivityAuth; onLeave: () => void }) {
+  const connection = useDuelConnection(activityAuth);
   const { snapshot, snapshotRef, input, status, error, notice } = connection;
   const host = useRef<HTMLDivElement>(null);
   const direction = useRef<Direction | null>(null);
