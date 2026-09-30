@@ -73,9 +73,12 @@ export function useDuelConnection(activityAuth: ActivityAuth | undefined) {
             failures = 0;
           } catch { fatal = true; setError("The game connection returned an invalid response."); setStatus("error"); socket.close(); }
         };
-        socket.onclose = () => {
+        socket.onclose = (event) => {
           clearTimeout(joinTimeout);
           if (cancelled || fatal) return;
+          // 4009: a newer window or device took this seat. Not an error, but reconnecting
+          // automatically would take it back and the two would trade the seat forever.
+          if (event.code === 4009) { setError("Your match continued in another window or device."); setStatus("error"); return; }
           setStatus("reconnecting");
           retry = setTimeout(() => void connect(), Math.min(5000, 1000 * 2 ** failures++));
         };
