@@ -18,7 +18,8 @@ simulation and presentation paths.
 - `server/index.ts`: standalone Node process and server-only MongoDB results.
 - `src/components/game/DuelGame.tsx`: React lobby, status, results, and controls.
 - `src/game/scenes/DuelScene.ts`: Phaser input and rendering with short movement
-  tweens. It never decides the outcome of multiplayer commands.
+  tweens. It shares the canonical board fit and explosion renderer with local
+  modes, and never decides the outcome of multiplayer commands.
 
 The server advances the simulation and broadcasts snapshots every 50 ms. Clients
 send sequenced commands tagged with the current round ID. The server ignores old
@@ -137,8 +138,14 @@ References:
 ## Lifecycle and persistence
 
 - One lobby per Activity instance, two distinct accounts, no spectators or queue.
-- A second live connection for the same account is rejected. A disconnected
-  account can reclaim its seat during the grace period.
+- A newer connection for the same account takes over its seat, even while the
+  old socket still looks live (a mobile network switch or Activity reload can
+  reconnect before the heartbeat notices). The fresh ticket is single-use and
+  membership-verified, so the match continues without a forfeit. The server
+  closes the old socket with code 4009 and ignores anything it still sends. The
+  replaced client does not reconnect on its own, so two open windows cannot keep
+  taking the seat from each other; Retry reclaims it. A disconnected account can
+  reclaim its seat during the grace period.
 - Both players must be connected, have loaded their arena, and select Ready.
 - A disconnect during countdown cancels it and clears both ready votes.
 - During play, the round continues while a player reconnects. The server reserves
@@ -166,7 +173,7 @@ References:
 
 `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build` cover
 both app and server. Tests exercise simulation, room isolation, readiness,
-reconnect/forfeit, rematches, membership verification, ticket tampering/replay,
+reconnect/forfeit, seat takeover by a newer connection, rematches, membership verification, ticket tampering/replay,
 and two real WebSocket clients receiving the same countdown.
 
 Before release, use two Discord accounts/devices in the same Activity to verify

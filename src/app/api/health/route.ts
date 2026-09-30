@@ -13,9 +13,20 @@ function configured(values: Array<string | undefined>): CheckState {
 }
 
 async function databaseState(): Promise<CheckState> {
-  const { db, mongo } = await tryGetMongoDb();
+  const { db, mongo, error } = await tryGetMongoDb();
 
   if (!db) {
+    if (mongo === "unavailable") {
+      reportOperationalError(
+        {
+          service: "web",
+          event: "health.database.failed",
+          summary: "The application database connection health probe failed",
+          fields: { stage: "connect" }
+        },
+        error
+      );
+    }
     return mongo === "unavailable" ? "unavailable" : "not-configured";
   }
 
@@ -27,7 +38,8 @@ async function databaseState(): Promise<CheckState> {
       {
         service: "web",
         event: "health.database.failed",
-        summary: "The application database health probe failed"
+        summary: "The application database ping health probe failed",
+        fields: { stage: "ping" }
       },
       error
     );

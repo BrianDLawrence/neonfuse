@@ -16,6 +16,7 @@ import type {
   ProfilePreferences
 } from "@/lib/player-profile-types";
 import { EMPTY_PROFILE_MATCH_STATS } from "@/lib/player-profile-types";
+import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import { ACCOUNT_DELETION_CONFIRMATION } from "@/lib/account-deletion";
 import { clearNeonFuseClientStorage } from "@/lib/client-storage";
@@ -32,7 +33,7 @@ import {
 export type ProfileSyncStatus = "loading" | "saved" | "saving" | "offline";
 
 type ProfileScreenProps = {
-  authToken?: string;
+  activityAuth?: ActivityAuth;
   fallbackName: string;
   profile: PlayerProfile | null;
   preferences: ProfilePreferences;
@@ -112,7 +113,7 @@ export function ProfileAvatar({
 }
 
 export function ProfileScreen({
-  authToken,
+  activityAuth,
   fallbackName,
   profile,
   preferences,
@@ -150,7 +151,7 @@ export function ProfileScreen({
         const query = new URLSearchParams({ limit: "6" });
         if (before) query.set("before", before);
         const response = await fetch(`/api/profile/history?${query}`, {
-          headers: authenticatedHeaders(authToken)
+          headers: authenticatedHeaders(activityAuth?.getToken())
         });
         const payload = (await response.json()) as {
           ok?: boolean;
@@ -180,7 +181,7 @@ export function ProfileScreen({
         setHistoryStatus("error");
       }
     },
-    [authToken]
+    [activityAuth]
   );
 
   useEffect(() => {
@@ -208,7 +209,7 @@ export function ProfileScreen({
     try {
       const response = await fetch("/api/account", {
         method: "DELETE",
-        headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+        headers: authenticatedHeaders(activityAuth?.getToken(), { "Content-Type": "application/json" }),
         body: JSON.stringify({ confirmation: deletionConfirmation })
       });
       const payload = (await response.json()) as { ok?: boolean; error?: string };

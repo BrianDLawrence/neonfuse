@@ -79,6 +79,9 @@ export function createRealtimeServer({
       }
     }));
   });
+  // A replaced connection keeps its room/seat until it closes; this stops it touching the seat.
+  const ownsSeat = (connection: Connection): connection is Connection & { room: Room; seat: Seat } =>
+    !!connection.room && connection.seat !== undefined && connection.room.members[connection.seat]?.connection === connection.id;
   function send(socket: WebSocket, message: ServerMessage) {
     if (socket.readyState !== WebSocket.OPEN) return;
     if (socket.bufferedAmount > 262144) { socket.terminate(); return; }
@@ -122,9 +125,13 @@ export function createRealtimeServer({
           connection.room = joined.room;
           connection.seat = joined.seat;
           clearTimeout(authTimeout);
+          if (joined.replaced) {
+            for (const [other, state] of connections) if (state.id === joined.replaced) other.close(4009, "Replaced by a newer connection");
+          }
           send(socket, rooms.snapshot(joined.room, joined.seat, now));
         } else {
           if (!connection.room || connection.seat === undefined) { socket.close(4001, "Join first"); return; }
+          if (!ownsSeat(connection)) return;
           rooms.message(connection.room, connection.seat, message, now);
           if (message.type === "leave") { socket.close(1000, "Left lobby"); return; }
         }
@@ -135,7 +142,7 @@ export function createRealtimeServer({
     });
     socket.on("close", () => {
       clearTimeout(authTimeout); clearTimeout(lifetime);
-      if (connection.room && connection.seat !== undefined && connection.room.members[connection.seat]?.connection === connection.id) {
+      if (ownsSeat(connection)) {
         rooms.disconnect(connection.room, connection.seat, Date.now());
       }
       connections.delete(socket);

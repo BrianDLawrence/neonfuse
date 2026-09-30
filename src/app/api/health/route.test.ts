@@ -14,6 +14,9 @@ vi.mock("@/lib/server-observability", () => ({
 
 import { GET } from "./route";
 
+const rawMongoError =
+  "connect ECONNREFUSED cluster0-shard-00.internal.example:27017 via mongodb+srv://neon:hunter2@cluster0.internal.example";
+
 beforeEach(() => {
   vi.stubEnv("DISCORD_CLIENT_ID", "discord-client");
   vi.stubEnv("DISCORD_CLIENT_SECRET", "discord-secret");
@@ -49,13 +52,27 @@ describe("GET /api/health", () => {
         multiplayerAdmission: "ready"
       }
     });
+    expect(mocks.reportOperationalError).not.toHaveBeenCalled();
   });
 
-  it("returns 503 without exposing a database driver's error details", async () => {
+  it("reports missing MongoDB configuration as unready", async () => {
+    mocks.tryGetMongoDb.mockResolvedValue({ db: null, mongo: "not-configured" });
+
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      checks: { database: "not-configured" }
+    });
+    expect(mocks.reportOperationalError).not.toHaveBeenCalled();
+  });
+
+  it("reports connection failure without exposing or logging driver details", async () => {
     mocks.tryGetMongoDb.mockResolvedValue({
       db: null,
       mongo: "unavailable",
-      error: "mongodb://user:secret@example.test"
+      error: rawMongoError
     });
 
     const response = await GET();
@@ -63,24 +80,36 @@ describe("GET /api/health", () => {
 
     expect(response.status).toBe(503);
     expect(body).toContain('"database":"unavailable"');
-    expect(body).not.toContain("mongodb://");
-    expect(body).not.toContain("secret");
+    expect(body).not.toContain("internal.example");
+    expect(body).not.toContain("hunter2");
+    expect(mocks.reportOperationalError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "health.database.failed",
+        fields: { stage: "connect" }
+      }),
+      rawMongoError
+    );
   });
 
   it("reports and contains database ping failures", async () => {
-    const error = new Error("private driver detail");
+    const error = new Error(rawMongoError);
+    const command = vi.fn().mockRejectedValue(error);
     mocks.tryGetMongoDb.mockResolvedValue({
-      db: { command: vi.fn().mockRejectedValue(error) },
+      db: { command },
       mongo: "connected"
     });
 
     const response = await GET();
 
+    expect(command).toHaveBeenCalledWith({ ping: 1 });
     expect(response.status).toBe(503);
     expect(mocks.reportOperationalError).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "health.database.failed" }),
+      expect.objectContaining({
+        event: "health.database.failed",
+        fields: { stage: "ping" }
+      }),
       error
     );
-    expect(await response.text()).not.toContain("private driver detail");
+    expect(await response.text()).not.toContain("hunter2");
   });
 });
