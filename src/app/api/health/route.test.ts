@@ -1,89 +1,115 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ isAuthConfigured: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  isAuthConfigured: vi.fn(),
+  tryGetMongoDb: vi.fn(),
+  reportOperationalError: vi.fn()
+}));
 
-import { isAuthConfigured } from "@/lib/auth";
-import { tryGetMongoDb } from "@/lib/mongodb";
+vi.mock("@/lib/auth", () => ({ isAuthConfigured: mocks.isAuthConfigured }));
+vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: mocks.tryGetMongoDb }));
+vi.mock("@/lib/server-observability", () => ({
+  reportOperationalError: mocks.reportOperationalError
+}));
+
 import { GET } from "./route";
 
 const rawMongoError =
   "connect ECONNREFUSED cluster0-shard-00.internal.example:27017 via mongodb+srv://neon:hunter2@cluster0.internal.example";
 
-let consoleError: ReturnType<typeof vi.spyOn>;
-
 beforeEach(() => {
-  vi.resetAllMocks();
-  vi.mocked(isAuthConfigured).mockReturnValue(true);
-  consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  vi.stubEnv("DISCORD_CLIENT_ID", "discord-client");
+  vi.stubEnv("DISCORD_CLIENT_SECRET", "discord-secret");
+  vi.stubEnv("NEXT_PUBLIC_DISCORD_CLIENT_ID", "discord-client");
+  vi.stubEnv("MULTIPLAYER_SECRET", "m".repeat(32));
+  vi.stubEnv("DISCORD_BOT_TOKEN", "bot-token");
+  mocks.isAuthConfigured.mockReturnValue(true);
+  mocks.tryGetMongoDb.mockResolvedValue({
+    db: { command: vi.fn().mockResolvedValue({ ok: 1 }) },
+    mongo: "connected"
+  });
 });
 
 afterEach(() => {
-  consoleError.mockRestore();
+  vi.unstubAllEnvs();
+  vi.clearAllMocks();
 });
 
-describe("health route", () => {
-  it("reports ok when MongoDB is not configured", async () => {
-    vi.mocked(tryGetMongoDb).mockResolvedValue({ db: null, mongo: "not-configured" });
-
+describe("GET /api/health", () => {
+  it("reports ready only when every production dependency is ready", async () => {
     const response = await GET();
-    const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload).toMatchObject({ ok: true, mongo: "not-configured", authentication: "configured" });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      service: "neon-fuse-web",
+      status: "ready",
+      checks: {
+        database: "ready",
+        authentication: "ready",
+        discordActivity: "ready",
+        multiplayerAdmission: "ready"
+      }
+    });
+    expect(mocks.reportOperationalError).not.toHaveBeenCalled();
   });
 
-  it("does not expose the raw connection error to callers", async () => {
-    vi.mocked(tryGetMongoDb).mockResolvedValue({ db: null, mongo: "unavailable", error: rawMongoError });
+  it("reports missing MongoDB configuration as unready", async () => {
+    mocks.tryGetMongoDb.mockResolvedValue({ db: null, mongo: "not-configured" });
 
     const response = await GET();
-    const payload = await response.json();
 
     expect(response.status).toBe(503);
-    expect(payload).toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       ok: false,
-      mongo: "unavailable",
-      authentication: "configured",
-      discordActivity: expect.any(String)
+      checks: { database: "not-configured" }
     });
-    expect(JSON.stringify(payload)).not.toContain("internal.example");
+    expect(mocks.reportOperationalError).not.toHaveBeenCalled();
   });
 
-  it("logs connection failures server-side without credentials", async () => {
-    vi.mocked(tryGetMongoDb).mockResolvedValue({ db: null, mongo: "unavailable", error: rawMongoError });
-
-    await GET();
-
-    expect(consoleError).toHaveBeenCalledTimes(1);
-    const logged = String(consoleError.mock.calls[0]?.[0]);
-    expect(logged).toContain("connect failed");
-    expect(logged).not.toContain("hunter2");
-    expect(logged).toContain("//<redacted>@");
-  });
-
-  it("returns 503 instead of throwing when the ping fails", async () => {
-    const command = vi.fn().mockRejectedValue(new Error(rawMongoError));
-    vi.mocked(tryGetMongoDb).mockResolvedValue({ db: { command } as never, mongo: "connected" });
+  it("reports connection failure without exposing or logging driver details", async () => {
+    mocks.tryGetMongoDb.mockResolvedValue({
+      db: null,
+      mongo: "unavailable",
+      error: rawMongoError
+    });
 
     const response = await GET();
-    const payload = await response.json();
+    const body = await response.text();
+
+    expect(response.status).toBe(503);
+    expect(body).toContain('"database":"unavailable"');
+    expect(body).not.toContain("internal.example");
+    expect(body).not.toContain("hunter2");
+    expect(mocks.reportOperationalError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "health.database.failed",
+        fields: { stage: "connect" }
+      }),
+      rawMongoError
+    );
+  });
+
+  it("reports and contains database ping failures", async () => {
+    const error = new Error(rawMongoError);
+    const command = vi.fn().mockRejectedValue(error);
+    mocks.tryGetMongoDb.mockResolvedValue({
+      db: { command },
+      mongo: "connected"
+    });
+
+    const response = await GET();
 
     expect(command).toHaveBeenCalledWith({ ping: 1 });
     expect(response.status).toBe(503);
-    expect(payload).toMatchObject({ ok: false, mongo: "unavailable" });
-    expect(payload).not.toHaveProperty("error");
-    expect(String(consoleError.mock.calls[0]?.[0])).not.toContain("hunter2");
-  });
-
-  it("reports connected when the ping succeeds", async () => {
-    const command = vi.fn().mockResolvedValue({ ok: 1 });
-    vi.mocked(tryGetMongoDb).mockResolvedValue({ db: { command } as never, mongo: "connected" });
-
-    const response = await GET();
-    const payload = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(payload).toMatchObject({ ok: true, mongo: "connected" });
-    expect(consoleError).not.toHaveBeenCalled();
+    expect(mocks.reportOperationalError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "health.database.failed",
+        fields: { stage: "ping" }
+      }),
+      error
+    );
+    expect(await response.text()).not.toContain("hunter2");
   });
 });

@@ -4,6 +4,7 @@ import { createActivitySession } from "@/lib/activity-session";
 import { discordAvatarUrl, discordPlayerId } from "@/lib/discord-identity";
 import { findBetterAuthUserId } from "@/lib/player-identity";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { reportOperationalError } from "@/lib/server-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +121,14 @@ export async function POST(request: Request) {
       player: { displayName, avatarUrl }
     });
   } catch (error) {
-    console.error("Discord Activity session creation failed", error);
+    reportOperationalError(
+      {
+        service: "web",
+        event: "activity.session.failed",
+        summary: "Discord Activity session creation failed"
+      },
+      error
+    );
     return NextResponse.json(
       { error: "The Discord gateway is temporarily unavailable." },
       { status: 500 }

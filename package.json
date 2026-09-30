@@ -11,6 +11,7 @@
     "build": "next build && npm run build:server",
     "start": "next start",
     "audit:security": "npm audit --audit-level=high",
+    "healthcheck:production": "node scripts/check-production-health.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",

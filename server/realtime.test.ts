@@ -13,6 +13,17 @@ async function start() {
   await new Promise<void>((resolve) => server!.http.listen(0, "127.0.0.1", resolve));
   return `ws://127.0.0.1:${(server.http.address() as AddressInfo).port}/multiplayer`;
 }
+async function startWithCapacity(maxConnections: number, maxRooms: number) {
+  server = createRealtimeServer({
+    secret,
+    onResult: () => undefined,
+    maxConnections,
+    maxRooms,
+    dependencyHealth: () => ({ persistence: "connected", pendingResults: 0 })
+  });
+  await new Promise<void>((resolve) => server!.http.listen(0, "127.0.0.1", resolve));
+  return `ws://127.0.0.1:${(server.http.address() as AddressInfo).port}/multiplayer`;
+}
 async function connect(url: string) {
   const socket = new WebSocket(url);
   await new Promise<void>((resolve, reject) => { socket.once("open", resolve); socket.once("error", reject); });
@@ -30,6 +41,37 @@ function nextState(socket: WebSocket, predicate: (state: RoomSnapshot) => boolea
 }
 
 describe("realtime transport", () => {
+  it("exposes sanitized dependency and capacity health", async () => {
+    const url = await startWithCapacity(12, 6);
+    const response = await fetch(url.replace("ws://", "http://").replace("/multiplayer", "/health"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      service: "neon-fuse-realtime",
+      status: "ready",
+      checks: { persistence: "connected" },
+      capacity: {
+        connections: 0,
+        maxConnections: 12,
+        rooms: 0,
+        maxRooms: 6,
+        pendingResults: 0
+      }
+    });
+  });
+
+  it("rejects excess WebSocket connections with a retryable 503", async () => {
+    const url = await startWithCapacity(1, 1);
+    const first = await connect(url);
+    const second = new WebSocket(url);
+    const error = await new Promise<Error>((resolve) => second.once("error", resolve));
+
+    expect(error.message).toContain("503");
+    first.close();
+  });
+
   it("connects two authenticated sockets to the same lobby and broadcasts a shared countdown", async () => {
     const url = await start();
     const a = await connect(url); const b = await connect(url);

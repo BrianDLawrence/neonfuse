@@ -41,7 +41,9 @@ portal, authorize `http://localhost:3000/api/auth/callback/discord` as an OAuth2
 redirect. Production needs the equivalent callback on its public domain.
 
 The health endpoint is available at `/api/health` and reports whether Discord
-authentication is configured.
+authentication, Discord Activity, multiplayer admission, and MongoDB are ready.
+Its response is sanitized and returns `503` when a production dependency is
+missing or unavailable.
 
 Public API writes and Discord session/ticket routes use layered fixed-window
 rate limits: a fast per-instance guard plus shared MongoDB counters with TTL
@@ -52,6 +54,10 @@ value in production when possible.
 Friend matches also need the persistent realtime service described in
 [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md). A Render Blueprint is included for
 the repository's single-instance WebSocket server.
+
+Production readiness, scheduled uptime checks, sanitized error events, capacity
+ceilings, and the single-to-multi-replica plan are documented in the
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md) runbook.
 
 ## Architecture Notes
 
@@ -64,6 +70,7 @@ React owns text-heavy UI. Phaser owns the playfield.
 - [Architecture guide](docs/ARCHITECTURE.md) — ownership boundaries, data flow, testing, security, and AI constraints.
 - [Authentication guide](docs/AUTHENTICATION.md) — Discord OAuth setup, environment variables, and server-side session boundaries.
 - [Discord Activity guide](docs/DISCORD_ACTIVITY.md) — embedded launch setup, URL mapping, and Activity session security.
+- [Production operations](docs/OPERATIONS.md) — health monitoring, alerting, capacity limits, and incident response.
 
 ## License
 

@@ -1,66 +1,81 @@
 import { NextResponse } from "next/server";
 import { isAuthConfigured } from "@/lib/auth";
 import { tryGetMongoDb } from "@/lib/mongodb";
+import { reportOperationalError } from "@/lib/server-observability";
 
-// Driver errors can embed the connection string, so strip any userinfo
-// (`//user:pass@`) before the message reaches server logs.
-function redactCredentials(message: string) {
-  return message.replace(/\/\/[^/\s@]+@/g, "//<redacted>@");
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type CheckState = "ready" | "not-configured" | "unavailable";
+
+function configured(values: Array<string | undefined>): CheckState {
+  return values.every(Boolean) ? "ready" : "not-configured";
 }
 
-function logMongoFailure(stage: "connect" | "ping", error: unknown) {
-  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "unknown error";
-  console.error(`Health check MongoDB ${stage} failed: ${redactCredentials(message)}`);
-}
-
-export async function GET() {
-  const { db, error, mongo } = await tryGetMongoDb();
-  const authentication = isAuthConfigured() ? "configured" : "not-configured";
-  const discordActivity = [
-    process.env.MONGODB_URI,
-    process.env.DISCORD_CLIENT_ID,
-    process.env.DISCORD_CLIENT_SECRET,
-    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID
-  ].every(Boolean)
-    ? "configured"
-    : "not-configured";
+async function databaseState(): Promise<CheckState> {
+  const { db, mongo, error } = await tryGetMongoDb();
 
   if (!db) {
     if (mongo === "unavailable") {
-      logMongoFailure("connect", error);
+      reportOperationalError(
+        {
+          service: "web",
+          event: "health.database.failed",
+          summary: "The application database connection health probe failed",
+          fields: { stage: "connect" }
+        },
+        error
+      );
     }
-
-    return NextResponse.json(
-      {
-        ok: mongo === "not-configured",
-        mongo,
-        authentication,
-        discordActivity
-      },
-      { status: mongo === "not-configured" ? 200 : 503 }
-    );
+    return mongo === "unavailable" ? "unavailable" : "not-configured";
   }
 
   try {
     await db.command({ ping: 1 });
-  } catch (pingError) {
-    logMongoFailure("ping", pingError);
-
-    return NextResponse.json(
+    return "ready";
+  } catch (error) {
+    reportOperationalError(
       {
-        ok: false,
-        mongo: "unavailable",
-        authentication,
-        discordActivity
+        service: "web",
+        event: "health.database.failed",
+        summary: "The application database ping health probe failed",
+        fields: { stage: "ping" }
       },
-      { status: 503 }
+      error
     );
+    return "unavailable";
   }
+}
 
-  return NextResponse.json({
-    ok: true,
-    mongo,
-    authentication,
-    discordActivity
-  });
+export async function GET() {
+  const checks = {
+    database: await databaseState(),
+    authentication: isAuthConfigured() ? "ready" : "not-configured",
+    discordActivity: configured([
+      process.env.DISCORD_CLIENT_ID,
+      process.env.DISCORD_CLIENT_SECRET,
+      process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID
+    ]),
+    multiplayerAdmission: configured([
+      process.env.MULTIPLAYER_SECRET && process.env.MULTIPLAYER_SECRET.length >= 32
+        ? process.env.MULTIPLAYER_SECRET
+        : undefined,
+      process.env.DISCORD_BOT_TOKEN
+    ])
+  } satisfies Record<string, CheckState>;
+  const ok = Object.values(checks).every((state) => state === "ready");
+
+  return NextResponse.json(
+    {
+      ok,
+      service: "neon-fuse-web",
+      status: ok ? "ready" : "unready",
+      checks,
+      timestamp: new Date().toISOString()
+    },
+    {
+      status: ok ? 200 : 503,
+      headers: { "Cache-Control": "no-store" }
+    }
+  );
 }
