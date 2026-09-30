@@ -97,6 +97,11 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
+          Your Discord display name and score are shown publicly on leaderboards when
+          you save a high score, and your display name, avatar, title, level, and duel
+          record are visible to other players in your current Discord Activity.
+        </p>
+        <p>
           We may also disclose information when required by law or when reasonably
           necessary to protect users, the service, or our legal rights. We do not
           share Discord API data with data brokers or advertising networks.
@@ -123,9 +128,11 @@ export default function PrivacyPage() {
           To delete your Neon Fuse account data, open <strong>Fighter Profile</strong>,
           find <strong>Data Controls</strong>, and choose <strong>Delete account data</strong>.
           After you type the confirmation phrase, Neon Fuse deletes the linked profile,
-          match history, leaderboard entries, visitor record, duel records, Activity
-          sessions, and authentication records from active storage. The game also
-          clears its visitor and music choices from that browser.
+          match history, leaderboard entries, visitor record, Activity sessions, and
+          authentication records from active storage. Your identity is removed from
+          friend-match duel records, and opponents keep only an anonymous result so
+          their own history stays accurate. The game also clears its visitor and music
+          choices from that browser.
         </p>
         <p>
           If you cannot access the in-game control, use the options on our{" "}

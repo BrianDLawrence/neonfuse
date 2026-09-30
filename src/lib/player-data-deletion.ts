@@ -3,12 +3,39 @@ import type { PlayerIdentity } from "@/lib/player-identity";
 
 type DeletionDocument = Record<string, unknown>;
 
+// Duel results are shared with the opponent, whose verified record must survive.
+// The deleting player's seat is replaced with this tombstone instead.
+export const DELETED_PLAYER_ID = "deleted-player";
+
 export type PlayerDataDeletionResult = {
   deletedDocuments: number;
 };
 
 function unique(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+async function anonymizeDuelResults(db: Db, playerIds: string[]): Promise<number> {
+  const result = await db.collection<DeletionDocument>("duel_results").updateMany(
+    { players: { $in: playerIds } },
+    [
+      {
+        $set: {
+          players: {
+            $map: {
+              input: "$players",
+              as: "seat",
+              in: { $cond: [{ $in: ["$$seat", playerIds] }, DELETED_PLAYER_ID, "$$seat"] }
+            }
+          },
+          winnerId: {
+            $cond: [{ $in: ["$winnerId", playerIds] }, DELETED_PLAYER_ID, "$winnerId"]
+          }
+        }
+      }
+    ]
+  );
+  return result.modifiedCount;
 }
 
 async function deleteFrom(
@@ -40,7 +67,7 @@ export async function deletePlayerData(
     deleteFrom(db, "matches", { accountId: { $in: playerIds } }),
     deleteFrom(db, "high-scores", { accountId: { $in: playerIds } }),
     deleteFrom(db, "visitors", { accountId: { $in: playerIds } }),
-    deleteFrom(db, "duel_results", { players: { $in: playerIds } }),
+    anonymizeDuelResults(db, playerIds),
     deleteFrom(db, "activity_sessions", { $or: activitySessionFilters })
   ]);
 

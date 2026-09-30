@@ -1,14 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import { deletePlayerData } from "@/lib/player-data-deletion";
+import { DELETED_PLAYER_ID, deletePlayerData } from "@/lib/player-data-deletion";
 
 describe("deletePlayerData", () => {
   it("removes game, Activity, and authentication records for current and legacy IDs", async () => {
-    const calls: Array<{ collection: string; filter: unknown }> = [];
+    const calls: Array<{ collection: string; filter: unknown; update?: unknown }> = [];
     const db = {
       collection: (collection: string) => ({
         deleteMany: vi.fn(async (filter: unknown) => {
           calls.push({ collection, filter });
           return { deletedCount: 1 };
+        }),
+        updateMany: vi.fn(async (filter: unknown, update: unknown) => {
+          calls.push({ collection, filter, update });
+          return { modifiedCount: 1 };
         })
       })
     };
@@ -45,6 +49,12 @@ describe("deletePlayerData", () => {
         { discordUserId: "discord-user" }
       ]
     });
+    const duelCall = calls.find(({ collection }) => collection === "duel_results");
+    expect(duelCall?.filter).toEqual({
+      players: { $in: ["stable-player", "legacy-player", "auth-user"] }
+    });
+    expect(duelCall?.update).toBeDefined();
+    expect(JSON.stringify(duelCall?.update)).toContain(DELETED_PLAYER_ID);
     expect(calls.find(({ collection }) => collection === "account")?.filter).toEqual({
       userId: { $in: ["auth-user", "legacy-player"] }
     });

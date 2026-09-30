@@ -7,6 +7,17 @@ import { musicTrackSchema } from "@/lib/schemas/music";
 // Custom tracks live in the "music-tracks" collection. The built-in tracks are
 // served from code (src/audio/musicTracks.ts), so this endpoint only carries the
 // user-added ones; the Music screen merges them on top of the built-ins.
+// Custom track text is shown to every player, so publishing is limited to the
+// Discord user IDs in MUSIC_TRACK_ADMIN_DISCORD_IDS (comma-separated).
+function canPublishTracks(discordUserId: string | undefined): boolean {
+  const admins = (process.env.MUSIC_TRACK_ADMIN_DISCORD_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  return Boolean(discordUserId && admins.includes(discordUserId));
+}
+
 export async function GET() {
   if (!process.env.MONGODB_URI) {
     return NextResponse.json({ ok: true, tracks: [] });
@@ -32,6 +43,13 @@ export async function POST(request: Request) {
 
   if (!player) {
     return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+  }
+
+  if (!canPublishTracks(player.discordUserId)) {
+    return NextResponse.json(
+      { ok: false, error: "Publishing music tracks is restricted" },
+      { status: 403 }
+    );
   }
 
   let body: unknown;

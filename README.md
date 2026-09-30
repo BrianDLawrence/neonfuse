@@ -85,5 +85,6 @@ Discord Community server.
 Signed-in players can permanently remove their account-linked data from
 **Fighter Profile → Data Controls**. The deletion endpoint validates the
 confirmation phrase server-side and removes profiles, matches, high scores,
-visitor records, duel records, Activity sessions, and linked authentication
-records. The client also clears Neon Fuse's visitor cookie and local choices.
+visitor records, Activity sessions, and linked authentication records. Shared
+duel results are anonymized rather than deleted so the opponent's verified
+record survives. The client also clears Neon Fuse's visitor cookie and local choices.

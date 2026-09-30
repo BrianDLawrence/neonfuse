@@ -7,8 +7,16 @@ const RATE_LIMIT_COLLECTION = "rate_limits";
 const MAX_LOCAL_BUCKETS = 5_000;
 const ephemeralSecret = randomBytes(32).toString("base64url");
 
+// Discord's Activity proxy hides player IP addresses, so every request made
+// inside the Activity arrives from a shared pool of Discord proxy addresses.
+// Bearer-authenticated (Activity) requests are limited per session token, with a
+// looser per-address ceiling that still caps floods of forged tokens.
+const SHARED_ADDRESS_MULTIPLIER = 25;
+
 const RATE_LIMIT_POLICIES = {
-  activitySession: { limit: 10, windowMs: 60_000 },
+  // Runs before a bearer token exists and only inside Discord, so everyone
+  // launching the Activity through the same proxy address shares this bucket.
+  activitySession: { limit: 120, windowMs: 60_000 },
   authRead: { limit: 180, windowMs: 60_000 },
   authWrite: { limit: 20, windowMs: 10 * 60_000 },
   highScoreWrite: { limit: 30, windowMs: 60_000 },
@@ -78,25 +86,15 @@ function clientAddress(request: Request): string {
   return forwardedFor || "unknown-client";
 }
 
-function clientDigest(request: Request): string {
-  return createHmac("sha256", rateLimitSecret())
-    .update(clientAddress(request))
-    .digest("hex");
+function bearerToken(request: Request): string | null {
+  return /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") ?? "")?.[1]?.trim() || null;
 }
 
-function bucketDetails(
-  request: Request,
-  policyName: RateLimitPolicyName,
-  now: number
-) {
-  const policy = RATE_LIMIT_POLICIES[policyName];
-  const windowStart = Math.floor(now / policy.windowMs) * policy.windowMs;
-  const resetAt = windowStart + policy.windowMs;
-  const id = createHmac("sha256", rateLimitSecret())
-    .update(`${policyName}:${clientDigest(request)}:${windowStart}`)
+function bucketId(policyName: RateLimitPolicyName, clientKey: string, windowStart: number) {
+  // Only a keyed digest is stored; raw addresses and tokens never leave memory.
+  return createHmac("sha256", rateLimitSecret())
+    .update(`${policyName}:${clientKey}:${windowStart}`)
     .digest("hex");
-
-  return { id, policy, resetAt };
 }
 
 function pruneLocalBuckets(now: number) {
@@ -191,13 +189,13 @@ async function consumeShared(
   };
 }
 
-export async function checkRateLimit(
-  request: Request,
-  policyName: RateLimitPolicyName,
-  now = Date.now()
+async function consume(
+  id: string,
+  limit: number,
+  resetAt: number,
+  now: number
 ): Promise<RateLimitResult> {
-  const { id, policy, resetAt } = bucketDetails(request, policyName, now);
-  const localResult = consumeLocal(id, policy.limit, resetAt, now);
+  const localResult = consumeLocal(id, limit, resetAt, now);
 
   if (!localResult.allowed) {
     return localResult;
@@ -205,12 +203,48 @@ export async function checkRateLimit(
 
   try {
     const { db } = await tryGetMongoDb();
-    return db
-      ? await consumeShared(db, id, policy.limit, resetAt, now)
-      : localResult;
+    return db ? await consumeShared(db, id, limit, resetAt, now) : localResult;
   } catch {
     return localResult;
   }
+}
+
+export async function checkRateLimit(
+  request: Request,
+  policyName: RateLimitPolicyName,
+  now = Date.now()
+): Promise<RateLimitResult> {
+  const policy = RATE_LIMIT_POLICIES[policyName];
+  const windowStart = Math.floor(now / policy.windowMs) * policy.windowMs;
+  const resetAt = windowStart + policy.windowMs;
+  const address = `address:${clientAddress(request)}`;
+  const token = bearerToken(request);
+  const buckets = token
+    ? [
+        { clientKey: `session:${token}`, limit: policy.limit },
+        { clientKey: address, limit: policy.limit * SHARED_ADDRESS_MULTIPLIER }
+      ]
+    : [{ clientKey: address, limit: policy.limit }];
+  let tightest: RateLimitResult | undefined;
+
+  for (const bucket of buckets) {
+    const result = await consume(
+      bucketId(policyName, bucket.clientKey, windowStart),
+      bucket.limit,
+      resetAt,
+      now
+    );
+
+    if (!result.allowed) {
+      return result;
+    }
+
+    if (!tightest || result.remaining < tightest.remaining) {
+      tightest = result;
+    }
+  }
+
+  return tightest ?? { allowed: true, limit: policy.limit, remaining: policy.limit, resetAt };
 }
 
 export async function enforceRateLimit(

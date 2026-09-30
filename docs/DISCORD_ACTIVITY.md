@@ -74,3 +74,8 @@ the Better Auth web flow. Activity behavior must be tested from inside Discord.
   guard remains active during MongoDB outages, while MongoDB-backed counters
   provide shared enforcement across serverless instances. Client addresses are
   HMAC-hashed before storage and expired buckets are removed by TTL.
+- Discord's proxy hides player IP addresses, so Activity requests share a small
+  pool of proxy addresses. Requests carrying an Activity bearer token are limited
+  per session token, with a 25x looser per-address ceiling that still bounds
+  forged-token floods. `/api/activity/session` runs before a token exists, so its
+  per-address limit is sized for many players launching through one proxy address.

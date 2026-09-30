@@ -11,6 +11,7 @@ import { POST } from "./route";
 
 const player = {
   id: "player-a",
+  discordUserId: "111111111111111111",
   displayName: "Alice",
   source: "web" as const
 };
@@ -44,6 +45,7 @@ function request() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("MONGODB_URI", "mongodb://test");
+  vi.stubEnv("MUSIC_TRACK_ADMIN_DISCORD_IDS", "999, 111111111111111111");
   vi.mocked(enforceRateLimit).mockResolvedValue(null);
   vi.mocked(getAuthenticatedPlayer).mockResolvedValue(player);
 });
@@ -70,6 +72,27 @@ describe("custom music track writes", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(401);
+    expect(getMongoDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects authenticated players who are not track publishers", async () => {
+    vi.mocked(getAuthenticatedPlayer).mockResolvedValue({
+      ...player,
+      discordUserId: "222222222222222222"
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(403);
+    expect(getMongoDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects every submission when no publishers are configured", async () => {
+    vi.stubEnv("MUSIC_TRACK_ADMIN_DISCORD_IDS", "");
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(403);
     expect(getMongoDb).not.toHaveBeenCalled();
   });
 
