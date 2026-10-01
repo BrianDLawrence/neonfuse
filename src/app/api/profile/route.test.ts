@@ -4,6 +4,7 @@ vi.mock("@/lib/mongoIndexes", () => ({ ensureGameIndexes: vi.fn() }));
 vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: vi.fn() }));
 vi.mock("@/lib/player-identity", () => ({ getAuthenticatedPlayer: vi.fn() }));
 vi.mock("@/lib/player-career", () => ({ loadPlayerCareer: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 vi.mock("@/lib/player-profiles", () => ({
   getOrCreatePlayerProfile: vi.fn(),
   updatePlayerProfile: vi.fn()
@@ -13,6 +14,7 @@ import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { loadPlayerCareer } from "@/lib/player-career";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { GET, PATCH } from "./route";
 
@@ -32,6 +34,7 @@ const storedProgression = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(enforceRateLimit).mockResolvedValue(null);
   vi.mocked(getAuthenticatedPlayer).mockResolvedValue(player);
   vi.mocked(tryGetMongoDb).mockResolvedValue({ db: db as never, mongo: "connected" });
   vi.mocked(ensureGameIndexes).mockResolvedValue();

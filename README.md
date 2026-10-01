@@ -27,6 +27,7 @@ MONGODB_URI=
 MONGODB_DB=neon-fuse
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:3000
+RATE_LIMIT_SECRET=
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 NEXT_PUBLIC_DISCORD_CLIENT_ID=
@@ -40,11 +41,23 @@ portal, authorize `http://localhost:3000/api/auth/callback/discord` as an OAuth2
 redirect. Production needs the equivalent callback on its public domain.
 
 The health endpoint is available at `/api/health` and reports whether Discord
-authentication is configured.
+authentication, Discord Activity, multiplayer admission, and MongoDB are ready.
+Its response is sanitized and returns `503` when a production dependency is
+missing or unavailable.
+
+Public API writes and Discord session/ticket routes use layered fixed-window
+rate limits: a fast per-instance guard plus shared MongoDB counters with TTL
+cleanup. Client addresses are HMAC-hashed before storage. `RATE_LIMIT_SECRET`
+is optional and falls back to `BETTER_AUTH_SECRET`; use a separate high-entropy
+value in production when possible.
 
 Friend matches also need the persistent realtime service described in
 [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md). A Render Blueprint is included for
 the repository's single-instance WebSocket server.
+
+Production readiness, manual health checks, sanitized error events, capacity
+ceilings, and the single-to-multi-replica plan are documented in the
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md) runbook.
 
 ## Architecture Notes
 
@@ -57,7 +70,27 @@ React owns text-heavy UI. Phaser owns the playfield.
 - [Architecture guide](docs/ARCHITECTURE.md) — ownership boundaries, data flow, testing, security, and AI constraints.
 - [Authentication guide](docs/AUTHENTICATION.md) — Discord OAuth setup, environment variables, and server-side session boundaries.
 - [Discord Activity guide](docs/DISCORD_ACTIVITY.md) — embedded launch setup, URL mapping, and Activity session security.
+- [Production operations](docs/OPERATIONS.md) — health monitoring, alerting, capacity limits, and incident response.
 
 ## License
 
 MIT License. Copyright (c) 2026 Spero Autem LLC.
+
+## Discord compliance surfaces
+
+Neon Fuse exposes public, unauthenticated routes for Discord review and App
+Directory setup:
+
+- `/privacy` — data collection, use, sharing, retention, and deletion policy
+- `/terms` — player-facing terms of service
+- `/support` — troubleshooting, privacy controls, and support channels
+
+Set `SUPPORT_EMAIL` and `DISCORD_SUPPORT_URL` in the production environment
+before submitting the App Directory listing. The support server must be a
+Discord Community server.
+
+Signed-in players can permanently remove their account-linked data from
+**Fighter Profile → Data Controls**. The deletion endpoint validates the
+confirmation phrase server-side and removes profiles, matches, high scores,
+visitor records, duel records, Activity sessions, and linked authentication
+records. The client also clears Neon Fuse's visitor cookie and local choices.

@@ -50,6 +50,7 @@ describe("authoritative duel", () => {
     const next = advanceDuel(state, 3100);
     expect(next.bombs).toHaveLength(0);
     expect(next.explosions).toHaveLength(2);
+    expect(next.explosions[0].clearedBlocks).toContainEqual({ x: 3, y: 1 });
     expect(next.arena[1][3]).toBe("floor");
   });
 });

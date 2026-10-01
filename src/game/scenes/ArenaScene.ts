@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import type { AudioDirector, AudioEventName, MusicIntensity } from "@/audio";
 import type { GameEvents, TouchControlsLayoutState, TouchInputState } from "../createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
+import { playExplosionEffect } from "../presentation/explosionEffect";
 import {
   ARENA_COLS,
   ARENA_ROWS,
@@ -12,7 +13,7 @@ import {
   type GridPoint,
   isWalkable
 } from "../simulation/arena";
-import { computeBoardFit, computeReservedBands } from "../simulation/layout";
+import { computeArenaBoardFit } from "../simulation/layout";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 import {
   BOT_PROFILES,
@@ -338,67 +339,17 @@ export class ArenaScene extends Phaser.Scene {
     const blast = resolveBlast(this.arena, bomb.tile, bomb.range);
     this.blocksCleared += blast.clearedBlocks.length;
     this.emitAudio(this.getExplosionAudioEvent(blast));
-    this.playExplosion(blast);
+    playExplosionEffect(this, blast, (tile) => this.tileToWorld(tile));
     this.time.delayedCall(220, () => {
       this.clearDestroyedBlocks(blast.clearedBlocks);
       this.spawnPowerups(blast.clearedBlocks);
     });
     this.time.delayedCall(140, () => this.evaluateBlastHits(blast));
 
-    this.cameras.main.shake(180, 0.008);
     this.time.delayedCall(720, () => {
       if (!this.roundOver && this.activeBombs.length === 0) {
         this.shellEvents?.onRoundStatusChange?.("Live");
       }
-    });
-  }
-
-  private playExplosion(blast: BlastResult) {
-    blast.tiles.forEach((blastTile, index) => {
-      this.time.delayedCall(index * 24, () => {
-        const didClearBlock = blast.clearedBlocks.some(
-          (block) => block.x === blastTile.x && block.y === blastTile.y
-        );
-
-        this.flashTile(blastTile, didClearBlock);
-      });
-    });
-  }
-
-  private flashTile(tile: GridPoint, didClearBlock: boolean) {
-    const world = this.tileToWorld(tile);
-    const blastColor = didClearBlock ? 0xf43f5e : 0x22d3ee;
-    const outer = this.add.rectangle(world.x, world.y, CELL_SIZE - 3, CELL_SIZE - 3, blastColor, 0.82);
-    const core = this.add.rectangle(world.x, world.y, CELL_SIZE - 18, CELL_SIZE - 18, 0xf59e0b, 0.96);
-    const spark = this.add.image(world.x, world.y, "spark").setAlpha(0.9);
-
-    outer.setBlendMode(Phaser.BlendModes.ADD);
-    core.setBlendMode(Phaser.BlendModes.ADD);
-    spark.setBlendMode(Phaser.BlendModes.ADD);
-    outer.setDepth(30);
-    core.setDepth(31);
-    spark.setDepth(32);
-
-    this.tweens.add({
-      targets: [outer, core],
-      alpha: 0,
-      scale: 1.3,
-      duration: 460,
-      ease: "Cubic.easeOut",
-      onComplete: () => {
-        outer.destroy();
-        core.destroy();
-      }
-    });
-
-    this.tweens.add({
-      targets: spark,
-      angle: 180,
-      alpha: 0,
-      scale: 2.1,
-      duration: 420,
-      ease: "Cubic.easeOut",
-      onComplete: () => spark.destroy()
     });
   }
 
@@ -450,14 +401,15 @@ export class ArenaScene extends Phaser.Scene {
 
     const boardWidth = ARENA_COLS * CELL_SIZE;
     const boardHeight = ARENA_ROWS * CELL_SIZE;
-    const { reservedTop, reservedBottom, reservedSides } = this.getReserved();
-    const reservedHeight = reservedTop + reservedBottom;
-    const fit = computeBoardFit(this.scale.width, this.scale.height, boardWidth, boardHeight, {
-      reservedWidth: reservedSides,
-      reservedHeight
+    const fit = computeArenaBoardFit(this.scale.width, this.scale.height, boardWidth, boardHeight, {
+      touchControlsVisible: this.getTouchControlsVisible()
     });
 
-    if (fit.zoom >= 1 && reservedSides === 0 && reservedHeight === 0) {
+    if (
+      fit.zoom >= 1 &&
+      fit.reservedSides === 0 &&
+      fit.reservedTop + fit.reservedBottom === 0
+    ) {
       camera.setZoom(1);
       camera.setScroll(0, 0);
       return;
@@ -470,21 +422,8 @@ export class ArenaScene extends Phaser.Scene {
     // Center the board in the region between the reserved top/bottom bands. A
     // larger top band pushes it down; a larger bottom band pushes it up. Side
     // bands are symmetric, so no horizontal shift is needed.
-    const verticalNudge = (reservedBottom - reservedTop) / (2 * fit.zoom);
+    const verticalNudge = (fit.reservedBottom - fit.reservedTop) / (2 * fit.zoom);
     camera.centerOn(boardCenterX, boardCenterY + verticalNudge);
-  }
-
-  // Thin adapter over the pure computeReservedBands (src/game/simulation/layout.ts),
-  // which mirrors the CSS layout in globals.css. Reads the live (visible) viewport.
-  private getReserved() {
-    return computeReservedBands(
-      this.scale.width,
-      this.scale.height,
-      {
-        isPlayer: this.currentMode === "player-vs-bot",
-        touchControlsVisible: this.getTouchControlsVisible()
-      }
-    );
   }
 
   private getTouchControlsVisible() {

@@ -20,6 +20,34 @@ depend on third-party cookies inside Discord's iframe.
    See [multiplayer setup](MULTIPLAYER.md) for its additional server, credentials,
    and Discord URL mapping.
 
+## Session renewal
+
+The Activity bearer session lasts at most one hour, so the client renews it
+before it lapses. Renewal lives in
+[`src/lib/activity-session-renewal.ts`](../src/lib/activity-session-renewal.ts)
+and is started by `DiscordActivityAuthGate` once the first session is issued.
+
+- `/api/activity/session` returns `expiresIn` (seconds). The client schedules a
+  renewal five minutes before that, or halfway through the lifetime for
+  sessions shorter than ten minutes.
+- A renewal repeats the full sign-in: a silent `sdk.commands.authorize` with
+  `prompt: "none"` for a fresh one-time code, then a POST to
+  `/api/activity/session`. Discord re-verifies the user each time, so the
+  server-side one-hour cap still applies to every token.
+- If renewal fails, the client keeps the old token and retries with
+  exponential backoff (2s, 4s, 8s, and so on, capped at 60s) until one
+  succeeds. Each failure is logged to the console.
+- Game code never receives the token as a string. React components get a
+  stable `ActivityAuth` object and call `getToken()` while building each
+  request, so a renewal re-renders nothing and re-runs no effects. This matters
+  most for friend matches: the duel socket's effect cleanup sends `leave`,
+  which the server treats as a forfeit.
+- Multiplayer ticket requests and match-result saves treat a `401` as "renew
+  now, then retry once" (`fetchWithActivityRenewal`). They report an error only
+  if the retry also fails. When the realtime server closes a socket at its
+  one-hour limit, the client reconnects without sending `leave` and asks for
+  a new ticket with the renewed token.
+
 ## Vercel environment
 
 Add this public value in addition to the existing authentication variables:
@@ -63,10 +91,14 @@ the Better Auth web flow. Activity behavior must be tested from inside Discord.
 
 - SDK-provided client identity is never accepted as proof of identity.
 - Discord OAuth codes are exchanged only on the server with the Client Secret.
-- Activity bearer tokens are random, held only in client memory, stored hashed in MongoDB, and expire after at most one hour.
+- Activity bearer tokens are random, held only in client memory, stored hashed in MongoDB, and expire after at most one hour. Renewal issues a new token only after Discord re-authorizes the user. The previous token keeps working until its own expiry.
 - MongoDB TTL cleanup is asynchronous; authorization also checks `expiresAt`, so an expired token stops working before cleanup.
 - `instanceId` and participant data are context, not authorization. Future multiplayer APIs must validate every player action server-side.
 - `/api/social/party` revalidates instance membership with the Discord bot before
   returning profile cards and never accepts client-supplied member IDs.
 - Party cards omit Discord IDs and private Neon Fuse player IDs.
-- Add rate limiting before public discovery or a large external test.
+- Activity session exchange, party lookup, multiplayer tickets, authentication,
+  and game-data writes use layered fixed-window rate limits. A per-instance
+  guard remains active during MongoDB outages, while MongoDB-backed counters
+  provide shared enforcement across serverless instances. Client addresses are
+  HMAC-hashed before storage and expired buckets are removed by TTL.

@@ -10,7 +10,7 @@ export type DuelState = {
   arena: ArenaGrid;
   players: { tile: GridPoint; alive: boolean; loadout: ActorLoadout; nextMoveAt: number }[];
   bombs: { id: number; owner: Seat; tile: GridPoint; range: number; explodesAt: number }[];
-  explosions: { id: number; tiles: GridPoint[]; expiresAt: number }[];
+  explosions: { id: number; tiles: GridPoint[]; clearedBlocks: GridPoint[]; expiresAt: number }[];
   powerups: { tile: GridPoint; type: PowerupType }[];
   nextBombId: number;
   winner: Seat | "draw" | null;
@@ -70,7 +70,12 @@ export function advanceDuel(state: DuelState, time: number): DuelState {
     next.bombs = next.bombs.filter((candidate) => candidate !== bomb);
     const blast = resolveBlast(next.arena, bomb.tile, bomb.range);
     hitTiles.push(...blast.tiles);
-    next.explosions.push({ id: bomb.id, tiles: blast.tiles, expiresAt: time + 460 });
+    next.explosions.push({
+      id: bomb.id,
+      tiles: blast.tiles,
+      clearedBlocks: blast.clearedBlocks,
+      expiresAt: time + 460
+    });
     queue.push(...next.bombs.filter((candidate) => tileListIncludes(blast.tiles, candidate.tile)));
     for (const tile of blast.clearedBlocks) {
       const type = choosePowerupDrop(tile);

@@ -8,6 +8,12 @@ import {
 } from "@discord/embedded-app-sdk";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { GameShell } from "@/components/game/GameShell";
+import { LegalLinks } from "@/components/legal/LegalPage";
+import {
+  ActivitySessionRenewer,
+  type ActivityAuth,
+  type RenewedActivitySession
+} from "@/lib/activity-session-renewal";
 import { authClient } from "@/lib/auth-client";
 
 type ActivityLoadState =
@@ -16,15 +22,52 @@ type ActivityLoadState =
   | {
       status: "ready";
       accountName: string;
-      sessionToken: string;
+      activityAuth: ActivityAuth;
       participantCount: number;
     };
 
 interface ActivitySessionResponse {
   accessToken?: string;
   sessionToken?: string;
+  expiresIn?: number;
   player?: { displayName: string };
   error?: string;
+}
+
+async function exchangeActivityCode(
+  sdk: DiscordSDK,
+  clientId: string
+): Promise<RenewedActivitySession & { accessToken: string; displayName: string }> {
+  const { code } = await sdk.commands.authorize({
+    client_id: clientId,
+    response_type: "code",
+    state: "",
+    prompt: "none",
+    scope: ["identify"]
+  });
+  const response = await fetch("/api/activity/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code, instanceId: sdk.instanceId })
+  });
+  const payload = (await response.json()) as ActivitySessionResponse;
+
+  if (
+    !response.ok ||
+    !payload.accessToken ||
+    !payload.sessionToken ||
+    typeof payload.expiresIn !== "number" ||
+    !payload.player
+  ) {
+    throw new Error(payload.error || "Discord Activity sign-in failed.");
+  }
+
+  return {
+    accessToken: payload.accessToken,
+    token: payload.sessionToken,
+    expiresIn: payload.expiresIn,
+    displayName: payload.player.displayName
+  };
 }
 
 function AuthStatus({ message }: Readonly<{ message: string }>) {
@@ -38,6 +81,7 @@ function AuthStatus({ message }: Readonly<{ message: string }>) {
         <h1>Syncing fighter profile</h1>
         <p className="auth-copy">{message}</p>
         <div className="auth-scanline" aria-hidden="true" />
+        <LegalLinks className="auth-legal-links" />
       </section>
     </main>
   );
@@ -62,6 +106,7 @@ function ActivityErrorGate({ message }: Readonly<{ message: string }>) {
         >
           Retry connection
         </button>
+        <LegalLinks className="auth-legal-links" />
       </section>
     </main>
   );
@@ -119,6 +164,7 @@ function SignInGate({ error }: Readonly<{ error?: string }>) {
           {working ? "Contacting Discord…" : "Continue with Discord"}
         </button>
         <p className="auth-footnote">Discord confirms your identity. Neon Fuse never receives your password.</p>
+        <LegalLinks className="auth-legal-links" />
       </section>
     </main>
   );
@@ -168,40 +214,36 @@ function DiscordActivityAuthGate() {
     let participantListener:
       | ((event: EventPayloadData<"ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE">) => void)
       | undefined;
+    let renewer: ActivitySessionRenewer | undefined;
     const sdk = new DiscordSDK(activityClientId);
     sdkRef.current = sdk;
 
     async function connect() {
       await sdk.ready();
-      const { code } = await sdk.commands.authorize({
-        client_id: activityClientId,
-        response_type: "code",
-        state: "",
-        prompt: "none",
-        scope: ["identify"]
-      });
-      const response = await fetch("/api/activity/session", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code, instanceId: sdk.instanceId })
-      });
-      const payload = (await response.json()) as ActivitySessionResponse;
+      const session = await exchangeActivityCode(sdk, activityClientId);
 
-      if (!response.ok || !payload.accessToken || !payload.sessionToken || !payload.player) {
-        throw new Error(payload.error || "Discord Activity sign-in failed.");
-      }
-
-      await sdk.commands.authenticate({ access_token: payload.accessToken });
+      await sdk.commands.authenticate({ access_token: session.accessToken });
       const connected = await sdk.commands.getInstanceConnectedParticipants();
 
       if (cancelled) {
         return;
       }
 
+      // Renewal re-runs the silent Discord authorization so every new bearer
+      // session is re-verified server-side. Consumers read the token through
+      // this stable object, so renewal never re-runs their effects.
+      renewer = new ActivitySessionRenewer({
+        session,
+        renewSession: () => exchangeActivityCode(sdk, activityClientId),
+        onRenewalError: (error, failures) => {
+          console.warn(`Discord Activity session renewal failed (attempt ${failures})`, error);
+        }
+      });
+
       setActivityState({
         status: "ready",
-        accountName: payload.player.displayName,
-        sessionToken: payload.sessionToken,
+        accountName: session.displayName,
+        activityAuth: renewer,
         participantCount: connected.participants.length
       });
 
@@ -232,6 +274,7 @@ function DiscordActivityAuthGate() {
 
     return () => {
       cancelled = true;
+      renewer?.dispose();
 
       if (participantListener) {
         void sdk.unsubscribe(Events.ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE, participantListener);
@@ -253,7 +296,7 @@ function DiscordActivityAuthGate() {
     <GameShell
       accountName={activityState.accountName}
       activityParticipantCount={activityState.participantCount}
-      authToken={activityState.sessionToken}
+      activityAuth={activityState.activityAuth}
       connectionLabel={partyLabel}
       onInviteFriends={async () => {
         const sdk = sdkRef.current;

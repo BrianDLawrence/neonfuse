@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Neon Fuse "NF" mark, matching .auth-mark. Colors mirror the :root tokens in
+       globals.css: background-deep #07080d, cyan #22d3ee, pink #f43f5e, text #f8fafc. -->
+  <defs>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.2" />
+    </filter>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="9" fill="#07080d" />
+  <rect x="2" y="2" width="60" height="60" rx="9" fill="#22d3ee" fill-opacity="0.12" stroke="#22d3ee" stroke-opacity="0.82" stroke-width="2.5" />
+  <g fill="none" stroke-width="6" stroke-linejoin="bevel">
+    <path d="M15 47V17l14 30V17M37 47V17h14M37 31h11" stroke="#22d3ee" stroke-opacity="0.55" filter="url(#glow)" />
+    <path d="M15 47V17l14 30V17M37 47V17h14M37 31h11" stroke="#f8fafc" />
+  </g>
+  <circle cx="51" cy="44" r="4" fill="#f43f5e" filter="url(#glow)" />
+  <circle cx="51" cy="44" r="3" fill="#f43f5e" />
+</svg>
