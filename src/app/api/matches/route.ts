@@ -5,8 +5,15 @@ import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { matchResultSchema } from "@/lib/schemas/match";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "matchWrite");
+
+  if (limited) {
+    return limited;
+  }
+
   const player = await getAuthenticatedPlayer(request);
 
   if (!player) {

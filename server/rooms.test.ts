@@ -14,9 +14,22 @@ function setup() {
 }
 
 describe("two-player rooms", () => {
+  it("enforces the configured per-process room ceiling", () => {
+    const rooms = new Rooms("server", () => "round", () => undefined, 1);
+    const ticket = (roomId: string): JoinTicket => ({
+      playerId: roomId,
+      name: roomId,
+      roomId,
+      expiresAt: 30000,
+      nonce: roomId
+    });
+
+    rooms.join(ticket("first"), "connection-first", 0);
+    expect(() => rooms.join(ticket("second"), "connection-second", 0)).toThrow("busy");
+  });
+
   it("reserves exactly two distinct accounts and starts only with both ready", () => {
     const { rooms, ticket, a } = setup();
-    expect(() => rooms.join(ticket("a"), "duplicate", 0)).toThrow("already");
     expect(() => rooms.join(ticket("c"), "third", 0)).toThrow("full");
     rooms.message(a.room, 0, { type: "ready", ready: true }, 0);
     expect(a.room.duel).toBeNull();
@@ -44,6 +57,17 @@ describe("two-player rooms", () => {
     expect(a.room.duel?.winner).toBe(1);
     expect(results).toHaveLength(1);
     expect(results[0].winnerId).toBe("b");
+  });
+  it("hands a live seat to a newer connection mid-match without a forfeit", () => {
+    const { rooms, a, ready, ticket, results } = setup(); ready(); rooms.tick(3000);
+    expect(a.replaced).toBeNull();
+    const takeover = rooms.join(ticket("a"), "replacement", 3100);
+    expect(takeover).toMatchObject({ seat: 0, replaced: "connection-a" });
+    expect(a.room.members[0]?.connection).toBe("replacement");
+    expect(rooms.snapshot(a.room, 0, 3100)).toMatchObject({ phase: "playing", reconnectSeconds: null });
+    rooms.tick(30000);
+    expect(a.room.duel?.winner).toBeNull();
+    expect(results).toHaveLength(0);
   });
   it("cancels countdown on disconnect and needs fresh ready votes", () => {
     const { rooms, a, ready, ticket } = setup(); ready();

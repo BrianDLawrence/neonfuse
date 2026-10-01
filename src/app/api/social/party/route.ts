@@ -4,6 +4,8 @@ import { verifyDiscordActivityInstance } from "@/lib/discord-activity-instance";
 import { loadDiscordPartyRoster } from "@/lib/discord-party";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { reportOperationalError } from "@/lib/server-observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +15,12 @@ function bearerToken(request: Request): string | null {
 }
 
 export async function GET(request: Request) {
+  const limited = await enforceRateLimit(request, "socialParty");
+
+  if (limited) {
+    return limited;
+  }
+
   const token = bearerToken(request);
 
   if (!token) {
@@ -53,7 +61,15 @@ export async function GET(request: Request) {
       { ok: true, roster },
       { headers: { "Cache-Control": "no-store" } }
     );
-  } catch {
+  } catch (error) {
+    reportOperationalError(
+      {
+        service: "web",
+        event: "social.party.failed",
+        summary: "Discord party lookup failed"
+      },
+      error
+    );
     return NextResponse.json(
       { ok: false, error: "Discord party is temporarily unavailable" },
       { status: 503 }

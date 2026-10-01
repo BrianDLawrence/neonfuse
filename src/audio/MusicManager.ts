@@ -1,4 +1,3 @@
-import { audioManifest } from "./audioManifest";
 import type { AudioAssetKey, MusicIntensity, MusicTrack } from "./types";
 import { Mixer } from "./Mixer";
 import { SfxManager } from "./SfxManager";
@@ -16,7 +15,6 @@ export class MusicManager {
   private readonly context: AudioContext;
   private readonly mixer: Mixer;
   private readonly sfx: SfxManager;
-  private currentSource?: AudioBufferSourceNode;
   private currentGain?: GainNode;
   private currentStop?: (when: number) => void;
   private currentIntensity: MusicIntensity = "combat";
@@ -107,78 +105,37 @@ export class MusicManager {
 
     const now = this.context.currentTime;
     const fadeEnd = now + fadeMs / 1000;
-    const source = this.currentSource;
 
     this.currentGain.gain.cancelScheduledValues(now);
     this.currentGain.gain.setValueAtTime(this.currentGain.gain.value, now);
     this.currentGain.gain.linearRampToValueAtTime(0, fadeEnd);
-    source?.stop(fadeEnd + 0.05);
     this.currentStop?.(fadeEnd + 0.05);
 
-    this.currentSource = undefined;
     this.currentGain = undefined;
     this.currentStop = undefined;
   }
 
   // Render the currently appropriate music (preview override → active track →
-  // legacy file/procedural loop) at the given intensity, crossfading the
+  // procedural intensity loop) at the given intensity, crossfading the
   // previous loop out.
   private async startLoop(intensity: MusicIntensity, fadeMs: number) {
-    const previousSource = this.currentSource;
     const previousGain = this.currentGain;
     const previousStop = this.currentStop;
     const now = this.context.currentTime;
     const fadeEnd = now + fadeMs / 1000;
     const track = this.previewOverride ?? this.activeTrack;
-    let source: AudioBufferSourceNode | undefined;
-    let gain: GainNode;
-    let stop: ((when: number) => void) | undefined;
-
-    if (track) {
-      const loop = createTrackMusicLoop(this.context, this.mixer, track, intensity, fadeMs);
-      gain = loop.gain;
-      stop = loop.stop;
-    } else {
-      const key = INTENSITY_TRACKS[intensity] ?? "music.gameplay.loop";
-      const buffer = await this.loadBuffer(key).catch(() => null);
-
-      if (buffer) {
-        source = this.context.createBufferSource();
-        gain = this.context.createGain();
-        source.buffer = buffer;
-        source.loop = true;
-        gain.gain.value = 0;
-        source.connect(gain);
-        gain.connect(this.mixer.getBus("music"));
-        source.start();
-        gain.gain.linearRampToValueAtTime(1, fadeEnd);
-      } else {
-        const proceduralLoop = createProceduralMusicLoop(this.context, this.mixer, intensity, fadeMs);
-        gain = proceduralLoop.gain;
-        stop = proceduralLoop.stop;
-      }
-    }
+    const loop = track
+      ? createTrackMusicLoop(this.context, this.mixer, track, intensity, fadeMs)
+      : createProceduralMusicLoop(this.context, this.mixer, intensity, fadeMs);
 
     if (previousGain) {
       previousGain.gain.cancelScheduledValues(now);
       previousGain.gain.setValueAtTime(previousGain.gain.value, now);
       previousGain.gain.linearRampToValueAtTime(0, fadeEnd);
-      previousSource?.stop(fadeEnd + 0.05);
       previousStop?.(fadeEnd + 0.05);
     }
 
-    this.currentSource = source;
-    this.currentGain = gain;
-    this.currentStop = stop;
-  }
-
-  private async loadBuffer(key: AudioAssetKey) {
-    const response = await fetch(audioManifest[key]);
-
-    if (!response.ok) {
-      throw new Error(`Failed to load music asset "${key}"`);
-    }
-
-    return this.context.decodeAudioData(await response.arrayBuffer());
+    this.currentGain = loop.gain;
+    this.currentStop = loop.stop;
   }
 }

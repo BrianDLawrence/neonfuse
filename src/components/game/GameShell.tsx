@@ -7,6 +7,7 @@ import { DiscordPartyScreen } from "./DiscordPartyScreen";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
+import { LegalLinks } from "@/components/legal/LegalPage";
 import {
   ProfileAvatar,
   ProfileScreen,
@@ -18,7 +19,9 @@ import type { MusicTrack } from "@/audio/types";
 import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
 import { calculateRoundScore } from "@/game/simulation/scoring";
+import { fetchWithActivityRenewal, type ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
+import { MUSIC_TRACK_STORAGE_KEY, VISITOR_STORAGE_KEY } from "@/lib/client-storage";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import {
   DEFAULT_PROFILE_PREFERENCES,
@@ -71,9 +74,6 @@ const AUDIO_CONTROLS: Array<{
   { type: "music", label: "Music", iconClass: "stat-icon-music" },
   { type: "sfx", label: "SFX", iconClass: "stat-icon-sfx" }
 ];
-
-const VISITOR_STORAGE_KEY = "neon-fuse:visitor-id";
-const MUSIC_TRACK_STORAGE_KEY = "neon-fuse:music-track";
 
 function readStoredMusicTrack(): MusicTrack | null {
   try {
@@ -130,14 +130,14 @@ function useTouchControlsEnabled() {
 
 export function GameShell({
   accountName,
-  authToken,
+  activityAuth,
   activityParticipantCount,
   connectionLabel,
   onInviteFriends,
   onSignOut
 }: Readonly<{
   accountName: string;
-  authToken?: string;
+  activityAuth?: ActivityAuth;
   activityParticipantCount?: number;
   connectionLabel?: string;
   onInviteFriends?: () => Promise<void>;
@@ -238,7 +238,7 @@ export function GameShell({
     async function loadProfile() {
       try {
         const response = await fetch("/api/profile", {
-          headers: authenticatedHeaders(authToken)
+          headers: authenticatedHeaders(activityAuth?.getToken())
         });
         const payload = (await response.json()) as {
           ok?: boolean;
@@ -257,7 +257,7 @@ export function GameShell({
         if (payload.created && !profile.preferences.selectedTrackId && localTrack) {
           const migrationResponse = await fetch("/api/profile", {
             method: "PATCH",
-            headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+            headers: authenticatedHeaders(activityAuth?.getToken(), { "Content-Type": "application/json" }),
             body: JSON.stringify({ preferences: { selectedTrackId: localTrack.id } })
           });
           const migrationPayload = (await migrationResponse.json()) as {
@@ -330,7 +330,7 @@ export function GameShell({
     return () => {
       active = false;
     };
-  }, [authToken]);
+  }, [activityAuth]);
 
   useEffect(() => {
     const nextVisitorId = readOrCreateVisitorId();
@@ -341,7 +341,7 @@ export function GameShell({
       try {
         const response = await fetch("/api/visitors", {
           method: "POST",
-          headers: authenticatedHeaders(authToken, {
+          headers: authenticatedHeaders(activityAuth?.getToken(), {
             "Content-Type": "application/json"
           }),
           body: JSON.stringify({ visitorId: nextVisitorId })
@@ -359,7 +359,7 @@ export function GameShell({
     }
 
     void registerVisitor();
-  }, [authToken]);
+  }, [activityAuth]);
 
   const persistProfilePreferences = useCallback(
     async (preferences: Partial<ProfilePreferences>) => {
@@ -377,7 +377,7 @@ export function GameShell({
       try {
         const response = await fetch("/api/profile", {
           method: "PATCH",
-          headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+          headers: authenticatedHeaders(activityAuth?.getToken(), { "Content-Type": "application/json" }),
           body: JSON.stringify({ preferences })
         });
         const payload = (await response.json()) as {
@@ -403,7 +403,7 @@ export function GameShell({
         }
       }
     },
-    [authToken]
+    [activityAuth]
   );
 
   const persistEquippedTitle = useCallback(
@@ -423,7 +423,7 @@ export function GameShell({
       try {
         const response = await fetch("/api/profile", {
           method: "PATCH",
-          headers: authenticatedHeaders(authToken, { "Content-Type": "application/json" }),
+          headers: authenticatedHeaders(activityAuth?.getToken(), { "Content-Type": "application/json" }),
           body: JSON.stringify({ equippedTitle })
         });
         const payload = (await response.json()) as { ok?: boolean; profile?: PlayerProfile };
@@ -450,7 +450,7 @@ export function GameShell({
         }
       }
     },
-    [authToken, playerProfile?.progression.equippedTitle]
+    [activityAuth, playerProfile?.progression.equippedTitle]
   );
 
   const handleLoadoutChange = useCallback(
@@ -533,16 +533,18 @@ export function GameShell({
 
     async function saveMatch() {
       try {
-        const response = await fetch("/api/matches", {
-          method: "POST",
-          headers: authenticatedHeaders(authToken, {
-            "Content-Type": "application/json"
-          }),
-          body: JSON.stringify({
-            ...payload,
-            visitorId: nextVisitorId
+        const response = await fetchWithActivityRenewal(activityAuth, (token) =>
+          fetch("/api/matches", {
+            method: "POST",
+            headers: authenticatedHeaders(token, {
+              "Content-Type": "application/json"
+            }),
+            body: JSON.stringify({
+              ...payload,
+              visitorId: nextVisitorId
+            })
           })
-        });
+        );
         const result = (await response.json()) as {
           ok?: boolean;
           stored?: boolean;
@@ -581,7 +583,7 @@ export function GameShell({
     }
 
     void saveMatch();
-  }, [authToken]);
+  }, [activityAuth]);
   const handleRegisterTouchControls = useCallback((api: TouchControlsApi | null) => {
     touchApiRef.current = api;
     api?.setMusicEnabled(musicEnabledRef.current, musicVolumeRef.current / 10);
@@ -676,6 +678,17 @@ export function GameShell({
   const handleTouchReset = useCallback(() => {
     touchApiRef.current?.requestReset();
   }, []);
+  const handleAccountDeleted = useCallback(async () => {
+    setPlayerProfile(null);
+
+    try {
+      await onSignOut();
+    } finally {
+      if (!activityAuth) {
+        window.location.reload();
+      }
+    }
+  }, [activityAuth, onSignOut]);
 
   const profilePreferences: ProfilePreferences = {
     musicEnabled,
@@ -686,7 +699,7 @@ export function GameShell({
   };
   const profileDisplayName = playerProfile?.identity.displayName ?? accountName;
 
-  if (isDuelOpen) return <DuelGame authToken={authToken} onLeave={() => setIsDuelOpen(false)} />;
+  if (isDuelOpen) return <DuelGame activityAuth={activityAuth} onLeave={() => setIsDuelOpen(false)} />;
 
   return (
     <main className="app-frame" data-touch-controls={touchControlsEnabled ? "true" : "false"}>
@@ -814,6 +827,7 @@ export function GameShell({
             <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
               Admin
             </a>
+            <LegalLinks className="hud-legal-links" linkClassName="admin-link" />
             <button
               aria-haspopup="dialog"
               className="profile-trigger"
@@ -828,7 +842,7 @@ export function GameShell({
               />
               <span>{profileDisplayName}</span>
             </button>
-            {connectionLabel && authToken && onInviteFriends ? (
+            {connectionLabel && activityAuth && onInviteFriends ? (
               <button
                 aria-haspopup="dialog"
                 className="admin-link hud-link-button account-name account-context"
@@ -850,10 +864,11 @@ export function GameShell({
 
         {isProfileOpen ? (
           <ProfileScreen
-            authToken={authToken}
+            activityAuth={activityAuth}
             fallbackName={accountName}
             onClose={() => setIsProfileOpen(false)}
             onEquippedTitleChange={(titleId) => void persistEquippedTitle(titleId)}
+            onAccountDeleted={handleAccountDeleted}
             onPreferencesChange={handleProfilePreferencesChange}
             preferences={profilePreferences}
             profile={playerProfile}
@@ -861,9 +876,9 @@ export function GameShell({
           />
         ) : null}
 
-        {isPartyOpen && authToken && onInviteFriends ? (
+        {isPartyOpen && activityAuth && onInviteFriends ? (
           <DiscordPartyScreen
-            authToken={authToken}
+            activityAuth={activityAuth}
             onClose={() => setIsPartyOpen(false)}
             onInviteFriends={onInviteFriends}
             onStartDuel={() => {
@@ -1079,7 +1094,7 @@ export function GameShell({
 
         {isHighScoresOpen ? (
           <HighScoresScreen
-            authToken={authToken}
+            activityAuth={activityAuth}
             playerName={accountName}
             result={scoreResult}
             onClose={() => setIsHighScoresOpen(false)}

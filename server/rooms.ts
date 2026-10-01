@@ -10,12 +10,22 @@ export type DuelResult = { roundId: string; roomId: string; players: string[]; w
 /** The process owns rooms; callers supply clock and IDs for deterministic tests. */
 export class Rooms {
   readonly rooms = new Map<string, Room>();
-  constructor(readonly serverId: string, private readonly newId: () => string, private readonly completed: (result: DuelResult) => void) {}
+  constructor(
+    readonly serverId: string,
+    private readonly newId: () => string,
+    private readonly completed: (result: DuelResult) => void,
+    private readonly maxRooms = 500
+  ) {
+    if (!Number.isInteger(maxRooms) || maxRooms < 1) {
+      throw new Error("maxRooms must be a positive integer");
+    }
+  }
 
-  join(ticket: JoinTicket, connection: string, now: number): { room: Room; seat: Seat } {
+  /** `replaced` names a still-live connection that the new one took the seat from. */
+  join(ticket: JoinTicket, connection: string, now: number): { room: Room; seat: Seat; replaced: string | null } {
     let room = this.rooms.get(ticket.roomId);
     if (!room) {
-      if (this.rooms.size >= 500) throw new Error("The arena is busy. Try again shortly.");
+      if (this.rooms.size >= this.maxRooms) throw new Error("The arena is busy. Try again shortly.");
       room = { id: ticket.roomId, roundId: this.newId(), members: [null, null], duel: null, startedAt: 0, emptyAt: null };
       this.rooms.set(room.id, room);
     }
@@ -25,13 +35,14 @@ export class Rooms {
     if (existing < 0 && active) throw new Error("A match is already in progress.");
     const seat = (existing >= 0 ? existing : room.members.findIndex((member) => !member)) as Seat;
     if (seat < 0) throw new Error("Match full. Two players are already in this lobby.");
-    const member = room.members[seat];
-    if (member?.connection) throw new Error("You already have a player slot open on another connection.");
+    // A fresh ticket is single-use and membership-verified, so it outranks an old
+    // socket whose death the heartbeat has not detected yet (network switch, reload).
+    const replaced = room.members[seat]?.connection ?? null;
     room.members[seat] = { id: ticket.playerId, name: ticket.name, connection, ready: false, disconnectedAt: null, sequence: -1 };
     room.emptyAt = null;
     // Rejoining a finished or waiting room clears both ready votes.
     if (!active) room.members.forEach((other) => { if (other) other.ready = false; });
-    return { room, seat };
+    return { room, seat, replaced };
   }
 
   message(room: Room, seat: Seat, message: Exclude<ClientMessage, { type: "join" }>, now: number) {
