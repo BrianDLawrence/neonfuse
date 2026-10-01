@@ -55,7 +55,7 @@ Friend matches also need the persistent realtime service described in
 [`docs/MULTIPLAYER.md`](docs/MULTIPLAYER.md). A Render Blueprint is included for
 the repository's single-instance WebSocket server.
 
-Production readiness, scheduled uptime checks, sanitized error events, capacity
+Production readiness, manual health checks, sanitized error events, capacity
 ceilings, and the single-to-multi-replica plan are documented in the
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md) runbook.
 
