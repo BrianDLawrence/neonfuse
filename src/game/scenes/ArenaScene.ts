@@ -2,7 +2,15 @@ import * as Phaser from "phaser";
 import type { AudioDirector, AudioEventName, MusicIntensity } from "@/audio";
 import type { GameEvents, TouchControlsLayoutState, TouchInputState } from "../createGame";
 import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
+import {
+  BombView,
+  DangerOverlay,
+  drawArenaBlocks,
+  drawArenaFloor,
+  shatterBlock
+} from "../presentation/arenaViews";
 import { playExplosionEffect } from "../presentation/explosionEffect";
+import { FusebotView, rowDepth } from "../presentation/fusebotView";
 import {
   ARENA_COLS,
   ARENA_ROWS,
@@ -24,7 +32,7 @@ import {
   type BotPowerupTarget,
   type BotProfile
 } from "../simulation/bots";
-import type { BombThreat } from "../simulation/danger";
+import { getDangerTiles, type BombThreat } from "../simulation/danger";
 import {
   applyPowerup,
   choosePowerupDrop,
@@ -49,15 +57,16 @@ type ActiveBomb = {
   owner: ActorId;
   tile: GridPoint;
   range: number;
-  sprite: Phaser.GameObjects.Image;
+  view: BombView;
   timer: Phaser.Time.TimerEvent;
+  urgentTimer: Phaser.Time.TimerEvent;
 };
 
 type CombatActor = {
   id: ActorId;
   kind: "player" | "bot";
   tile: GridPoint;
-  sprite: Phaser.GameObjects.Image;
+  view: FusebotView;
   alive: boolean;
   loadout: ActorLoadout;
   profile?: BotProfile;
@@ -89,8 +98,8 @@ export class ArenaScene extends Phaser.Scene {
   private audio?: AudioDirector;
   private boardOrigin = { x: 0, y: 0 };
   private boardLayer?: Phaser.GameObjects.Container;
-  private blockLayer?: Phaser.GameObjects.Container;
   private fxLayer?: Phaser.GameObjects.Container;
+  private dangerOverlay?: DangerOverlay;
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
   private currentMode: GameMode = DEFAULT_GAME_MODE;
   private roundOver = false;
@@ -116,8 +125,9 @@ export class ArenaScene extends Phaser.Scene {
     >;
 
     this.boardLayer = this.add.container(0, 0).setDepth(0);
-    this.blockLayer = this.add.container(0, 0).setDepth(1);
     this.fxLayer = this.add.container(0, 0).setDepth(2);
+    this.dangerOverlay = new DangerOverlay(this);
+    this.applyCameraFx();
 
     this.game.events.on("mode-change", this.handleModeChange, this);
     this.game.events.on("touch-bomb", this.handleTouchBomb, this);
@@ -272,7 +282,7 @@ export class ArenaScene extends Phaser.Scene {
     };
 
     if (!this.canActorMoveTo(player, nextTile)) {
-      this.bumpActor(player, delta);
+      player.view.bump(delta.x, delta.y);
       this.emitAudio("ui.error");
       return;
     }
@@ -292,32 +302,26 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.plantBombAt(player.id, { ...player.tile }, player.loadout.blast, PLAYER_FUSE_MS);
+    player.view.plant();
     this.emitAudio("weapon.charge.start");
     this.shellEvents?.onRoundStatusChange?.("Fuse");
   }
 
   private plantBombAt(owner: ActorId, tile: GridPoint, range: number, fuseMs: number) {
     const world = this.tileToWorld(tile);
-    const sprite = this.add.image(world.x, world.y, owner === "player" ? "bomb-core" : "bot-bomb-core");
-    sprite.setDepth(12);
-    this.tweens.add({
-      targets: sprite,
-      scale: { from: 0.92, to: 1.08 },
-      yoyo: true,
-      repeat: -1,
-      duration: 280,
-      ease: "Sine.easeInOut"
-    });
+    const view = new BombView(this, world.x, world.y, tile.y, owner === "player");
 
     const bomb: ActiveBomb = {
       owner,
       tile,
       range,
-      sprite,
-      timer: this.time.delayedCall(fuseMs, () => this.detonateBomb(bomb))
+      view,
+      timer: this.time.delayedCall(fuseMs, () => this.detonateBomb(bomb)),
+      urgentTimer: this.time.delayedCall(fuseMs * 0.62, () => view.setUrgent())
     };
 
     this.activeBombs.push(bomb);
+    this.refreshDangerTiles();
 
     if (owner !== "player") {
       this.emitAudio("weapon.enemy.fire");
@@ -332,14 +336,16 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     this.activeBombs = this.activeBombs.filter((activeBomb) => activeBomb !== bomb);
-    bomb.sprite.destroy();
+    bomb.view.destroy();
     bomb.timer.destroy();
+    bomb.urgentTimer.remove(false);
     this.shellEvents?.onRoundStatusChange?.("Blast");
 
     const blast = resolveBlast(this.arena, bomb.tile, bomb.range);
     this.blocksCleared += blast.clearedBlocks.length;
     this.emitAudio(this.getExplosionAudioEvent(blast));
     playExplosionEffect(this, blast, (tile) => this.tileToWorld(tile));
+    this.refreshDangerTiles();
     this.time.delayedCall(220, () => {
       this.clearDestroyedBlocks(blast.clearedBlocks);
       this.spawnPowerups(blast.clearedBlocks);
@@ -364,24 +370,8 @@ export class ArenaScene extends Phaser.Scene {
       y: (this.scale.height - boardHeight) / 2 + 22
     };
 
-    const glow = this.add.rectangle(
-      this.boardOrigin.x + boardWidth / 2,
-      this.boardOrigin.y + boardHeight / 2,
-      boardWidth + 28,
-      boardHeight + 28,
-      0x22d3ee,
-      0.04
-    );
-    glow.setStrokeStyle(2, 0x22d3ee, 0.18);
-    this.boardLayer?.add(glow);
-
-    for (let y = 0; y < ARENA_ROWS; y += 1) {
-      for (let x = 0; x < ARENA_COLS; x += 1) {
-        const world = this.tileToWorld({ x, y });
-        const tile = this.add.rectangle(world.x, world.y, CELL_SIZE - 3, CELL_SIZE - 3, 0x0f172a, 0.82);
-        tile.setStrokeStyle(1, 0x22d3ee, 0.14);
-        this.boardLayer?.add(tile);
-      }
+    if (this.boardLayer) {
+      drawArenaFloor(this, this.boardLayer, this.boardOrigin.x, this.boardOrigin.y);
     }
 
     this.redrawBlocks();
@@ -432,24 +422,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private redrawBlocks() {
-    this.blockLayer?.removeAll(true);
-    this.blockSprites.clear();
-
-    for (let y = 0; y < ARENA_ROWS; y += 1) {
-      for (let x = 0; x < ARENA_COLS; x += 1) {
-        const cell = this.arena[y][x];
-
-        if (cell !== "hard" && cell !== "soft") {
-          continue;
-        }
-
-        const world = this.tileToWorld({ x, y });
-        const texture = cell === "hard" ? "hard-block" : "soft-block";
-        const block = this.add.image(world.x, world.y, texture).setDepth(cell === "hard" ? 2 : 1);
-        this.blockLayer?.add(block);
-        this.blockSprites.set(this.tileKey({ x, y }), block);
-      }
-    }
+    this.blockSprites.forEach((block) => block.destroy());
+    this.blockSprites = drawArenaBlocks(this, this.arena, (tile) => this.tileToWorld(tile));
   }
 
   private clearDestroyedBlocks(blocks: GridPoint[]) {
@@ -461,17 +435,8 @@ export class ArenaScene extends Phaser.Scene {
         return;
       }
 
-      this.tweens.add({
-        targets: block,
-        alpha: 0,
-        scale: 1.2,
-        duration: 120,
-        ease: "Cubic.easeOut",
-        onComplete: () => {
-          block.destroy();
-          this.blockSprites.delete(key);
-        }
-      });
+      this.blockSprites.delete(key);
+      shatterBlock(this, block, () => block.destroy());
     });
   }
 
@@ -494,7 +459,8 @@ export class ArenaScene extends Phaser.Scene {
 
       const world = this.tileToWorld(blockTile);
       const sprite = this.add.image(world.x, world.y, this.getPowerupTexture(powerup));
-      sprite.setDepth(8);
+      sprite.setDepth(rowDepth(blockTile.y, "actor") - 0.6).setScale(0.3);
+      this.tweens.add({ targets: sprite, scale: 1, duration: 220, ease: "Back.easeOut" });
       this.tweens.add({
         targets: sprite,
         y: world.y - 5,
@@ -541,14 +507,7 @@ export class ArenaScene extends Phaser.Scene {
     hitActors.forEach((actor) => {
       actor.alive = false;
       this.emitAudio(actor.kind === "player" ? "player.damage" : "enemy.destroyed");
-      actor.sprite.setTint(0xf59e0b);
-      this.tweens.add({
-        targets: actor.sprite,
-        alpha: 0.22,
-        scale: 0.7,
-        duration: 220,
-        ease: "Cubic.easeOut"
-      });
+      actor.view.knockout();
     });
 
     if (hitActors.length === 0) {
@@ -628,15 +587,17 @@ export class ArenaScene extends Phaser.Scene {
   private spawnActor(id: ActorId, tile: GridPoint, profile?: BotProfile) {
     const world = this.tileToWorld(tile);
     const kind = id === "player" ? "player" : "bot";
-    const texture =
-      kind === "player" ? "player-core" : profile?.texture ?? BOT_PROFILES[DEFAULT_BOT_SELECTION["bot-a"]].texture;
-    const sprite = this.add.image(world.x, world.y, texture).setDepth(kind === "player" ? 5 : 11);
+    const character = kind === "player" ? "spark" : profile?.id ?? DEFAULT_BOT_SELECTION["bot-a"];
+    const view = new FusebotView(this, character, world.x, world.y, {
+      marker: kind === "player" ? "P1" : undefined,
+      row: tile.y
+    });
 
     this.actors.set(id, {
       id,
       kind,
       tile,
-      sprite,
+      view,
       alive: true,
       loadout: createInitialLoadout(),
       profile,
@@ -710,17 +671,11 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private moveActorTo(actor: CombatActor, tile: GridPoint, duration: number) {
+    const from = actor.tile;
     actor.tile = tile;
     const world = this.tileToWorld(tile);
     this.collectPowerupAt(tile, actor.id);
-
-    this.tweens.add({
-      targets: actor.sprite,
-      x: world.x,
-      y: world.y,
-      duration,
-      ease: "Quad.easeOut"
-    });
+    actor.view.moveTo(world.x, world.y, duration, from.y, tile.y, directionBetween(from, tile));
   }
 
   private canActorMoveTo(actor: CombatActor, tile: GridPoint) {
@@ -738,27 +693,20 @@ export class ArenaScene extends Phaser.Scene {
 
     this.actors.forEach((actor) => {
       const world = this.tileToWorld(actor.tile);
-      actor.sprite.setPosition(world.x, world.y);
+      actor.view.setPosition(world.x, world.y, actor.tile.y);
     });
 
     this.activeBombs.forEach((bomb) => {
       const world = this.tileToWorld(bomb.tile);
-      bomb.sprite.setPosition(world.x, world.y);
+      bomb.view.setPosition(world.x, world.y);
     });
+
+    this.dangerOverlay?.clear();
+    this.refreshDangerTiles();
 
     this.activePowerups.forEach((powerup) => {
       const world = this.tileToWorld(powerup.tile);
       powerup.sprite.setPosition(world.x, world.y);
-    });
-  }
-
-  private bumpActor(actor: CombatActor, delta: GridPoint) {
-    this.tweens.add({
-      targets: actor.sprite,
-      x: actor.sprite.x + delta.x * 5,
-      y: actor.sprite.y + delta.y * 5,
-      yoyo: true,
-      duration: 42
     });
   }
 
@@ -771,12 +719,14 @@ export class ArenaScene extends Phaser.Scene {
     this.clearCountdownEvents();
     this.activeBombs.forEach((bomb) => {
       bomb.timer.destroy();
-      bomb.sprite.destroy();
+      bomb.urgentTimer.remove(false);
+      bomb.view.destroy();
     });
     this.activeBombs = [];
+    this.dangerOverlay?.clear();
     this.activePowerups.forEach((powerup) => powerup.sprite.destroy());
     this.activePowerups.clear();
-    this.actors.forEach((actor) => actor.sprite.destroy());
+    this.actors.forEach((actor) => actor.view.destroy());
     this.actors.clear();
     this.fxLayer?.removeAll(true);
   }
@@ -809,6 +759,24 @@ export class ArenaScene extends Phaser.Scene {
       tile: bomb.tile,
       range: bomb.range
     }));
+  }
+
+  private refreshDangerTiles() {
+    this.dangerOverlay?.update(getDangerTiles(this.arena, this.getBombThreats()), (tile) =>
+      this.tileToWorld(tile)
+    );
+  }
+
+  // Subtle lens vignette; WebGL only, the Canvas renderer simply skips it.
+  private applyCameraFx() {
+    const camera = this.cameras.main;
+
+    if (this.game.renderer.type !== Phaser.WEBGL || !camera.postFX) {
+      return;
+    }
+
+    camera.postFX.clear();
+    camera.postFX.addVignette(0.5, 0.5, 0.92, 0.32);
   }
 
   private getBotPowerupTargets(): BotPowerupTarget[] {
@@ -955,4 +923,24 @@ export class ArenaScene extends Phaser.Scene {
   private setMusicIntensity(intensity: MusicIntensity) {
     void this.audio?.setMusicIntensity(intensity).catch(() => undefined);
   }
+}
+
+function directionBetween(from: GridPoint, to: GridPoint): Direction | undefined {
+  if (to.x < from.x) {
+    return "left";
+  }
+
+  if (to.x > from.x) {
+    return "right";
+  }
+
+  if (to.y < from.y) {
+    return "up";
+  }
+
+  if (to.y > from.y) {
+    return "down";
+  }
+
+  return undefined;
 }

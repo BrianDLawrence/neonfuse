@@ -24,6 +24,10 @@ React UI components and DOM overlays.
 
 Phaser scene orchestration. Scenes adapt simulation state into sprites, tweens, camera movement, and effects. Scenes should stay thin.
 
+`src/game/presentation`
+
+Cosmetic building blocks the scenes share: generated textures (`overdriveTextures.ts`), the animated `FusebotView` character, bomb and danger-tile views, block sprites and the explosion effect. These modules read resolved simulation data, such as blast tiles and danger tiles, and never decide outcomes. `fusebotArt.ts` uses only the Canvas 2D API, with no Phaser import, so React can draw the same character portraits.
+
 `src/game/simulation`
 
 Pure game rules: arena layout, walkability, bombs, blast calculation, bot decisions, damage, powerups, and win conditions.

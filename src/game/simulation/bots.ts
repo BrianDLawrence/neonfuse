@@ -24,7 +24,6 @@ export type BotTraitSet = {
 export type BotProfile = {
   id: BotProfileId;
   name: string;
-  texture: string;
   accent: string;
   tagline: string;
   summary: string;
@@ -80,7 +79,6 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
   "fuse-rush": {
     id: "fuse-rush",
     name: "Fuse Rush",
-    texture: "bot-fuse-core",
     accent: "#f43f5e",
     tagline: "Aggressive lane breaker",
     summary: "Presses forward, cracks soft blocks early, and looks for fast bomb pressure.",
@@ -99,7 +97,6 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
   "circuit-shade": {
     id: "circuit-shade",
     name: "Circuit Shade",
-    texture: "bot-circuit-core",
     accent: "#8b5cf6",
     tagline: "Cautious upgrade hunter",
     summary: "Prioritizes useful powerups, waits out danger, and bombs when the opening is clean.",
@@ -118,7 +115,6 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
   "volt-warden": {
     id: "volt-warden",
     name: "Volt Warden",
-    texture: "bot-volt-core",
     accent: "#22d3ee",
     tagline: "Trap-setting defender",
     summary: "Controls space with careful bombs and tries to turn soft-block pockets into traps.",
@@ -137,7 +133,6 @@ export const BOT_PROFILES: Record<BotProfileId, BotProfile> = {
   "glitch-bloom": {
     id: "glitch-bloom",
     name: "Glitch Bloom",
-    texture: "bot-glitch-core",
     accent: "#a3e635",
     tagline: "Chaotic power spike",
     summary: "Takes odd routes, chases tempo swings, and is comfortable making messy fights happen.",
