@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { DuelGame } from "./DuelGame";
+import { FusebotPortrait } from "./FusebotPortrait";
 import { DiscordPartyScreen } from "./DiscordPartyScreen";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
@@ -1167,89 +1168,5 @@ export function GameShell({
 function BotProfileIcon({ profile, size = "normal" }: { profile: BotProfile; size?: "normal" | "large" }) {
   const className = size === "large" ? "bot-profile-icon bot-profile-icon-large" : "bot-profile-icon";
 
-  if (profile.texture === "bot-circuit-core") {
-    return (
-      <svg aria-hidden="true" className={className} viewBox="0 0 34 34">
-        <rect fill="#8b5cf6" height="34" rx="8" width="34" />
-        <rect
-          fill="none"
-          height="28"
-          rx="7"
-          stroke="#22d3ee"
-          strokeOpacity="0.9"
-          strokeWidth="2"
-          width="28"
-          x="3"
-          y="3"
-        />
-        <rect fill="#101217" height="7" rx="2" width="5" x="9" y="10" />
-        <rect fill="#101217" height="7" rx="2" width="5" x="20" y="10" />
-        <rect fill="#22d3ee" height="2" width="2" x="11" y="12" />
-        <rect fill="#22d3ee" height="2" width="2" x="22" y="12" />
-      </svg>
-    );
-  }
-
-  if (profile.texture === "bot-volt-core") {
-    return (
-      <svg aria-hidden="true" className={className} viewBox="0 0 34 34">
-        <rect fill="#22d3ee" height="34" rx="8" width="34" />
-        <rect
-          fill="none"
-          height="28"
-          rx="7"
-          stroke="#a3e635"
-          strokeOpacity="0.9"
-          strokeWidth="2"
-          width="28"
-          x="3"
-          y="3"
-        />
-        <rect fill="#101217" height="7" rx="2" width="6" x="8" y="10" />
-        <rect fill="#101217" height="7" rx="2" width="6" x="20" y="10" />
-        <path d="M9 24H25M17 18V30" stroke="#f8fafc" strokeLinecap="round" strokeOpacity="0.92" strokeWidth="2" />
-      </svg>
-    );
-  }
-
-  if (profile.texture === "bot-glitch-core") {
-    return (
-      <svg aria-hidden="true" className={className} viewBox="0 0 34 34">
-        <rect fill="#a3e635" height="34" rx="8" width="34" />
-        <rect
-          fill="none"
-          height="28"
-          rx="7"
-          stroke="#f43f5e"
-          strokeOpacity="0.9"
-          strokeWidth="2"
-          width="28"
-          x="3"
-          y="3"
-        />
-        <path d="M8 10L15 13L8 17ZM26 10L19 13L26 17Z" fill="#101217" />
-        <path d="M10 25L15 22L20 27L25 23" stroke="#101217" strokeLinecap="round" strokeWidth="2" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg aria-hidden="true" className={className} viewBox="0 0 34 34">
-      <rect fill="#f43f5e" height="34" rx="8" width="34" />
-      <rect
-        fill="none"
-        height="28"
-        rx="7"
-        stroke="#f59e0b"
-        strokeOpacity="0.9"
-        strokeWidth="2"
-        width="28"
-        x="3"
-        y="3"
-      />
-      <rect fill="#101217" height="5" width="6" x="8" y="11" />
-      <rect fill="#101217" height="5" width="6" x="20" y="11" />
-      <path d="M14 24L20 17V30Z" fill="#f59e0b" />
-    </svg>
-  );
+  return <FusebotPortrait character={profile.id} className={className} />;
 }

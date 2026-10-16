@@ -12,6 +12,8 @@
   --text: #f8fafc;
   --muted: #94a3b8;
   --danger: #fb7185;
+  --font-display: var(--font-chakra), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: var(--font-plex), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 * {
@@ -24,9 +26,7 @@ body {
   margin: 0;
   background: var(--background-deep);
   color: var(--text);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: var(--font-body);
 }
 
 body {
@@ -41,6 +41,47 @@ select {
 
 button {
   cursor: pointer;
+}
+
+/* Overdrive display type: headings, uppercase labels and stat numbers. Rules
+   later in the file that set their own font-family (the Courier score readouts)
+   still win. */
+h1,
+h2,
+h3,
+h4,
+h5,
+.account-name,
+.admin-link,
+.auth-kicker,
+.auth-legal-links a,
+.bot-roster-button strong,
+.bot-slot-row,
+.command-button,
+.current-score-readout span,
+.dialog-close-button,
+.dialog-icon-button,
+.hud-chip span,
+.hud-chip strong,
+.key-chip,
+.legal-brand,
+.legal-nav a,
+.music-track-tag,
+.music-track-title strong,
+.party-member-record > span,
+.profile-career-metrics span,
+.profile-level-meter-label,
+.profile-match-kind,
+.profile-record span,
+.profile-section-heading span,
+.profile-title-picker > span,
+.profile-trigger,
+.score-facts span,
+.score-player-card span,
+.scoreboard-tab,
+.touch-button,
+.trait-pill strong {
+  font-family: var(--font-display);
 }
 
 .auth-gate {
@@ -269,8 +310,8 @@ button {
   margin: 0;
   color: var(--text);
   font-size: clamp(28px, 5vw, 72px);
-  font-weight: 900;
-  letter-spacing: 0;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   line-height: 0.9;
   text-transform: uppercase;
   text-shadow: 0 0 22px rgba(34, 211, 238, 0.62);
@@ -292,23 +333,50 @@ button {
   max-width: min(520px, 50vw);
 }
 
+/* Chamfered HUD chips: the cut corners echo the Fusebot visor and the
+   arena's lifted blocks. A box-shadow would be clipped by clip-path, so the
+   glow comes from a drop-shadow filter instead. */
 .hud-chip {
+  --chip-cut: 9px;
   min-width: 104px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  box-shadow:
-    0 0 24px rgba(34, 211, 238, 0.12),
-    inset 0 0 18px rgba(34, 211, 238, 0.06);
-  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  /* The first two layers redraw the border along the two cut corners. */
+  background:
+    linear-gradient(
+        to bottom left,
+        transparent calc(50% - 0.75px),
+        var(--line-strong) calc(50% - 0.75px) calc(50% + 0.75px),
+        transparent calc(50% + 0.75px)
+      )
+      top right / var(--chip-cut) var(--chip-cut) no-repeat border-box,
+    linear-gradient(
+        to bottom left,
+        transparent calc(50% - 0.75px),
+        var(--line-strong) calc(50% - 0.75px) calc(50% + 0.75px),
+        transparent calc(50% + 0.75px)
+      )
+      bottom left / var(--chip-cut) var(--chip-cut) no-repeat border-box,
+    linear-gradient(135deg, rgba(34, 211, 238, 0.12), transparent 42%),
+    var(--panel-strong);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--chip-cut)) 0,
+    100% var(--chip-cut),
+    100% 100%,
+    var(--chip-cut) 100%,
+    0 calc(100% - var(--chip-cut))
+  );
+  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.16));
+  padding: 10px 14px 10px 12px;
 }
 
 .hud-chip span {
   display: block;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -435,7 +503,9 @@ button {
   display: block;
   margin-top: 3px;
   color: var(--text);
-  font-size: 20px;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -469,7 +539,8 @@ button {
   border-radius: 8px;
   background: rgba(34, 211, 238, 0.14);
   color: var(--text);
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   padding: 11px 14px;
   text-transform: uppercase;
 }
@@ -1765,10 +1836,13 @@ button {
 }
 
 .bot-profile-icon {
+  display: block;
   flex: 0 0 auto;
   width: 34px;
   height: 34px;
+  border: 1px solid var(--line);
   border-radius: 8px;
+  background: var(--panel-strong);
   box-shadow:
     0 0 14px rgba(34, 211, 238, 0.14),
     0 0 18px rgba(0, 0, 0, 0.22);
@@ -2644,8 +2718,9 @@ button {
   .hud-top {
     align-items: stretch;
     flex-direction: column;
-    /* Reserve the top-right corner for the compact match-setup pill below. */
-    padding-right: clamp(108px, 32vw, 148px);
+    /* Reserve the top-right corner for the compact match-setup pill below
+       (about 172px wide), so the stat chips wrap beside it, never under it. */
+    padding-right: 192px;
   }
 
   .hud-cluster {
@@ -2660,6 +2735,7 @@ button {
     display: flex;
     align-items: center;
     gap: 6px;
+    --chip-cut: 6px;
     min-width: 0;
     padding: 3px 10px;
     box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.05);
@@ -3069,6 +3145,7 @@ button {
     display: flex;
     align-items: center;
     gap: 7px;
+    --chip-cut: 6px;
     min-width: 0;
     padding: 5px 12px;
     box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.05);
@@ -3260,6 +3337,7 @@ button {
     display: flex;
     align-items: center;
     gap: 7px;
+    --chip-cut: 6px;
     min-width: 0;
     padding: 5px 12px;
     box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.05);
@@ -3409,6 +3487,7 @@ button {
     display: flex;
     align-items: center;
     gap: 6px;
+    --chip-cut: 6px;
     min-width: 0;
     padding: 3px 10px;
     box-shadow: inset 0 0 14px rgba(34, 211, 238, 0.05);
