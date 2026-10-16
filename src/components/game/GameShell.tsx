@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { DuelGame } from "./DuelGame";
 import { FusebotPortrait } from "./FusebotPortrait";
+import { RoundBanner } from "./RoundBanner";
+import { ShellMenu } from "./ShellMenu";
 import { DiscordPartyScreen } from "./DiscordPartyScreen";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
 import { MusicScreen } from "./MusicScreen";
-import { LegalLinks } from "@/components/legal/LegalPage";
 import {
   ProfileAvatar,
   ProfileScreen,
@@ -54,6 +55,9 @@ const POWERUP_CONTROLS: Array<{
   { type: "blast", label: "Blast", iconClass: "stat-icon-blast" },
   { type: "speed", label: "Speed", iconClass: "stat-icon-speed" }
 ];
+
+// Let the KO / Knocked out banner land before the results dialog covers the arena.
+const RESULTS_DIALOG_DELAY_MS = 1400;
 
 const BOT_SLOTS: Array<{ id: BotId; label: string }> = [
   { id: "bot-a", label: "Slot A" },
@@ -174,6 +178,7 @@ export function GameShell({
   const [sfxVolume, setSfxVolume] = useState(DEFAULT_PROFILE_PREFERENCES.sfxVolume);
   const [selectedTrack, setSelectedTrack] = useState<MusicTrack | null>(null);
   const touchApiRef = useRef<TouchControlsApi | null>(null);
+  const resultsTimerRef = useRef<number | null>(null);
   const musicEnabledRef = useRef(musicEnabled);
   const musicVolumeRef = useRef(musicVolume);
   const sfxVolumeRef = useRef(sfxVolume);
@@ -202,6 +207,15 @@ export function GameShell({
   useEffect(() => {
     selectedTrackRef.current = selectedTrack;
   }, [selectedTrack]);
+
+  useEffect(
+    () => () => {
+      if (resultsTimerRef.current !== null) {
+        window.clearTimeout(resultsTimerRef.current);
+      }
+    },
+    []
+  );
 
   // Local storage remains the immediate fallback while the signed-in profile loads.
   useEffect(() => {
@@ -483,10 +497,6 @@ export function GameShell({
       [type]: value
     }));
   }, []);
-  const handleAdminLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    setIsAdminOpen(true);
-  }, []);
   const handleBotLabLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     setIsBotLabOpen(true);
@@ -509,6 +519,10 @@ export function GameShell({
     setSelectedBotInfo(profileId);
   }, [botSelection, persistProfilePreferences]);
   const handleModeStart = useCallback((mode: GameMode) => {
+    if (resultsTimerRef.current !== null) {
+      window.clearTimeout(resultsTimerRef.current);
+      resultsTimerRef.current = null;
+    }
     setModeCommand((currentCommand) => ({
       mode,
       sequence: currentCommand.sequence + 1
@@ -530,7 +544,13 @@ export function GameShell({
       topScores: [],
       status: "saving"
     });
-    setIsHighScoresOpen(true);
+    if (resultsTimerRef.current !== null) {
+      window.clearTimeout(resultsTimerRef.current);
+    }
+    resultsTimerRef.current = window.setTimeout(() => {
+      resultsTimerRef.current = null;
+      setIsHighScoresOpen(true);
+    }, RESULTS_DIALOG_DELAY_MS);
 
     async function saveMatch() {
       try {
@@ -699,12 +719,13 @@ export function GameShell({
     botSelection
   };
   const profileDisplayName = playerProfile?.identity.displayName ?? accountName;
+  const opponentProfile = BOT_PROFILES[botSelection["bot-a"]];
 
   if (isDuelOpen) return <DuelGame activityAuth={activityAuth} onLeave={() => setIsDuelOpen(false)} />;
 
   return (
     <main className="app-frame" data-touch-controls={touchControlsEnabled ? "true" : "false"}>
-      <section className="game-stage" aria-label="Neon Fuse game prototype">
+      <section className="game-stage" aria-label="Neon Fuse arena">
         <PhaserGame
           botSelection={botSelection}
           modeCommand={modeCommand}
@@ -723,15 +744,12 @@ export function GameShell({
         <div className="hud-top">
           <div className="brand-lockup">
             <h1>Neon Fuse</h1>
-            <p>
-              A first playable arena shell for the local-versus bomber prototype.
-              Move, plant a bomb, and watch the grid light up.
-            </p>
+            <p>Plant. Run. Light up the grid.</p>
           </div>
 
           <div className="hud-cluster">
             <div className="hud-chip">
-              <span>Round</span>
+              <span>Status</span>
               <strong>{roundStatus}</strong>
             </div>
             {modeCommand.mode === "bot-skirmish" ? (
@@ -777,6 +795,8 @@ export function GameShell({
           </div>
         </div>
 
+        <RoundBanner opponent={opponentProfile} status={roundStatus} />
+
         <aside className="match-actions" aria-label="Match actions">
           <div className="command-row" role="group" aria-label="Match mode">
             <button
@@ -807,28 +827,34 @@ export function GameShell({
               <span className="label-compact">Friend</span>
             </button>
           </div>
-          <div className="match-links">
+          <nav className="match-links" aria-label="Game menu">
             <button
               aria-pressed={musicEnabled}
-              className="admin-link hud-link-button music-toggle-button"
+              className="admin-link hud-link-button music-toggle-button match-link-secondary"
               onClick={handleMusicToggle}
               type="button"
             >
               Music {musicEnabled ? "On" : "Off"}
             </button>
-            <a className="admin-link" href="#music" onClick={handleMusicLinkClick}>
+            <a className="admin-link match-link-secondary" href="#music" onClick={handleMusicLinkClick}>
               Tracks
             </a>
-            <a className="admin-link" href="#high-scores" onClick={handleHighScoresLinkClick}>
+            <a className="admin-link match-link-secondary" href="#high-scores" onClick={handleHighScoresLinkClick}>
               High Scores
             </a>
-            <a className="admin-link" href="#bot-lab" onClick={handleBotLabLinkClick}>
+            <a className="admin-link match-link-secondary" href="#bot-lab" onClick={handleBotLabLinkClick}>
               Bots
             </a>
-            <a className="admin-link" href="#admin-settings" onClick={handleAdminLinkClick}>
-              Admin
-            </a>
-            <LegalLinks className="hud-legal-links" linkClassName="admin-link" />
+            {connectionLabel && activityAuth && onInviteFriends ? (
+              <button
+                aria-haspopup="dialog"
+                className="admin-link hud-link-button account-name account-context match-link-secondary"
+                onClick={() => setIsPartyOpen(true)}
+                type="button"
+              >
+                {connectionLabel}
+              </button>
+            ) : null}
             <button
               aria-haspopup="dialog"
               className="profile-trigger"
@@ -843,24 +869,21 @@ export function GameShell({
               />
               <span>{profileDisplayName}</span>
             </button>
-            {connectionLabel && activityAuth && onInviteFriends ? (
-              <button
-                aria-haspopup="dialog"
-                className="admin-link hud-link-button account-name account-context"
-                onClick={() => setIsPartyOpen(true)}
-                type="button"
-              >
-                {connectionLabel}
-              </button>
-            ) : null}
-            <button
-              className="admin-link hud-link-button"
-              onClick={() => void onSignOut()}
-              type="button"
-            >
-              Sign Out
-            </button>
-          </div>
+            <ShellMenu
+              items={[
+                { label: "Profile", onSelect: () => setIsProfileOpen(true) },
+                ...(connectionLabel && activityAuth && onInviteFriends
+                  ? [{ label: "Discord party", onSelect: () => setIsPartyOpen(true) }]
+                  : []),
+                { label: "Music", onSelect: handleMusicToggle, pressed: musicEnabled },
+                { label: "Tracks", onSelect: () => setIsMusicOpen(true) },
+                { label: "High Scores", onSelect: () => setIsHighScoresOpen(true) },
+                { label: "Bots", onSelect: () => setIsBotLabOpen(true) },
+                { label: "Admin", onSelect: () => setIsAdminOpen(true) }
+              ]}
+              onSignOut={() => void onSignOut()}
+            />
+          </nav>
         </aside>
 
         {isProfileOpen ? (
@@ -1113,9 +1136,9 @@ export function GameShell({
           )}
           <span className="key-chip">R: Reset</span>
           <span className="key-chip">
-            Goal: {modeCommand.mode === "bot-skirmish" ? "Last bot standing" : "Blast the red bot"}
+            Goal: {modeCommand.mode === "bot-skirmish" ? "Last bot standing" : `Blast ${opponentProfile.name}`}
           </span>
-          <span className="key-chip">Danger: Bot bombs</span>
+          <span className="key-chip">Pulsing tiles: about to blow</span>
         </div>
 
         <aside className="touch-controls" aria-label="Touch controls">

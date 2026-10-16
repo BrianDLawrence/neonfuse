@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { CELL_SIZE, type GridPoint } from "../simulation/arena";
 import type { BlastResult } from "../simulation/blast";
+import { prefersReducedMotion } from "./motionPreference";
 
 type ExplosionScene = Pick<Phaser.Scene, "add" | "cameras" | "time" | "tweens">;
 
@@ -25,6 +26,7 @@ export function playExplosionEffect(
   }
 
   const center = tileToWorld(origin);
+  const reducedMotion = prefersReducedMotion();
   const cleared = new Set(blast.clearedBlocks.map((tile) => `${tile.x}:${tile.y}`));
 
   // Flash of light that washes over nearby walls and fighters.
@@ -32,12 +34,12 @@ export function playExplosionEffect(
     .image(center.x, center.y, "glow")
     .setTint(0xffc46b)
     .setScale(1.2)
-    .setAlpha(0.95)
+    .setAlpha(reducedMotion ? 0.45 : 0.95)
     .setDepth(BLAST_DEPTH + 3)
     .setBlendMode(Phaser.BlendModes.ADD);
   scene.tweens.add({
     targets: flash,
-    scale: 3.6 + blast.tiles.length * 0.18,
+    scale: reducedMotion ? 2 : 3.6 + blast.tiles.length * 0.18,
     alpha: 0,
     duration: 420,
     ease: "Cubic.easeOut",
@@ -73,7 +75,9 @@ export function playExplosionEffect(
     });
   });
 
-  scene.cameras.main.shake(200, 0.009);
+  if (!reducedMotion) {
+    scene.cameras.main.shake(200, 0.009);
+  }
 }
 
 function playFlameTile(

@@ -12,6 +12,8 @@
   --text: #f8fafc;
   --muted: #94a3b8;
   --danger: #fb7185;
+  /* See-through surface for controls that sit on top of the arena (touch pad). */
+  --panel-glass: rgba(8, 10, 18, 0.5);
   --font-display: var(--font-chakra), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: var(--font-plex), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -76,9 +78,13 @@ h5,
 .profile-section-heading span,
 .profile-title-picker > span,
 .profile-trigger,
+.round-banner-caption,
+.round-banner-title,
 .score-facts span,
 .score-player-card span,
 .scoreboard-tab,
+.shell-menu-button,
+.shell-menu-item,
 .touch-button,
 .trait-pill strong {
   font-family: var(--font-display);
@@ -632,6 +638,273 @@ h5,
 .profile-trigger:hover,
 .profile-trigger:focus-visible {
   color: var(--cyan);
+}
+
+/* HUD overflow menu: account, settings and legal links that are not needed
+   mid-match. Opens upward from the bottom-left match actions on desktop; the
+   compact layouts below flip it to open downward from the top corner. */
+.shell-menu {
+  position: relative;
+}
+
+.shell-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 5px 12px 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.shell-menu-button:hover,
+.shell-menu-button[aria-expanded="true"] {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.18);
+}
+
+.shell-menu-glyph {
+  position: relative;
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--cyan);
+  box-shadow:
+    0 -4px 0 var(--cyan),
+    0 4px 0 var(--cyan);
+}
+
+.shell-menu-panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 15;
+  display: grid;
+  gap: 6px;
+  width: 220px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.55),
+    0 0 26px rgba(34, 211, 238, 0.14);
+  padding: 8px;
+}
+
+/* The panel's display: grid would otherwise override the hidden attribute. */
+.shell-menu-panel[hidden] {
+  display: none;
+}
+
+.shell-menu-group {
+  display: grid;
+  gap: 2px;
+}
+
+.shell-menu-legal {
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.shell-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.shell-menu-legal .shell-menu-item {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.shell-menu-item:hover,
+.shell-menu-item:focus-visible {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--text);
+  outline: none;
+}
+
+.shell-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.shell-menu-state {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.shell-menu-item[aria-pressed="true"] .shell-menu-state {
+  color: var(--green);
+}
+
+.shell-menu-signout {
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 6px 6px;
+  color: var(--danger);
+}
+
+/* Countdown and knockout callouts. They sit over the arena (above HUD content,
+   below modal backdrops) and never take pointer input. */
+.round-banner-region {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+}
+
+.round-banner {
+  --banner-glow: rgba(34, 211, 238, 0.6);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  animation: round-banner-count 640ms ease-out forwards;
+}
+
+.round-banner[data-kind="count"] {
+  --banner-glow: rgba(245, 158, 11, 0.7);
+}
+
+.round-banner[data-kind="go"] {
+  --banner-glow: rgba(163, 230, 53, 0.7);
+  animation-duration: 760ms;
+}
+
+.round-banner[data-kind="win"],
+.round-banner[data-kind="lose"],
+.round-banner[data-kind="draw"] {
+  width: 100%;
+  padding-block: clamp(14px, 3vw, 26px);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--panel-strong) 22%,
+    var(--panel-strong) 78%,
+    transparent
+  );
+  animation: round-banner-outcome 1500ms ease-out forwards;
+}
+
+.round-banner[data-kind="lose"] {
+  --banner-glow: rgba(244, 63, 94, 0.7);
+}
+
+.round-banner[data-kind="draw"] {
+  --banner-glow: rgba(148, 163, 184, 0.55);
+}
+
+.round-banner-title {
+  color: var(--text);
+  font-size: clamp(56px, 11vw, 140px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 0.9;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 28px var(--banner-glow),
+    0 0 2px var(--text);
+}
+
+.round-banner[data-kind="count"] .round-banner-title {
+  color: var(--amber);
+}
+
+.round-banner[data-kind="go"] .round-banner-title {
+  color: var(--green);
+}
+
+.round-banner[data-kind="lose"] .round-banner-title {
+  color: var(--pink);
+}
+
+.round-banner-caption {
+  color: var(--muted);
+  font-size: clamp(12px, 1.5vw, 15px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.round-banner-portrait {
+  display: block;
+  width: clamp(56px, 8vw, 84px);
+  height: clamp(56px, 8vw, 84px);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: 0 0 24px var(--banner-glow);
+}
+
+@keyframes round-banner-count {
+  0% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+
+  18% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes round-banner-outcome {
+  0% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+
+  12% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes round-banner-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+
+  15%,
+  80% {
+    opacity: 1;
+  }
 }
 
 .profile-avatar {
@@ -2039,7 +2312,9 @@ h5,
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--panel-strong);
+  background: var(--panel-glass);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: var(--cyan);
   font-size: clamp(18px, 5vw, 24px);
   line-height: 1;
@@ -2097,7 +2372,9 @@ h5,
   min-height: clamp(64px, 18vw, 96px);
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: var(--panel-strong);
+  background: var(--panel-glass);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: var(--text);
   font-weight: 900;
   font-size: 13px;
@@ -2309,6 +2586,11 @@ h5,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .round-banner,
+  .round-banner[data-kind] {
+    animation-name: round-banner-fade;
+  }
+
   .auth-scanline {
     animation: none;
     opacity: 0.72;
@@ -2834,6 +3116,19 @@ h5,
     justify-content: flex-end;
   }
 
+  /* Compact layouts keep only the profile avatar and the Menu inline; the
+     secondary links live in the menu, which opens downward from this corner. */
+  .match-link-secondary {
+    display: none;
+  }
+
+  .shell-menu-panel {
+    top: calc(100% + 8px);
+    bottom: auto;
+    right: 0;
+    left: auto;
+  }
+
   .bot-lab-grid {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -3228,6 +3523,18 @@ h5,
   .app-frame[data-touch-controls="true"] .match-links {
     justify-content: flex-end;
   }
+  /* Compact layouts keep only the profile avatar and the Menu inline; the
+     secondary links live in the menu, which opens downward from this corner. */
+  .app-frame[data-touch-controls="true"] .match-link-secondary {
+    display: none;
+  }
+
+  .app-frame[data-touch-controls="true"] .shell-menu-panel {
+    top: calc(100% + 8px);
+    bottom: auto;
+    right: 0;
+    left: auto;
+  }
 
   .app-frame[data-touch-controls="true"] .touch-controls {
     display: flex;
@@ -3271,6 +3578,18 @@ h5,
     bottom: auto;
     align-items: flex-start;
     width: min(240px, 28vw);
+  }
+
+  /* Compact layout: secondary links move into the menu, which opens downward. */
+  .app-frame[data-touch-controls="true"] .match-link-secondary {
+    display: none;
+  }
+
+  .app-frame[data-touch-controls="true"] .shell-menu-panel {
+    top: calc(100% + 8px);
+    bottom: auto;
+    left: 0;
+    right: auto;
   }
 
   .app-frame[data-touch-controls="true"] .command-row {
@@ -3417,6 +3736,18 @@ h5,
     bottom: auto;
     align-items: flex-start;
     width: min(220px, 42vw);
+  }
+
+  /* Compact layout: secondary links move into the menu, which opens downward. */
+  .match-link-secondary {
+    display: none;
+  }
+
+  .shell-menu-panel {
+    top: calc(100% + 8px);
+    bottom: auto;
+    left: 0;
+    right: auto;
   }
 
   /* Same compact segmented pill as portrait (this block also matches landscape
