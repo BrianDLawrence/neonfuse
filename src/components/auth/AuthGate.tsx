@@ -7,8 +7,10 @@ import {
   type EventPayloadData
 } from "@discord/embedded-app-sdk";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { FusebotPortrait } from "@/components/game/FusebotPortrait";
 import { GameShell } from "@/components/game/GameShell";
 import { LegalLinks } from "@/components/legal/LegalPage";
+import type { FusebotId } from "@/game/presentation/fusebotArt";
 import {
   ActivitySessionRenewer,
   type ActivityAuth,
@@ -70,13 +72,26 @@ async function exchangeActivityCode(
   };
 }
 
+// Spark leads in the middle with the four bots either side.
+const LINEUP: FusebotId[] = ["fuse-rush", "circuit-shade", "spark", "volt-warden", "glitch-bloom"];
+
+function AuthLineup() {
+  return (
+    <div className="auth-lineup" aria-hidden="true">
+      {LINEUP.map((character) => (
+        <span className="auth-lineup-slot" data-lead={character === "spark"} key={character}>
+          <FusebotPortrait character={character} className="auth-lineup-portrait" />
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function AuthStatus({ message }: Readonly<{ message: string }>) {
   return (
     <main className="auth-gate">
       <section className="auth-panel" aria-live="polite">
-        <div className="auth-mark" aria-hidden="true">
-          NF
-        </div>
+        <AuthLineup />
         <p className="auth-kicker">Neon Fuse // Identity Link</p>
         <h1>Syncing fighter profile</h1>
         <p className="auth-copy">{message}</p>
@@ -91,9 +106,7 @@ function ActivityErrorGate({ message }: Readonly<{ message: string }>) {
   return (
     <main className="auth-gate">
       <section className="auth-panel" aria-labelledby="activity-error-title">
-        <div className="auth-mark" aria-hidden="true">
-          NF
-        </div>
+        <AuthLineup />
         <p className="auth-kicker">Neon Fuse // Discord Activity</p>
         <h1 id="activity-error-title">Link interrupted</h1>
         <p className="auth-error" role="alert">
@@ -141,9 +154,7 @@ function SignInGate({ error }: Readonly<{ error?: string }>) {
   return (
     <main className="auth-gate">
       <section className="auth-panel" aria-labelledby="auth-title">
-        <div className="auth-mark" aria-hidden="true">
-          NF
-        </div>
+        <AuthLineup />
         <p className="auth-kicker">Neon Fuse // Player Link</p>
         <h1 id="auth-title">Enter the arena</h1>
         <p className="auth-copy">

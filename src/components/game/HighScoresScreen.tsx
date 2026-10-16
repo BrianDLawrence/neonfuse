@@ -239,7 +239,12 @@ export function HighScoresScreen({
             <ol className="scoreboard-list" aria-busy={isLoading}>
               {scores.length ? (
                 scores.map((score) => (
-                  <li className="scoreboard-row" key={score.matchId}>
+                  <li
+                    className="scoreboard-row"
+                    data-podium={score.rank <= 3 ? score.rank : undefined}
+                    data-self={score.playerName === playerName}
+                    key={score.matchId}
+                  >
                     <span className="score-rank">{String(score.rank).padStart(2, "0")}</span>
                     <strong className="scoreboard-player" title={score.playerName}>
                       {score.playerName}

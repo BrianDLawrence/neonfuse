@@ -45,9 +45,7 @@ button {
   cursor: pointer;
 }
 
-/* Overdrive display type: headings, uppercase labels and stat numbers. Rules
-   later in the file that set their own font-family (the Courier score readouts)
-   still win. */
+/* Overdrive display type: headings, uppercase labels and stat numbers. */
 h1,
 h2,
 h3,
@@ -61,6 +59,7 @@ h5,
 .bot-slot-row,
 .command-button,
 .current-score-readout span,
+.current-score-readout strong,
 .dialog-close-button,
 .dialog-icon-button,
 .hud-chip span,
@@ -82,6 +81,7 @@ h5,
 .round-banner-title,
 .score-facts span,
 .score-player-card span,
+.scoreboard-row,
 .scoreboard-tab,
 .shell-menu-button,
 .shell-menu-item,
@@ -128,25 +128,6 @@ h5,
     inset 0 0 30px rgba(34, 211, 238, 0.06);
   padding: clamp(24px, 5vw, 42px);
   text-align: center;
-}
-
-.auth-mark {
-  display: grid;
-  place-items: center;
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 20px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: rgba(34, 211, 238, 0.12);
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 950;
-  letter-spacing: -0.04em;
-  box-shadow:
-    0 0 26px rgba(34, 211, 238, 0.24),
-    inset 0 0 20px rgba(34, 211, 238, 0.12);
-  text-shadow: 0 0 14px rgba(34, 211, 238, 0.72);
 }
 
 .auth-kicker {
@@ -1472,8 +1453,8 @@ h5,
 }
 
 .profile-bot-grid .bot-slot-row {
-  grid-template-columns: 1fr;
-  gap: 6px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 6px 10px;
 }
 
 .profile-history {
@@ -2586,6 +2567,10 @@ h5,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .auth-lineup-slot {
+    animation: none;
+  }
+
   .round-banner,
   .round-banner[data-kind] {
     animation-name: round-banner-fade;
@@ -2620,9 +2605,10 @@ h5,
   max-height: min(760px, calc(100dvh - 32px));
   border: 2px solid rgba(245, 158, 11, 0.72);
   border-radius: 8px;
+  position: relative;
   background:
-    linear-gradient(180deg, rgba(17, 20, 30, 0.98), rgba(8, 10, 18, 0.98)),
-    repeating-linear-gradient(90deg, rgba(245, 158, 11, 0.06) 0 2px, transparent 2px 8px);
+    radial-gradient(circle at 50% -10%, rgba(245, 158, 11, 0.14), transparent 46%),
+    linear-gradient(180deg, rgba(17, 20, 30, 0.98), rgba(8, 10, 18, 0.98));
   box-shadow:
     0 28px 100px rgba(0, 0, 0, 0.68),
     0 0 46px rgba(245, 158, 11, 0.18),
@@ -2637,7 +2623,7 @@ h5,
   align-items: center;
   gap: 14px;
   border-bottom: 1px solid rgba(245, 158, 11, 0.48);
-  background: rgba(7, 8, 13, 0.84);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), rgba(7, 8, 13, 0.84) 30% 70%, rgba(34, 211, 238, 0.08));
   padding: 14px 18px;
   text-transform: uppercase;
 }
@@ -2657,8 +2643,8 @@ h5,
 .high-score-marquee strong {
   color: var(--green);
   font-size: clamp(22px, 4vw, 42px);
-  font-weight: 950;
-  letter-spacing: 0;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   line-height: 1;
   text-shadow: 0 0 22px rgba(163, 230, 53, 0.44);
 }
@@ -2732,17 +2718,15 @@ h5,
   gap: 10px;
   min-height: 42px;
   border: 1px solid rgba(245, 158, 11, 0.26);
-  border-radius: 6px;
-  background:
-    repeating-linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0 1px, transparent 1px 6px),
-    rgba(8, 10, 18, 0.78);
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.08), transparent 38%), rgba(8, 10, 18, 0.78);
   color: var(--amber);
-  font-family: "Courier New", ui-monospace, monospace;
   font-size: 14px;
-  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   padding: 8px 10px;
   text-transform: uppercase;
-  text-shadow: 0 0 10px rgba(245, 158, 11, 0.42);
 }
 
 .scoreboard-row strong {
@@ -2782,10 +2766,8 @@ h5,
 
 .current-score-readout {
   border: 1px solid rgba(163, 230, 53, 0.42);
-  border-radius: 8px;
-  background:
-    repeating-linear-gradient(90deg, rgba(163, 230, 53, 0.09) 0 1px, transparent 1px 7px),
-    rgba(7, 8, 13, 0.76);
+  border-radius: 0;
+  background: radial-gradient(circle at 50% 100%, rgba(163, 230, 53, 0.14), transparent 70%), rgba(7, 8, 13, 0.76);
   padding: 14px;
   text-align: center;
 }
@@ -2803,9 +2785,9 @@ h5,
   display: block;
   margin-top: 8px;
   color: var(--green);
-  font-family: "Courier New", ui-monospace, monospace;
   font-size: clamp(34px, 6vw, 62px);
-  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
   line-height: 1;
   text-shadow: 0 0 22px rgba(163, 230, 53, 0.48);
 }
@@ -2870,6 +2852,256 @@ h5,
   font-size: 12px;
   font-weight: 750;
   line-height: 1.45;
+}
+
+/* Overdrive surfaces for the secondary screens (profile, party, tracks,
+   high scores, sign-in). Cards get the HUD chip's chamfer: top-right and
+   bottom-left corners cut by --cut. clip-path also cuts the 1px border, so the
+   ::after layer redraws it along both diagonals in --cut-line. Hosts keep
+   their own background, border colour and inset glow. */
+.profile-identity,
+.profile-career,
+.profile-progression,
+.profile-preferences,
+.profile-history,
+.profile-data-controls,
+.profile-avatar[data-size="normal"],
+.party-member,
+.music-track-card,
+.scoreboard-panel,
+.score-entry-panel,
+.scoreboard-row,
+.current-score-readout,
+.score-player-card {
+  --cut: 12px;
+  --cut-line: var(--line);
+  position: relative;
+  border-radius: 0;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+}
+
+.profile-identity::after,
+.profile-career::after,
+.profile-progression::after,
+.profile-preferences::after,
+.profile-history::after,
+.profile-data-controls::after,
+.profile-avatar[data-size="normal"]::after,
+.party-member::after,
+.music-track-card::after,
+.scoreboard-panel::after,
+.score-entry-panel::after,
+.scoreboard-row::after,
+.current-score-readout::after,
+.score-player-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+        to bottom left,
+        transparent calc(50% - 0.75px),
+        var(--cut-line) calc(50% - 0.75px) calc(50% + 0.75px),
+        transparent calc(50% + 0.75px)
+      )
+      top right / var(--cut) var(--cut) no-repeat,
+    linear-gradient(
+        to bottom left,
+        transparent calc(50% - 0.75px),
+        var(--cut-line) calc(50% - 0.75px) calc(50% + 0.75px),
+        transparent calc(50% + 0.75px)
+      )
+      bottom left / var(--cut) var(--cut) no-repeat;
+}
+
+.profile-avatar[data-size="normal"],
+.party-member,
+.music-track-card,
+.score-player-card {
+  --cut: 10px;
+}
+
+.scoreboard-row {
+  --cut: 8px;
+  --cut-line: rgba(245, 158, 11, 0.26);
+}
+
+.profile-avatar[data-size="normal"] {
+  --cut-line: var(--line-strong);
+}
+
+.profile-data-controls {
+  --cut-line: color-mix(in srgb, var(--danger) 32%, transparent);
+}
+
+.party-member[data-current="true"] {
+  --cut-line: var(--green);
+}
+
+.music-track-card[data-selected="true"] {
+  --cut-line: var(--track-accent);
+}
+
+.scoreboard-panel,
+.score-entry-panel {
+  --cut-line: rgba(245, 158, 11, 0.38);
+}
+
+.current-score-readout {
+  --cut-line: rgba(163, 230, 53, 0.42);
+}
+
+/* Podium ranks and the signed-in player's own rows on the leaderboard. */
+.scoreboard-row[data-podium] .score-rank {
+  text-shadow: 0 0 12px currentColor;
+}
+
+.scoreboard-row[data-podium="1"] {
+  --cut-line: rgba(163, 230, 53, 0.7);
+  border-color: rgba(163, 230, 53, 0.7);
+  background: linear-gradient(90deg, rgba(163, 230, 53, 0.16), transparent 52%), rgba(8, 10, 18, 0.78);
+}
+
+.scoreboard-row[data-podium="1"] .score-rank {
+  color: var(--green);
+}
+
+.scoreboard-row[data-podium="2"] {
+  --cut-line: rgba(34, 211, 238, 0.6);
+  border-color: rgba(34, 211, 238, 0.6);
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.12), transparent 48%), rgba(8, 10, 18, 0.78);
+}
+
+.scoreboard-row[data-podium="3"] {
+  --cut-line: rgba(244, 63, 94, 0.55);
+  border-color: rgba(244, 63, 94, 0.55);
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.12), transparent 44%), rgba(8, 10, 18, 0.78);
+}
+
+.scoreboard-row[data-podium="3"] .score-rank {
+  color: var(--pink);
+}
+
+.scoreboard-row[data-self="true"] .scoreboard-player {
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.45);
+}
+
+/* Corner ticks on the screen frames, the same cue the danger tiles use. */
+.admin-dialog,
+.high-score-screen {
+  position: relative;
+}
+
+.admin-dialog::before,
+.high-score-screen::before,
+.auth-panel::before {
+  --tick: var(--line-strong);
+  --tick-len: 16px;
+  content: "";
+  position: absolute;
+  inset: 5px;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--tick), var(--tick)) top left / var(--tick-len) 2px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top left / 2px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / var(--tick-len) 2px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 2px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / var(--tick-len) 2px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 2px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / var(--tick-len) 2px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 2px var(--tick-len) no-repeat;
+  opacity: 0.7;
+}
+
+.high-score-screen::before {
+  --tick: var(--amber);
+}
+
+/* Fusebot lineup on the sign-in and loading gates: Spark in the middle,
+   the four bots either side. */
+.auth-lineup {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto 22px;
+}
+
+.auth-lineup-slot {
+  --slot-cut: 9px;
+  display: block;
+  padding: 1px;
+  background: var(--line);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--slot-cut)) 0,
+    100% var(--slot-cut),
+    100% 100%,
+    var(--slot-cut) 100%,
+    0 calc(100% - var(--slot-cut))
+  );
+  opacity: 0.82;
+  animation: auth-lineup-float 3.2s ease-in-out infinite;
+}
+
+.auth-lineup-slot:nth-child(2),
+.auth-lineup-slot:nth-child(4) {
+  animation-delay: -0.8s;
+}
+
+.auth-lineup-slot:nth-child(1),
+.auth-lineup-slot:nth-child(5) {
+  animation-delay: -1.6s;
+}
+
+.auth-lineup-slot[data-lead="true"] {
+  --slot-cut: 13px;
+  background: var(--line-strong);
+  filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.32));
+  opacity: 1;
+}
+
+.auth-lineup-portrait {
+  display: block;
+  width: 46px;
+  height: 46px;
+  clip-path: inherit;
+}
+
+.auth-lineup-slot[data-lead="true"] .auth-lineup-portrait {
+  width: 78px;
+  height: 78px;
+}
+
+@keyframes auth-lineup-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.profile-achievement > span {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+
+/* Profile bot slots show the selected Fusebot beside each picker. */
+.profile-bot-portrait {
+  grid-row: span 2;
 }
 
 /* Friend matches reuse the existing arcade tokens and button system. */
@@ -2946,11 +3178,19 @@ h5,
     padding: 24px 20px;
   }
 
-  .auth-mark {
-    width: 58px;
-    height: 58px;
+  .auth-lineup {
+    gap: 6px;
     margin-bottom: 16px;
-    font-size: 20px;
+  }
+
+  .auth-lineup-portrait {
+    width: 36px;
+    height: 36px;
+  }
+
+  .auth-lineup-slot[data-lead="true"] .auth-lineup-portrait {
+    width: 60px;
+    height: 60px;
   }
 
   .auth-panel .auth-discord-button {
@@ -3057,8 +3297,10 @@ h5,
   }
 
   /* Match-setup becomes ONE compact segmented toggle pill instead of two big
-     stacked buttons. The two existing buttons become the pill's segments. */
-  .command-button {
+     stacked buttons. The two existing buttons become the pill's segments.
+     :where() scopes this to the mode row without raising specificity, so the
+     buttons inside dialogs (Tracks, Discord party) keep their outlines. */
+  :where(.command-row) .command-button {
     flex: 1 1 0;
     border: 0;
     border-radius: 0;
@@ -3069,16 +3311,16 @@ h5,
     text-align: center;
   }
 
-  .command-button + .command-button {
+  :where(.command-row) .command-button + .command-button {
     border-left: 1px solid var(--line);
   }
 
-  .command-button.secondary {
+  :where(.command-row) .command-button.secondary {
     border-color: transparent;
     background: transparent;
   }
 
-  .command-button[aria-pressed="true"] {
+  :where(.command-row) .command-button[aria-pressed="true"] {
     border-color: transparent;
     background: rgba(163, 230, 53, 0.16);
     box-shadow: none;
@@ -3149,6 +3391,7 @@ h5,
   }
 
   .party-actions .command-button {
+    font-size: 12px;
     padding-inline: 8px;
   }
 
@@ -3493,7 +3736,7 @@ h5,
     background: var(--panel);
   }
 
-  .app-frame[data-touch-controls="true"] .command-button {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button {
     flex: 1 1 0;
     border: 0;
     border-radius: 0;
@@ -3504,16 +3747,16 @@ h5,
     text-align: center;
   }
 
-  .app-frame[data-touch-controls="true"] .command-button + .command-button {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button + .command-button {
     border-left: 1px solid var(--line);
   }
 
-  .app-frame[data-touch-controls="true"] .command-button.secondary {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button.secondary {
     border-color: transparent;
     background: transparent;
   }
 
-  .app-frame[data-touch-controls="true"] .command-button[aria-pressed="true"] {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button[aria-pressed="true"] {
     border-color: transparent;
     background: rgba(163, 230, 53, 0.16);
     box-shadow: none;
@@ -3603,7 +3846,7 @@ h5,
     background: var(--panel);
   }
 
-  .app-frame[data-touch-controls="true"] .command-button {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button {
     flex: 1 1 0;
     border: 0;
     border-radius: 0;
@@ -3614,16 +3857,16 @@ h5,
     text-align: center;
   }
 
-  .app-frame[data-touch-controls="true"] .command-button + .command-button {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button + .command-button {
     border-left: 1px solid var(--line);
   }
 
-  .app-frame[data-touch-controls="true"] .command-button.secondary {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button.secondary {
     border-color: transparent;
     background: transparent;
   }
 
-  .app-frame[data-touch-controls="true"] .command-button[aria-pressed="true"] {
+  .app-frame[data-touch-controls="true"] :where(.command-row) .command-button[aria-pressed="true"] {
     border-color: transparent;
     background: rgba(163, 230, 53, 0.16);
     box-shadow: none;
@@ -3763,7 +4006,7 @@ h5,
     background: var(--panel);
   }
 
-  .command-button {
+  :where(.command-row) .command-button {
     flex: 1 1 0;
     border: 0;
     border-radius: 0;
@@ -3774,16 +4017,16 @@ h5,
     text-align: center;
   }
 
-  .command-button + .command-button {
+  :where(.command-row) .command-button + .command-button {
     border-left: 1px solid var(--line);
   }
 
-  .command-button.secondary {
+  :where(.command-row) .command-button.secondary {
     border-color: transparent;
     background: transparent;
   }
 
-  .command-button[aria-pressed="true"] {
+  :where(.command-row) .command-button[aria-pressed="true"] {
     border-color: transparent;
     background: rgba(163, 230, 53, 0.16);
     box-shadow: none;
