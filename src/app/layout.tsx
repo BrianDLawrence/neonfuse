@@ -1,18 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Chakra_Petch, IBM_Plex_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 // Overdrive type: Chakra Petch for labels, numbers and headings; IBM Plex Sans for body copy.
-const displayFont = Chakra_Petch({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+// Both are self-hosted (latin subset, SIL OFL; licenses in ./fonts), so the build never
+// depends on fetching from Google Fonts.
+const displayFont = localFont({
+  src: [
+    { path: "./fonts/chakra-petch-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/chakra-petch-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/chakra-petch-latin-700-normal.woff2", weight: "700", style: "normal" }
+  ],
   variable: "--font-chakra",
   display: "swap"
 });
 
-const bodyFont = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const bodyFont = localFont({
+  src: [
+    { path: "./fonts/ibm-plex-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/ibm-plex-sans-latin-700-normal.woff2", weight: "700", style: "normal" }
+  ],
   variable: "--font-plex",
   display: "swap"
 });
