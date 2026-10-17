@@ -29,6 +29,7 @@ import {
   type PlayerProgression,
   type PlayerTitleId
 } from "@/game/simulation/progression";
+import { FusebotPortrait } from "./FusebotPortrait";
 
 export type ProfileSyncStatus = "loading" | "saved" | "saving" | "offline";
 
@@ -419,6 +420,10 @@ export function ProfileScreen({
 
                   return (
                     <label className="bot-slot-row" key={slot.id}>
+                      <FusebotPortrait
+                        character={preferences.botSelection[slot.id]}
+                        className="bot-profile-icon bot-profile-icon-large profile-bot-portrait"
+                      />
                       <span>{slot.label}</span>
                       <select
                         className="bot-select"
