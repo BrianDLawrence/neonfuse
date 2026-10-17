@@ -18,11 +18,14 @@ function statusChip(page: Page) {
 
 test.describe("game shell", () => {
   test("a local match counts down, goes live, and lets the player plant a bomb", async ({ page }, testInfo) => {
+    // The countdown runs on Phaser's game clock, which crawls under CI's software
+    // WebGL (each 650ms tick took about 5s on GitHub runners), so allow extra time.
+    test.slow();
     await openShell(page);
 
     await expect(page.getByRole("button", { name: /Local/ })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("status").filter({ hasText: "Get ready" })).toBeVisible();
-    await expect(statusChip(page)).toHaveText("Live", { timeout: 15_000 });
+    await expect(statusChip(page)).toHaveText("Live", { timeout: 60_000 });
 
     if (testInfo.project.name === "phone") {
       await page.getByRole("button", { name: "Plant bomb" }).tap();
