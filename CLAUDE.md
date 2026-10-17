@@ -19,12 +19,13 @@ npm run typecheck    # tsc --noEmit (strict)
 npm run test         # vitest run (one-shot)
 npm run test:watch   # vitest watch
 npm run build        # next build
+npm run test:e2e     # Playwright browser tests (run after build)
 ```
 
 **Required after any code change** (this is what CI runs — see [.github/workflows/ci.yml](.github/workflows/ci.yml)):
 
 ```bash
-npm run lint && npm run typecheck && npm run test && npm run build
+npm run lint && npm run typecheck && npm run test && npm run build && npm run test:e2e
 ```
 
 ## Architecture in one screen
@@ -71,6 +72,7 @@ The React↔Phaser bridge is intentional and narrow: React passes data/callbacks
 - Unit tests live next to the code as `*.test.ts` and run under **Vitest** (e.g. [blast.test.ts](src/game/simulation/blast.test.ts)).
 - Tests cover **pure simulation behavior only** — arena creation, walkability, blast propagation, block destruction, bot decisions, win/loss, schema validation. They must not depend on Phaser rendering.
 - **Add or update tests whenever a simulation rule changes.** If a rule needs a test, it belongs in `src/game/simulation` as a pure function.
+- **Browser tests** live in [e2e/](e2e/) and run under **Playwright** (desktop and phone projects) against `next start` on port 3100, so build first. They need no MongoDB or Discord credentials: [e2e/fixtures.ts](e2e/fixtures.ts) stubs the signed-in session and every other API keeps its offline behaviour. If Playwright's own Chromium isn't downloaded, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to a local Chromium.
 
 ## Security & AI boundaries (do not violate)
 

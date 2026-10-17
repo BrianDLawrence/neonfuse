@@ -22,3 +22,7 @@ pnpm-debug.log*
 
 # system
 .DS_Store
+
+# playwright
+test-results
+playwright-report

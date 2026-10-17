@@ -1,6 +1,6 @@
 ---
 name: check
-description: Run the required Neon Fuse verification gate (lint → typecheck → test → build) in order, stop at the first failure, and summarize. Use after any code change, before committing, or when the user asks to "check", "verify the build", or "run the gates".
+description: Run the required Neon Fuse verification gate (lint → typecheck → test → build → browser tests) in order, stop at the first failure, and summarize. Use after any code change, before committing, or when the user asks to "check", "verify the build", or "run the gates".
 ---
 
 # /check — required verification gate
@@ -15,8 +15,9 @@ Run each as a separate Bash call so failures are attributable:
 2. `npm run typecheck`
 3. `npm run test`
 4. `npm run build`
+5. `npm run test:e2e` (Playwright, uses the build from step 4)
 
-For speed, you may chain them with `&&` in one call (`npm run lint && npm run typecheck && npm run test && npm run build`) — but if the chain fails, re-run the individual failing step to capture its full output.
+For speed, you may chain them with `&&` in one call (`npm run lint && npm run typecheck && npm run test && npm run build && npm run test:e2e`) — but if the chain fails, re-run the individual failing step to capture its full output.
 
 ## On failure
 
@@ -27,4 +28,4 @@ For speed, you may chain them with `&&` in one call (`npm run lint && npm run ty
 
 ## On success
 
-Report a one-line summary: `✅ lint · typecheck · test · build all passed`. Keep it short — don't paste full output when everything is green.
+Report a one-line summary: `✅ lint · typecheck · test · build · e2e all passed`. Keep it short — don't paste full output when everything is green.
