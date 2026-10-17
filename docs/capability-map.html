@@ -671,7 +671,7 @@
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>23</strong>
+            <strong>25</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
@@ -789,6 +789,10 @@
                     <strong>Player progression</strong>
                     <span>Derived XP, levels, achievements, and earned titles.</span>
                   </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="shell" data-status="implemented">
+                    <strong>Game shell + round moments</strong>
+                    <span>Tiered menu, round banners, comfort settings, Overdrive screens.</span>
+                  </button>
                 </div>
               </section>
 
@@ -814,6 +818,10 @@
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="bridge" data-status="implemented">
                     <strong>React ↔ Phaser bridge</strong>
                     <span>Typed callbacks, selectors, touch input state.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="overdrive" data-status="implemented">
+                    <strong>Overdrive art direction</strong>
+                    <span>Fusebot characters, 2.5D arena, new blasts, self-hosted type.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="maps" data-status="planned">
                     <strong>Generated maps</strong>
@@ -900,7 +908,7 @@
               <h2 id="review-title">What is strong, what should move next</h2>
             </div>
             <p class="section-note">
-              Identity, private Discord parties, layered abuse controls, and bounded production health monitoring are now in place; the next gains come from multi-process routing and regression coverage.
+              Identity, private Discord parties, layered abuse controls, bounded production health monitoring, and the Overdrive visual refresh are now in place; the next gains come from multi-process routing and regression coverage.
             </p>
           </div>
           <div class="review-grid">
@@ -916,6 +924,7 @@
                 <li><span class="review-index">06</span><span><strong>Instance-scoped social data.</strong> Party cards are derived server-side from Discord-verified membership without exposing account identifiers or enabling global discovery.</span></li>
                 <li><span class="review-index">07</span><span><strong>Layered HTTP abuse controls.</strong> Authentication, Activity exchange, tickets, party discovery, and game-data writes use local and shared rate-limit buckets without storing raw client addresses.</span></li>
                 <li><span class="review-index">08</span><span><strong>Operational guardrails.</strong> Sanitized health/error telemetry, scheduled probes, graceful restarts, and enforced room/connection ceilings make the single-process launch topology observable.</span></li>
+                <li><span class="review-index">09</span><span><strong>Presentation kept apart from rules.</strong> The Overdrive refresh lives in <code>src/game/presentation</code> and the React shell; no simulation rule changed to deliver it.</span></li>
               </ol>
             </section>
             <section class="review-column next">
@@ -923,7 +932,7 @@
               <h3>Review findings to address</h3>
               <ol class="review-list">
                 <li><span class="review-index">01</span><span><strong>Implement shared room routing before replica two.</strong> The launch service is explicitly capped at one process; horizontal scale still requires sticky/shared ownership and shared nonce replay storage.</span></li>
-                <li><span class="review-index">02</span><span><strong>Add browser regression coverage.</strong> Automate Discord gate, party roster/invites, Activity lobby, reconnect, profile sync, progression refresh, and result persistence flows.</span></li>
+                <li><span class="review-index">02</span><span><strong>Extend browser regression coverage.</strong> Playwright now covers the sign-in gate, local and skirmish rounds, the game menu, Profile, High Scores, Tracks, Bot Lab, and phone touch controls on desktop and phone. Still to automate: Activity lobby, party roster/invites, duel reconnect, profile sync, progression refresh, and result persistence.</span></li>
                 <li><span class="review-index">03</span><span><strong>Separate competitive rewards.</strong> Keep local achievements cosmetic until local match facts have an authoritative source.</span></li>
                 <li><span class="review-index">04</span><span><strong>Decompose orchestration.</strong> Continue extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
               </ol>
@@ -933,7 +942,7 @@
       </main>
 
       <footer class="capability-footer">
-        <p>Reviewed against repository code · 23 September 2026</p>
+        <p>Reviewed against repository code · 17 October 2026</p>
         <p>Solid = implemented · Dashed = planned</p>
       </footer>
     </div>
@@ -1035,6 +1044,22 @@
           owner: "Pure progression rules + authenticated profile APIs + React profile UI",
           code: ["src/game/simulation/progression.ts", "src/app/api/profile/route.ts", "src/components/game/ProfileScreen.tsx"],
           boundary: "The browser may request an allowlisted title, but the server re-derives unlock eligibility before persisting the equipped choice."
+        },
+        shell: {
+          status: "implemented",
+          title: "Game shell + round moments",
+          summary: "Mode buttons stay primary while Music, Tracks, High Scores, Profile and settings move into a tiered game menu; round banners mark round start, wins and losses; Profile, High Scores, Tracks, Party and the sign-in gate share the Overdrive card styling.",
+          owner: "React shell, menu, and banner components + globals.css tokens",
+          code: ["src/components/game/ShellMenu.tsx", "src/components/game/RoundBanner.tsx", "src/components/game/GameShell.tsx", "src/app/globals.css"],
+          boundary: "RoundBanner only maps existing onRoundStatusChange events; reduced-motion preferences soften shake and blast effects without changing any rule."
+        },
+        overdrive: {
+          status: "implemented",
+          title: "Overdrive art direction",
+          summary: "The player and four bots render as Fusebot characters on a framed 2.5D arena with lifted walls, glossy owner-banded bombs, and redesigned blasts, in both solo play and duels. Chakra Petch and IBM Plex Sans are bundled locally so builds never fetch fonts.",
+          owner: "Phaser presentation modules + generated textures + React portraits",
+          code: ["src/game/presentation/fusebotView.ts", "src/game/presentation/arenaViews.ts", "src/game/presentation/explosionEffect.ts", "src/components/game/FusebotPortrait.tsx", "src/app/fonts/"],
+          boundary: "Rendering only: presentation reads simulation state and never changes gameplay rules."
         },
         "arena-rules": {
           status: "implemented",
