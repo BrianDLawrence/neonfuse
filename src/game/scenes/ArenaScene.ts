@@ -12,18 +12,27 @@ import {
 import { playExplosionEffect } from "../presentation/explosionEffect";
 import { FusebotView, rowDepth } from "../presentation/fusebotView";
 import {
+  ArenaMinimap,
+  OffscreenIndicators,
+  visibleWorldRect,
+  type BoardRect,
+  type ScreenInsets
+} from "../presentation/megagridView";
+import { prefersReducedMotion } from "../presentation/motionPreference";
+import {
   ARENA_COLS,
   ARENA_ROWS,
   CELL_SIZE,
   createArena,
   createInitialArena,
+  getArenaSize,
   getSpawnPoints,
   type Direction,
   directionToDelta,
   type GridPoint,
   isWalkable
 } from "../simulation/arena";
-import { computeArenaBoardFit } from "../simulation/layout";
+import { computeFollowCamera, type ArenaCameraPlan } from "../simulation/layout";
 import { resolveBlast, tileListIncludes, type BlastResult } from "../simulation/blast";
 import {
   BOT_PROFILES,
@@ -60,6 +69,8 @@ const COUNTDOWN_LABELS = ["3", "2", "1", "Fuse!"];
 // Auto-repeat cadence for a held touch D-pad direction. Kept just above the
 // player move tween so steps don't queue ahead of the animation.
 const TOUCH_STEP_MS = 140;
+// How quickly the follow camera catches up with the player (1 = locked on).
+const FOLLOW_LERP = 0.14;
 
 type ActorId = "player" | BotId;
 
@@ -70,6 +81,7 @@ type ActiveBomb = {
   view: BombView;
   timer: Phaser.Time.TimerEvent;
   urgentTimer: Phaser.Time.TimerEvent;
+  urgent: boolean;
 };
 
 type CombatActor = {
@@ -110,6 +122,9 @@ export class ArenaScene extends Phaser.Scene {
   private boardLayer?: Phaser.GameObjects.Container;
   private fxLayer?: Phaser.GameObjects.Container;
   private dangerOverlay?: DangerOverlay;
+  private minimap?: ArenaMinimap;
+  private indicators?: OffscreenIndicators;
+  private cameraPlan?: ArenaCameraPlan;
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
   private currentMode: GameMode = DEFAULT_GAME_MODE;
   private currentStage: CampaignStage | null = null;
@@ -142,6 +157,8 @@ export class ArenaScene extends Phaser.Scene {
     this.boardLayer = this.add.container(0, 0).setDepth(0);
     this.fxLayer = this.add.container(0, 0).setDepth(2);
     this.dangerOverlay = new DangerOverlay(this);
+    this.minimap = new ArenaMinimap(this);
+    this.indicators = new OffscreenIndicators(this);
     this.applyCameraFx();
 
     this.game.events.on("mode-change", this.handleModeChange, this);
@@ -157,6 +174,8 @@ export class ArenaScene extends Phaser.Scene {
       this.input.keyboard?.off("keydown", this.unlockAudio, this);
       this.input.off("pointerdown", this.unlockAudio, this);
       this.scale.off("resize", this.handleResize, this);
+      this.indicators?.destroy();
+      this.minimap?.destroy();
     });
 
     const mode = (this.registry.get("gameMode") as GameMode | undefined) ?? DEFAULT_GAME_MODE;
@@ -165,6 +184,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   update(time: number) {
+    this.updateCameraAids(time);
+
     if (!this.cursors || !this.wasd) {
       return;
     }
@@ -248,6 +269,8 @@ export class ArenaScene extends Phaser.Scene {
       this.spawnActor("bot-b", spawns[1], botBProfile);
     }
 
+    // Re-frame now the player exists, so a follow camera has its target.
+    this.applyCamera();
     this.emitLoadout();
     this.emitBotHud();
     this.startRoundCountdown();
@@ -354,7 +377,11 @@ export class ArenaScene extends Phaser.Scene {
       range,
       view,
       timer: this.time.delayedCall(fuseMs, () => this.detonateBomb(bomb)),
-      urgentTimer: this.time.delayedCall(fuseMs * 0.62, () => view.setUrgent())
+      urgentTimer: this.time.delayedCall(fuseMs * 0.62, () => {
+        bomb.urgent = true;
+        view.setUrgent();
+      }),
+      urgent: false
     };
 
     this.activeBombs.push(bomb);
@@ -396,11 +423,23 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
+  private getBoardRect(): BoardRect {
+    const { cols, rows } = getArenaSize(this.arena);
+
+    return {
+      left: this.boardOrigin.x,
+      top: this.boardOrigin.y,
+      width: cols * CELL_SIZE,
+      height: rows * CELL_SIZE
+    };
+  }
+
   private drawArena() {
     this.boardLayer?.removeAll(true);
 
-    const boardWidth = ARENA_COLS * CELL_SIZE;
-    const boardHeight = ARENA_ROWS * CELL_SIZE;
+    const { cols, rows } = getArenaSize(this.arena);
+    const boardWidth = cols * CELL_SIZE;
+    const boardHeight = rows * CELL_SIZE;
 
     this.boardOrigin = {
       x: (this.scale.width - boardWidth) / 2,
@@ -408,49 +447,137 @@ export class ArenaScene extends Phaser.Scene {
     };
 
     if (this.boardLayer) {
-      drawArenaFloor(this, this.boardLayer, this.boardOrigin.x, this.boardOrigin.y);
+      drawArenaFloor(this, this.boardLayer, this.boardOrigin.x, this.boardOrigin.y, cols, rows);
     }
 
     this.redrawBlocks();
-    this.applyCameraFit();
+    this.applyCamera();
   }
 
-  // Zoom/center the fixed-size board so it is always fully visible. On desktop
-  // (board fits natively, no reserved band) the camera is left at its default so
-  // behavior is unchanged; otherwise we zoom to fit and re-center via the camera,
-  // which preserves tileToWorld math and all absolute-coordinate rendering.
-  private applyCameraFit() {
+  // Frames the board. Boards that fit at a readable size keep the fit path: on
+  // desktop (fits natively, no reserved band) the camera stays at its default;
+  // otherwise it zooms to fit and re-centres, which preserves tileToWorld math.
+  // Boards too big for that (Act 3 on phones) follow the player instead, with a
+  // minimap and edge arrows for whatever is off screen.
+  private applyCamera() {
     const camera = this.cameras.main;
 
     if (!camera) {
       return;
     }
 
-    const boardWidth = ARENA_COLS * CELL_SIZE;
-    const boardHeight = ARENA_ROWS * CELL_SIZE;
-    const fit = computeArenaBoardFit(this.scale.width, this.scale.height, boardWidth, boardHeight, {
-      touchControlsVisible: this.getTouchControlsVisible()
+    const board = this.getBoardRect();
+    const { cols, rows } = getArenaSize(this.arena);
+    const plan = computeFollowCamera(this.scale.width, this.scale.height, board.width, board.height, {
+      cellSize: CELL_SIZE,
+      touchControlsVisible: this.getTouchControlsVisible(),
+      reserveDesktopHud: cols > ARENA_COLS || rows > ARENA_ROWS
     });
+    this.cameraPlan = plan;
+
+    if (plan.mode === "follow") {
+      this.applyFollowCamera(plan, board);
+      return;
+    }
+
+    camera.stopFollow();
+    camera.removeBounds();
+    this.minimap?.setVisible(false);
+    this.indicators?.hide();
 
     if (
-      fit.zoom >= 1 &&
-      fit.reservedSides === 0 &&
-      fit.reservedTop + fit.reservedBottom === 0
+      plan.zoom >= 1 &&
+      plan.reservedSides === 0 &&
+      plan.reservedTop + plan.reservedBottom === 0
     ) {
       camera.setZoom(1);
       camera.setScroll(0, 0);
       return;
     }
 
-    camera.setZoom(fit.zoom);
+    camera.setZoom(plan.zoom);
 
-    const boardCenterX = this.boardOrigin.x + boardWidth / 2;
-    const boardCenterY = this.boardOrigin.y + boardHeight / 2;
+    const boardCenterX = board.left + board.width / 2;
+    const boardCenterY = board.top + board.height / 2;
     // Center the board in the region between the reserved top/bottom bands. A
     // larger top band pushes it down; a larger bottom band pushes it up. Side
     // bands are symmetric, so no horizontal shift is needed.
-    const verticalNudge = (fit.reservedBottom - fit.reservedTop) / (2 * fit.zoom);
+    const verticalNudge = (plan.reservedBottom - plan.reservedTop) / (2 * plan.zoom);
     camera.centerOn(boardCenterX, boardCenterY + verticalNudge);
+  }
+
+  private applyFollowCamera(plan: ArenaCameraPlan, board: BoardRect) {
+    const camera = this.cameras.main;
+    const zoom = plan.zoom;
+    const insets = this.getScreenInsets();
+    // Let the board edge scroll clear of the HUD and touch bands, plus the frame.
+    const pad = CELL_SIZE / 2;
+
+    camera.setZoom(zoom);
+    camera.setBounds(
+      board.left - pad - insets.sides / 2 / zoom,
+      board.top - pad - insets.top / zoom,
+      board.width + pad * 2 + insets.sides / zoom,
+      board.height + pad * 2 + (insets.top + insets.bottom) / zoom
+    );
+
+    const player = this.actors.get("player");
+    // Phaser centres the camera on (target - followOffset). Aiming below the
+    // player by half the extra bottom band keeps them centred in the open area
+    // between the HUD and the touch controls (same nudge as the fit path).
+    const offsetY = (insets.top - insets.bottom) / (2 * zoom);
+
+    if (player) {
+      const lerp = prefersReducedMotion() ? 1 : FOLLOW_LERP;
+      camera.startFollow(player.view.root, false, lerp, lerp, 0, offsetY);
+      // Snap on (re)framing so a new round never opens mid-pan.
+      camera.centerOn(player.view.root.x, player.view.root.y - offsetY);
+    } else {
+      camera.stopFollow();
+      camera.centerOn(board.left + board.width / 2, board.top + board.height / 2);
+    }
+
+    this.minimap?.layout(board, this.scale.width, insets);
+    this.minimap?.setVisible(true);
+  }
+
+  private getScreenInsets(): ScreenInsets {
+    return {
+      top: this.cameraPlan?.reservedTop ?? 0,
+      bottom: this.cameraPlan?.reservedBottom ?? 0,
+      sides: this.cameraPlan?.reservedSides ?? 0
+    };
+  }
+
+  private updateCameraAids(time: number) {
+    if (this.cameraPlan?.mode !== "follow" || !this.minimap || !this.indicators) {
+      return;
+    }
+
+    const camera = this.cameras.main;
+    const insets = this.getScreenInsets();
+    const bots = this.getLiveBots();
+    const colorOf = (actor: CombatActor) =>
+      Phaser.Display.Color.HexStringToColor(actor.profile?.accent ?? "#f43f5e").color;
+
+    this.indicators.update(
+      camera,
+      insets,
+      [
+        ...bots.map((bot) => ({ x: bot.view.root.x, y: bot.view.root.y, color: colorOf(bot) })),
+        ...this.activeBombs
+          .filter((bomb) => bomb.urgent)
+          .map((bomb) => ({ ...this.tileToWorld(bomb.tile), color: 0xf59e0b, urgent: true }))
+      ],
+      time,
+      (arrow) => this.minimap?.ignore(arrow)
+    );
+
+    const player = this.actors.get("player");
+    this.minimap.update(visibleWorldRect(camera, insets), [
+      ...bots.map((bot) => ({ x: bot.view.root.x, y: bot.view.root.y, color: colorOf(bot) })),
+      ...(player?.alive ? [{ x: player.view.root.x, y: player.view.root.y, color: 0x22d3ee, isPlayer: true }] : [])
+    ]);
   }
 
   private getTouchControlsVisible() {

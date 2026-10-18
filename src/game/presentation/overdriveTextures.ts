@@ -105,11 +105,16 @@ function createCharacterTextures(scene: Phaser.Scene) {
   });
 }
 
-function createArenaTextures(scene: Phaser.Scene) {
-  const boardW = ARENA_COLS * CELL_SIZE;
-  const boardH = ARENA_ROWS * CELL_SIZE;
+/**
+ * The framed floor plate for a cols x rows board, painted once per size. The
+ * standard 13x11 plate keeps its original "arena-floor" key.
+ */
+export function ensureArenaFloorTexture(scene: Phaser.Scene, cols = ARENA_COLS, rows = ARENA_ROWS) {
+  const key = cols === ARENA_COLS && rows === ARENA_ROWS ? "arena-floor" : `arena-floor-${cols}x${rows}`;
+  const boardW = cols * CELL_SIZE;
+  const boardH = rows * CELL_SIZE;
 
-  paint(scene, "arena-floor", boardW + FLOOR_FRAME * 2, boardH + FLOOR_FRAME * 2, (ctx) => {
+  paint(scene, key, boardW + FLOOR_FRAME * 2, boardH + FLOOR_FRAME * 2, (ctx) => {
     // Frame: a dark plinth with a cyan edge light.
     ctx.save();
     ctx.shadowColor = "rgba(34, 211, 238, 0.45)";
@@ -124,8 +129,8 @@ function createArenaTextures(scene: Phaser.Scene) {
     ctx.stroke();
 
     ctx.translate(FLOOR_FRAME, FLOOR_FRAME);
-    for (let y = 0; y < ARENA_ROWS; y += 1) {
-      for (let x = 0; x < ARENA_COLS; x += 1) {
+    for (let y = 0; y < rows; y += 1) {
+      for (let x = 0; x < cols; x += 1) {
         const px = x * CELL_SIZE;
         const py = y * CELL_SIZE;
         const gradient = ctx.createLinearGradient(0, py, 0, py + CELL_SIZE);
@@ -141,6 +146,13 @@ function createArenaTextures(scene: Phaser.Scene) {
       }
     }
   });
+
+
+  return key;
+}
+
+function createArenaTextures(scene: Phaser.Scene) {
+  ensureArenaFloorTexture(scene);
 
   paint(scene, "arena-backdrop", 512, 400, (ctx) => {
     // Both glows fade out fully inside the canvas so the stretched image has no visible edge.

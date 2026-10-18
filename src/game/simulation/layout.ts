@@ -141,3 +141,78 @@ export function computeArenaBoardFit(
 
   return { ...fit, ...bands };
 }
+
+export type ArenaCameraPlan = ArenaBoardFit & {
+  /** "fit" shows the whole board (today's path); "follow" tracks the player. */
+  mode: "fit" | "follow";
+};
+
+// Desktop HUD footprint (brand + two chip rows on top, mode row + key chips at the
+// bottom). Mirrors globals.css like DEFAULT_RESERVED_BANDS_CONFIG does.
+export const DESKTOP_HUD_BANDS = { top: 168, bottom: 112 } as const;
+
+export type FollowCameraOptions = ArenaBoardFitOptions & {
+  cellSize: number;
+  /**
+   * Keep the desktop HUD clear of a board that doesn't fit between its rows.
+   * ArenaScene opts in only for boards larger than the standard arena, so 13x11
+   * framing is unchanged.
+   */
+  reserveDesktopHud?: boolean;
+  /** Below this on-screen tile size the whole board is too small to read. */
+  minTilePx?: number;
+  /** In follow mode, roughly how many tiles stay visible around the player. */
+  minVisibleCols?: number;
+  minVisibleRows?: number;
+};
+
+/**
+ * Picks how the arena camera frames a board. A board that still fits the
+ * viewport at a readable tile size keeps the fit-to-screen path, so every 13x11
+ * board (and large boards on roomy screens) is unchanged. Otherwise the camera
+ * follows the player at a zoom that shows about minVisibleCols x minVisibleRows
+ * tiles of the area left between the HUD and touch-control bands.
+ */
+export function computeFollowCamera(
+  viewportWidth: number,
+  viewportHeight: number,
+  boardWidth: number,
+  boardHeight: number,
+  {
+    cellSize,
+    minTilePx = 30,
+    minVisibleCols = 11,
+    minVisibleRows = 9,
+    reserveDesktopHud = false,
+    ...fitOptions
+  }: FollowCameraOptions
+): ArenaCameraPlan {
+  const arenaFit = computeArenaBoardFit(viewportWidth, viewportHeight, boardWidth, boardHeight, fitOptions);
+  const noBands = arenaFit.reservedTop + arenaFit.reservedBottom + arenaFit.reservedSides === 0;
+  const fitsNatively = boardWidth <= viewportWidth && boardHeight <= viewportHeight - DESKTOP_HUD_BANDS.top - DESKTOP_HUD_BANDS.bottom;
+  const fit: ArenaBoardFit =
+    reserveDesktopHud && noBands && !fitsNatively
+      ? {
+          ...computeBoardFit(viewportWidth, viewportHeight, boardWidth, boardHeight, {
+            reservedHeight: DESKTOP_HUD_BANDS.top + DESKTOP_HUD_BANDS.bottom
+          }),
+          reservedTop: DESKTOP_HUD_BANDS.top,
+          reservedBottom: DESKTOP_HUD_BANDS.bottom,
+          reservedSides: 0
+        }
+      : arenaFit;
+
+  if (fit.zoom * cellSize >= minTilePx) {
+    return { ...fit, mode: "fit" };
+  }
+
+  const availableWidth = Math.max(1, viewportWidth - fit.reservedSides);
+  const availableHeight = Math.max(1, viewportHeight - fit.reservedTop - fit.reservedBottom);
+  const followZoom = Math.min(
+    1,
+    availableWidth / (minVisibleCols * cellSize),
+    availableHeight / (minVisibleRows * cellSize)
+  );
+
+  return { ...fit, mode: "follow", zoom: Math.max(fit.zoom, followZoom) };
+}

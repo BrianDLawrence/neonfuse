@@ -1,16 +1,23 @@
 import * as Phaser from "phaser";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, type ArenaGrid, type GridPoint } from "../simulation/arena";
 import { rowDepth } from "./fusebotView";
-import { BLOCK_ORIGIN_Y, FLOOR_FRAME } from "./overdriveTextures";
+import { BLOCK_ORIGIN_Y, FLOOR_FRAME, ensureArenaFloorTexture } from "./overdriveTextures";
 
 type ToWorld = (tile: GridPoint) => GridPoint;
 
 const DANGER_DEPTH = 3;
 
 /** Backdrop glow plus the framed floor plate for a board whose top-left corner is (boardLeft, boardTop). */
-export function drawArenaFloor(scene: Phaser.Scene, layer: Phaser.GameObjects.Container, boardLeft: number, boardTop: number) {
-  const width = ARENA_COLS * CELL_SIZE;
-  const height = ARENA_ROWS * CELL_SIZE;
+export function drawArenaFloor(
+  scene: Phaser.Scene,
+  layer: Phaser.GameObjects.Container,
+  boardLeft: number,
+  boardTop: number,
+  cols = ARENA_COLS,
+  rows = ARENA_ROWS
+) {
+  const width = cols * CELL_SIZE;
+  const height = rows * CELL_SIZE;
   const centerX = boardLeft + width / 2;
   const centerY = boardTop + height / 2;
 
@@ -20,7 +27,7 @@ export function drawArenaFloor(scene: Phaser.Scene, layer: Phaser.GameObjects.Co
       .setDisplaySize(width + 760, height + 560)
       .setBlendMode(Phaser.BlendModes.ADD)
   );
-  layer.add(scene.add.image(centerX, centerY, "arena-floor"));
+  layer.add(scene.add.image(centerX, centerY, ensureArenaFloorTexture(scene, cols, rows)));
 
   return { width: width + FLOOR_FRAME * 2, height: height + FLOOR_FRAME * 2 };
 }

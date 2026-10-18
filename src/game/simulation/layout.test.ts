@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeArenaBoardFit, computeBoardFit, computeReservedBands } from "./layout";
+import {
+  DESKTOP_HUD_BANDS,
+  computeArenaBoardFit,
+  computeBoardFit,
+  computeFollowCamera,
+  computeReservedBands
+} from "./layout";
 
 const BOARD_W = 624;
 const BOARD_H = 528;
@@ -267,5 +273,85 @@ describe("board fits at reduced iOS visible viewports", () => {
   it("iPad Pro landscape 1366x1024 — full board visible between tablet controls", () => {
     const fit = expectBoardFullyVisible(1366, 1024);
     expect(fit.reservedSides).toBe(420);
+  });
+});
+
+describe("computeFollowCamera", () => {
+  const CELL = 48;
+  const board = (cols: number, rows: number) => [cols * CELL, rows * CELL] as const;
+
+  it("keeps the fit path for the standard board on a phone", () => {
+    const plan = computeFollowCamera(412, 839, ...board(13, 11), { cellSize: CELL, touchControlsVisible: true });
+
+    expect(plan.mode).toBe("fit");
+    expect(plan.zoom).toBe(
+      computeArenaBoardFit(412, 839, ...board(13, 11), { touchControlsVisible: true }).zoom
+    );
+  });
+
+  it("keeps today's desktop framing for boards that don't opt in to HUD space", () => {
+    const plan = computeFollowCamera(1280, 720, ...board(13, 11), { cellSize: CELL, touchControlsVisible: false });
+
+    expect(plan).toEqual({
+      ...computeArenaBoardFit(1280, 720, ...board(13, 11), { touchControlsVisible: false }),
+      mode: "fit"
+    });
+    expect(plan.zoom).toBe(1);
+  });
+
+  it("shows a large board whole between the desktop HUD rows on a tall screen", () => {
+    const plan = computeFollowCamera(1440, 1000, ...board(25, 19), {
+      cellSize: CELL,
+      touchControlsVisible: false,
+      reserveDesktopHud: true
+    });
+
+    expect(plan.mode).toBe("fit");
+    expect(plan.reservedTop).toBe(DESKTOP_HUD_BANDS.top);
+    expect(plan.zoom * CELL).toBeGreaterThanOrEqual(30);
+    expect(19 * CELL * plan.zoom).toBeLessThanOrEqual(1000 - DESKTOP_HUD_BANDS.top - DESKTOP_HUD_BANDS.bottom + 0.001);
+  });
+
+  it("follows on a laptop when the large board would hide under the desktop HUD", () => {
+    const plan = computeFollowCamera(1280, 720, ...board(25, 19), {
+      cellSize: CELL,
+      touchControlsVisible: false,
+      reserveDesktopHud: true
+    });
+
+    expect(plan.mode).toBe("follow");
+    expect(plan.zoom).toBe(1);
+    expect(plan.reservedBottom).toBe(DESKTOP_HUD_BANDS.bottom);
+  });
+
+  it("follows the player on a phone once the board would shrink below a readable tile", () => {
+    const plan = computeFollowCamera(412, 839, ...board(19, 15), { cellSize: CELL, touchControlsVisible: true });
+    const fit = computeArenaBoardFit(412, 839, ...board(19, 15), { touchControlsVisible: true });
+
+    expect(fit.zoom * CELL).toBeLessThan(30);
+    expect(plan.mode).toBe("follow");
+    expect(plan.zoom).toBeGreaterThan(fit.zoom);
+    // About 11 columns fit across the phone.
+    expect(Math.floor(412 / (plan.zoom * CELL))).toBe(11);
+  });
+
+  it("keeps the HUD and touch bands from the fit so follow framing can avoid them", () => {
+    const plan = computeFollowCamera(390, 844, ...board(25, 19), { cellSize: CELL, touchControlsVisible: true });
+
+    expect(plan.mode).toBe("follow");
+    expect(plan.reservedTop).toBeGreaterThan(0);
+    expect(plan.reservedBottom).toBeGreaterThan(0);
+  });
+
+  it("never zooms past native size when following", () => {
+    const plan = computeFollowCamera(1600, 300, ...board(25, 19), {
+      cellSize: CELL,
+      touchControlsVisible: false,
+      minVisibleCols: 3,
+      minVisibleRows: 1
+    });
+
+    expect(plan.mode).toBe("follow");
+    expect(plan.zoom).toBeLessThanOrEqual(1);
   });
 });

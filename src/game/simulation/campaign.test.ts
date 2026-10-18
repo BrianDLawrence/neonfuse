@@ -57,10 +57,10 @@ describe("campaign stage table", () => {
     CAMPAIGN_ACTS.forEach((act) => expect(getActStages(act.id).length).toBeGreaterThan(0));
   });
 
-  it("ends Act 2 with a two-bot gauntlet and keeps every other stage 1v1", () => {
+  it("introduces gauntlets at 2-5 and uses them for the later Megagrid stages", () => {
     const gauntlets = CAMPAIGN_STAGES.filter((stage) => stage.bots.length > 1).map((stage) => stage.id);
 
-    expect(gauntlets).toEqual(["2-5"]);
+    expect(gauntlets).toEqual(["2-5", "3-2", "3-3"]);
     expect(getCampaignStage("2-5")?.bots.map((bot) => bot.profileId)).toEqual(["fuse-rush", "circuit-shade"]);
   });
 
@@ -101,6 +101,11 @@ describe("stage unlocks", () => {
     expect(isStageUnlocked(progress, "1-2")).toBe(true);
     expect(isStageUnlocked(progress, "1-3")).toBe(false);
     expect(getNextStage(progress)?.id).toBe("1-2");
+  });
+
+  it("opens Act 3 only after the Act 2 gauntlet is cleared", () => {
+    expect(isActUnlocked(clearThrough("2-4"), 3)).toBe(false);
+    expect(isActUnlocked(clearThrough("2-5"), 3)).toBe(true);
   });
 
   it("opens Act 2 only after the last Act 1 stage is cleared", () => {
@@ -274,14 +279,20 @@ describe("resolveStageModifiers", () => {
 });
 
 describe("stage boards", () => {
-  // ArenaScene still renders a fixed 13x11 board; Phase 3 (Megagrid) lifts this.
-  it("keeps every stage on the standard 13x11 board until rendering supports other sizes", () => {
-    CAMPAIGN_STAGES.forEach((stage) => expect([stage.arena.cols, stage.arena.rows]).toEqual([13, 11]));
+  it("keeps Acts 1-2 on the standard board and grows Act 3", () => {
+    CAMPAIGN_STAGES.filter((stage) => stage.act < 3).forEach((stage) =>
+      expect([stage.arena.cols, stage.arena.rows]).toEqual([13, 11])
+    );
+    expect(getActStages(3).map((stage) => [stage.arena.cols, stage.arena.rows])).toEqual([
+      [19, 15],
+      [21, 17],
+      [25, 19]
+    ]);
   });
 });
 
-describe("Act 2 boards", () => {
-  it.each(getActStages(2).map((stage) => [stage.id, stage] as const))(
+describe("Act 2 and 3 boards", () => {
+  it.each([...getActStages(2), ...getActStages(3)].map((stage) => [stage.id, stage] as const))(
     "lets the stage %s bots act from their spawn instead of waiting forever",
     (_id, stage) => {
       const arena = createArena(stage.arena);

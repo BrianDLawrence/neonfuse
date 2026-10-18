@@ -63,14 +63,17 @@ function softBlockAt(spec: ArenaSpec, x: number, y: number, seed: number): boole
   }
 
   if (spec.preset === "open-core") {
+    // The core grows with the board (2x1 half-size on 13x11), ringed two tiles deep.
+    const coreX = Math.max(2, Math.floor(spec.cols / 6));
+    const coreY = Math.max(1, Math.floor(spec.rows / 8));
     const dx = Math.abs(x - (spec.cols - 1) / 2);
     const dy = Math.abs(y - (spec.rows - 1) / 2);
 
-    if (dx <= 2 && dy <= 1) {
+    if (dx <= coreX && dy <= coreY) {
       return false;
     }
 
-    if (dx <= 4 && dy <= 3) {
+    if (dx <= coreX + 2 && dy <= coreY + 2) {
       return true;
     }
   }
