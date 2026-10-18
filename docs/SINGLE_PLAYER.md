@@ -1,7 +1,12 @@
 # Single-Player Modes — Design
 
-Status: **Phases 1–3 (Acts 1–3) implemented**; Phase 4 (Versus picker) is still
-design. Notes from the build:
+Status: **all four phases implemented** (Campaign Acts 1–3 and the Versus
+picker). Notes from the build:
+- Versus: every bot's Overclocked variant unlocks by clearing its Act 2 stage
+  (2-1 to 2-4) and uses one shared, bounded tuning (`VERSUS_OVERCLOCK`). The
+  Overclocked toggle is session-only, so stored preferences are unchanged.
+  Picking slot B's bot swaps the Bot Lab slots rather than creating a mirror
+  skirmish.
 - Phones (≤760px): Friend moved from the mode pill into the game menu.
 - Bots don't model fuse timing (they flee any bomb), so stage data keeps
   `botFuseMs` at 1500 or more even though the bound allows 1200.

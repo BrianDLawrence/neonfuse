@@ -41,6 +41,7 @@ type PhaserGameProps = {
     sequence: number;
   };
   botSelection: BotSelection;
+  versusOverclocked?: boolean;
   powerupDropRates: PowerupDropRates;
   touchControlsEnabled?: boolean;
   onRoundStatusChange?: (status: string) => void;
@@ -54,6 +55,7 @@ type PhaserGameProps = {
 export function PhaserGame({
   modeCommand,
   botSelection,
+  versusOverclocked = false,
   powerupDropRates,
   touchControlsEnabled = false,
   onRoundStatusChange,
@@ -75,10 +77,12 @@ export function PhaserGame({
   const registerTouchControlsRef = useRef(onRegisterTouchControls);
   const powerupDropRatesRef = useRef(powerupDropRates);
   const botSelectionRef = useRef(botSelection);
+  const versusOverclockedRef = useRef(versusOverclocked);
   const touchControlsEnabledRef = useRef(touchControlsEnabled);
 
   useEffect(() => {
     botSelectionRef.current = botSelection;
+    versusOverclockedRef.current = versusOverclocked;
     powerupDropRatesRef.current = powerupDropRates;
     touchControlsEnabledRef.current = touchControlsEnabled;
     roundStatusChangeRef.current = onRoundStatusChange;
@@ -96,7 +100,8 @@ export function PhaserGame({
     onRegisterTouchControls,
     onRoundStatusChange,
     powerupDropRates,
-    touchControlsEnabled
+    touchControlsEnabled,
+    versusOverclocked
   ]);
 
   useEffect(() => {
@@ -133,7 +138,8 @@ export function PhaserGame({
           onRoundComplete: (payload) => roundCompleteRef.current?.(payload),
           getPowerupDropRates: () => powerupDropRatesRef.current,
           getBotSelection: () => botSelectionRef.current,
-          getCampaignStage: () => campaignStageRef.current
+          getCampaignStage: () => campaignStageRef.current,
+          getVersusOverclock: () => versusOverclockedRef.current
         }
       });
       gameRef.current = game;

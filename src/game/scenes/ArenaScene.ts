@@ -60,6 +60,7 @@ import {
   type PowerupType
 } from "../simulation/powerups";
 import { resolveRoundWinner } from "../simulation/round";
+import { resolveVersusOpponent } from "../simulation/versus";
 
 const PLAYER_FUSE_MS = 1400;
 const BOT_AI_TICK_MS = 120;
@@ -236,7 +237,13 @@ export class ArenaScene extends Phaser.Scene {
     this.clearRoundObjects();
     this.arena = stage ? createArena(stage.arena) : createInitialArena();
 
-    const modifiers = stage ? resolveStageModifiers(stage) : null;
+    const botSelection = this.shellEvents?.getBotSelection?.() ?? DEFAULT_BOT_SELECTION;
+    // Versus fights slot A's bot, as its Overclocked variant when the shell asks.
+    const versusOpponent =
+      mode === "player-vs-bot"
+        ? resolveVersusOpponent(botSelection["bot-a"], this.shellEvents?.getVersusOverclock?.() ?? false)
+        : null;
+    const modifiers = stage ? resolveStageModifiers(stage) : (versusOpponent?.modifiers ?? null);
     this.botFuseMs = modifiers?.botFuseMs ?? DEFAULT_BOT_FUSE_MS;
     this.botMoveScale = modifiers?.botMoveScale ?? 1;
     this.stageDropRates = modifiers?.powerupDropRates ?? null;
@@ -248,7 +255,6 @@ export class ArenaScene extends Phaser.Scene {
     this.lastTouchStepAt = Number.NEGATIVE_INFINITY;
     this.drawArena();
 
-    const botSelection = this.shellEvents?.getBotSelection?.() ?? DEFAULT_BOT_SELECTION;
     const botAProfile = BOT_PROFILES[botSelection["bot-a"]];
     const botBProfile = BOT_PROFILES[botSelection["bot-b"]];
 
@@ -261,9 +267,9 @@ export class ArenaScene extends Phaser.Scene {
         const { profile, loadout } = resolveStageBot(spec);
         this.spawnActor(index === 0 ? "bot-a" : "bot-b", spawns[index + 1], profile, loadout);
       });
-    } else if (mode === "player-vs-bot") {
+    } else if (versusOpponent) {
       this.spawnActor("player", spawns[0]);
-      this.spawnActor("bot-a", spawns[1], botAProfile);
+      this.spawnActor("bot-a", spawns[1], versusOpponent.profile, versusOpponent.loadout);
     } else {
       this.spawnActor("bot-a", spawns[0], botAProfile);
       this.spawnActor("bot-b", spawns[1], botBProfile);
