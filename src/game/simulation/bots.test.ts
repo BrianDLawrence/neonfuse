@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createInitialArena, type ArenaGrid } from "./arena";
+import { createArena, createInitialArena, getSpawnPoints, isWalkable, type ArenaGrid, type GridPoint } from "./arena";
+import { resolveBlast, tileListIncludes } from "./blast";
+import { manhattanDistance } from "./danger";
 import {
   BOT_PROFILE_ORDER,
   BOT_PROFILES,
   DEFAULT_BOT_SELECTION,
   chooseBotTurn,
-  type BotActorState
+  type BotActorState,
+  type BotProfileId
 } from "./bots";
 import { createInitialLoadout } from "./powerups";
 
@@ -197,5 +200,56 @@ describe("chooseBotTurn", () => {
     expect(DEFAULT_BOT_SELECTION["bot-a"]).not.toBe(DEFAULT_BOT_SELECTION["bot-b"]);
     expect(BOT_PROFILES[DEFAULT_BOT_SELECTION["bot-a"]]).toBeDefined();
     expect(BOT_PROFILES[DEFAULT_BOT_SELECTION["bot-b"]]).toBeDefined();
+  });
+});
+
+// Plays one bot alone on a board, turn by turn: bombs go off after a fixed number
+// of bot turns (about 1.8s at the bot's pace) and really clear blocks.
+function runBotAlone(arena: ArenaGrid, profileId: BotProfileId, turns: number) {
+  const [target, start] = getSpawnPoints(arena);
+  let tile: GridPoint = start;
+  let bombs: Array<{ tile: GridPoint; range: number; fuse: number }> = [];
+  let alive = true;
+  const loadout = createInitialLoadout();
+
+  for (let turn = 0; turn < turns && alive; turn += 1) {
+    const intent = chooseBotTurn({
+      arena,
+      actor: { id: "bot-a", tile, alive, loadout, profile: BOT_PROFILES[profileId], turn },
+      opponentTile: target,
+      bombs: bombs.map((bomb) => ({ tile: bomb.tile, range: bomb.range })),
+      activeBombCount: bombs.length,
+      blockedTiles: bombs.map((bomb) => bomb.tile),
+      decisionSeed: turn * 101
+    });
+
+    if (intent.type === "move" && isWalkable(arena, intent.tile)) {
+      tile = intent.tile;
+    } else if (intent.type === "plant-bomb") {
+      bombs.push({ tile, range: loadout.blast, fuse: 4 });
+      tile = intent.moveTo ?? tile;
+    }
+
+    bombs = bombs.filter((bomb) => {
+      bomb.fuse -= 1;
+
+      if (bomb.fuse > 0) {
+        return true;
+      }
+
+      alive = alive && !tileListIncludes(resolveBlast(arena, bomb.tile, bomb.range).tiles, tile);
+      return false;
+    });
+  }
+
+  return { alive, startDistance: manhattanDistance(start, target), endDistance: manhattanDistance(tile, target) };
+}
+
+describe("bots on large boards", () => {
+  it.each(BOT_PROFILE_ORDER)("%s survives and closes on a player across a 25x19 board", (profileId) => {
+    const run = runBotAlone(createArena({ cols: 25, rows: 19, preset: "standard" }), profileId, 160);
+
+    expect(run.alive).toBe(true);
+    expect(run.endDistance).toBeLessThan(run.startDistance / 2);
   });
 });

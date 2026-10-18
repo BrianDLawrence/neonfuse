@@ -124,6 +124,35 @@ test.describe("game shell", () => {
     await expect(page.locator(".hud-chip-bots")).toContainText("2/2");
   });
 
+  test("Act 3 opens Megagrid stages on boards bigger than the standard arena", async ({ page }) => {
+    await page.addInitScript(() => {
+      const cleared = { stars: 1, bestTimeMs: 90_000 };
+      const ids = ["1-1", "1-2", "1-3", "1-4", "2-1", "2-2", "2-3", "2-4", "2-5"];
+      window.localStorage.setItem(
+        "neon-fuse:campaign-progress",
+        JSON.stringify({ stages: Object.fromEntries(ids.map((id) => [id, cleared])) })
+      );
+    });
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Campaign" }).click();
+    const campaign = page.getByRole("dialog", { name: "Campaign" });
+
+    await expect(campaign.getByRole("group", { name: "Acts" }).getByRole("button", { name: /Act 3/ })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(campaign.getByRole("list", { name: "Act 3 stages" }).getByRole("button", { name: /3-1/ })).toHaveAttribute(
+      "data-state",
+      "next"
+    );
+    await expect(campaign.locator(".trait-pill", { hasText: "Board" })).toContainText("19×15");
+    await campaign.getByRole("button", { name: "Start stage" }).click();
+
+    await expect(page.locator(".hud-chip-stage")).toContainText("Stage 3-1");
+    await expect(statusChip(page)).toHaveText(/^[123]$|Fuse!|Live/);
+  });
+
   test("the game menu opens with Escape-to-close and returns focus", async ({ page }) => {
     await openShell(page);
 

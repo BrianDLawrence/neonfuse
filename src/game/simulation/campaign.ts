@@ -13,17 +13,31 @@ import {
   type PowerupDropRates
 } from "./powerups";
 
-// Acts 1 (Circuit Ladder) and 2 (Overclock). Act 3 extends these unions and the
-// table; see docs/SINGLE_PLAYER.md for the full plan.
-export const CAMPAIGN_STAGE_IDS = ["1-1", "1-2", "1-3", "1-4", "2-1", "2-2", "2-3", "2-4", "2-5"] as const;
+// Acts 1 (Circuit Ladder), 2 (Overclock) and 3 (Megagrid); see
+// docs/SINGLE_PLAYER.md for the plan behind each act.
+export const CAMPAIGN_STAGE_IDS = [
+  "1-1",
+  "1-2",
+  "1-3",
+  "1-4",
+  "2-1",
+  "2-2",
+  "2-3",
+  "2-4",
+  "2-5",
+  "3-1",
+  "3-2",
+  "3-3"
+] as const;
 
 export type CampaignStageId = (typeof CAMPAIGN_STAGE_IDS)[number];
 
-export type CampaignActId = 1 | 2;
+export type CampaignActId = 1 | 2 | 3;
 
 export const CAMPAIGN_ACTS: readonly { id: CampaignActId; title: string }[] = [
   { id: 1, title: "Circuit Ladder" },
-  { id: 2, title: "Overclock" }
+  { id: 2, title: "Overclock" },
+  { id: 3, title: "Megagrid" }
 ];
 
 /**
@@ -216,6 +230,52 @@ export const CAMPAIGN_STAGES: readonly CampaignStage[] = [
     roundsToWin: 1,
     parTimeMs: 120_000,
     blockTarget: 14
+  },
+  {
+    id: "3-1",
+    act: 3,
+    title: "Wide Grid",
+    brief: "A board bigger than the screen. Volt Warden is out there somewhere. Follow the arrow.",
+    arena: { cols: 19, rows: 15, preset: "standard" },
+    bots: [{ profileId: "volt-warden" }],
+    modifiers: {},
+    objective: "knockout",
+    roundsToWin: 1,
+    parTimeMs: 150_000,
+    blockTarget: 24
+  },
+  {
+    id: "3-2",
+    act: 3,
+    title: "Twin Signal",
+    brief: "Circuit Shade and Glitch Bloom split the grid between them. Pick one off before they find you.",
+    arena: { cols: 21, rows: 17, preset: "standard" },
+    bots: [{ profileId: "circuit-shade" }, { profileId: "glitch-bloom" }],
+    modifiers: {},
+    objective: "knockout",
+    roundsToWin: 1,
+    parTimeMs: 180_000,
+    blockTarget: 30
+  },
+  {
+    id: "3-3",
+    act: 3,
+    title: "Megagrid",
+    brief: "The final grid. Two Overclocked bots, short fuses, fast drops, and a core everyone wants.",
+    arena: { cols: 25, rows: 19, preset: "open-core" },
+    bots: [
+      { profileId: "fuse-rush", traitDelta: { aggression: 1 }, startingLoadout: { bombs: 2 } },
+      { profileId: "glitch-bloom", traitDelta: { riskTolerance: -1 }, startingLoadout: { bombs: 2, blast: 3 } }
+    ],
+    modifiers: {
+      botFuseMs: 1500,
+      botMoveScale: 0.9,
+      powerupDropRates: { bomb: 5, blast: 5, speed: 7 }
+    },
+    objective: "knockout",
+    roundsToWin: 1,
+    parTimeMs: 210_000,
+    blockTarget: 36
   }
 ];
 
