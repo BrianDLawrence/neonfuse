@@ -57,6 +57,12 @@ h5,
 .auth-legal-links a,
 .bot-roster-button strong,
 .bot-slot-row,
+.campaign-briefing-stage,
+.campaign-goals-heading > span,
+.campaign-intel strong,
+.campaign-stage-mark,
+.campaign-stage-name strong,
+.campaign-stage-number,
 .command-button,
 .current-score-readout span,
 .current-score-readout strong,
@@ -2567,7 +2573,8 @@ h5,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-lineup-slot {
+  .auth-lineup-slot,
+  .campaign-result-stars .campaign-star[data-earned="true"] {
     animation: none;
   }
 
@@ -2854,6 +2861,381 @@ h5,
   line-height: 1.45;
 }
 
+/* Campaign: a vertical circuit trace of stage cards beside a briefing. The
+   connector between cards lights up once the stage above it is cleared. */
+.campaign-dialog {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.campaign-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(280px, 1.1fr);
+  gap: 16px;
+}
+
+.campaign-ladder {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.campaign-ladder li {
+  position: relative;
+}
+
+.campaign-ladder li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 26px;
+  width: 1px;
+  height: 12px;
+  background: var(--line);
+}
+
+.campaign-ladder li[data-state="cleared"]:not(:last-child)::after {
+  background: var(--line-strong);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+}
+
+.campaign-stage-card {
+  display: grid;
+  grid-template-columns: 30px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(17, 20, 30, 0.76);
+  color: var(--text);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.campaign-stage-card[aria-pressed="true"] {
+  --cut-line: var(--line-strong);
+  border-color: var(--line-strong);
+  background: rgba(34, 211, 238, 0.14);
+  box-shadow: inset 0 0 18px rgba(34, 211, 238, 0.08);
+}
+
+/* clip-path cuts outlines too, so focus is drawn inside the card. */
+.campaign-stage-card:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--cyan);
+}
+
+.campaign-stage-card[data-state="next"] {
+  --cut-line: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.campaign-stage-card[data-state="locked"] {
+  --cut-line: rgba(148, 163, 184, 0.22);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: var(--muted);
+}
+
+.campaign-stage-number {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.campaign-stage-card[data-state="cleared"] .campaign-stage-number {
+  color: var(--green);
+}
+
+.campaign-stage-card[data-state="next"] .campaign-stage-number {
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.55);
+}
+
+.campaign-stage-portrait {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.campaign-stage-card[data-state="locked"] .campaign-stage-portrait {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+.campaign-stage-name strong,
+.campaign-stage-name small {
+  display: block;
+}
+
+.campaign-stage-name strong {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.campaign-stage-name small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.campaign-stage-mark {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.campaign-stage-card[data-state="next"] .campaign-stage-mark {
+  color: var(--cyan);
+}
+
+.campaign-stars {
+  display: inline-flex;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.campaign-star {
+  color: rgba(148, 163, 184, 0.35);
+}
+
+.campaign-star[data-earned="true"] {
+  color: var(--amber);
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
+}
+
+.campaign-briefing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
+  padding-left: 16px;
+}
+
+.campaign-briefing-head,
+.campaign-result-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.campaign-briefing-portrait,
+.campaign-result-portrait {
+  display: block;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.18);
+}
+
+.campaign-briefing-stage {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.campaign-briefing-head h4 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.campaign-briefing-head p:last-child {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.campaign-brief {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.campaign-intel {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.campaign-intel strong {
+  margin-right: 6px;
+  color: var(--amber);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.trait-grid.campaign-facts {
+  margin-top: 0;
+}
+
+.campaign-goals {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: rgba(8, 10, 18, 0.46);
+  padding: 10px 12px;
+}
+
+.campaign-goals-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.campaign-goals-heading > span:first-child {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.campaign-goals ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.campaign-goals li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.campaign-goals li::before {
+  content: "★";
+  position: absolute;
+  left: 0;
+  color: rgba(245, 158, 11, 0.6);
+}
+
+.campaign-lock-note {
+  margin: 0;
+  border-left: 2px solid var(--pink);
+  color: var(--muted);
+  font-size: 13px;
+  padding-left: 8px;
+}
+
+.campaign-start {
+  align-self: flex-start;
+  min-width: 180px;
+  min-height: 44px;
+}
+
+.campaign-start:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.campaign-result {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.campaign-result .admin-panel {
+  gap: 14px;
+}
+
+.campaign-result-head h3 {
+  margin: 4px 0 0;
+  font-size: clamp(22px, 4vw, 30px);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.campaign-result[data-outcome="win"] h3 {
+  color: var(--green);
+  text-shadow: 0 0 18px rgba(163, 230, 53, 0.4);
+}
+
+.campaign-result[data-outcome="loss"] h3 {
+  color: var(--pink);
+  text-shadow: 0 0 18px rgba(244, 63, 94, 0.35);
+}
+
+.campaign-result[data-outcome="loss"] .campaign-result-portrait {
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 0 0 22px rgba(244, 63, 94, 0.18);
+}
+
+.campaign-result-stars {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 38px;
+}
+
+/* The one orchestrated moment: earned stars light up in turn. */
+.campaign-result-stars .campaign-star[data-earned="true"] {
+  animation: campaign-star-in 420ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+.campaign-result-stars .campaign-star:nth-child(2) {
+  animation-delay: 260ms;
+}
+
+.campaign-result-stars .campaign-star:nth-child(3) {
+  animation-delay: 520ms;
+}
+
+@keyframes campaign-star-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.campaign-callout {
+  margin: 0;
+  border: 1px solid rgba(163, 230, 53, 0.4);
+  border-radius: 8px;
+  background: rgba(163, 230, 53, 0.08);
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+
+.campaign-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.campaign-result-actions .command-button {
+  flex: 1 1 auto;
+  min-height: 44px;
+}
+
 /* Overdrive surfaces for the secondary screens (profile, party, tracks,
    high scores, sign-in). Cards get the HUD chip's chamfer: top-right and
    bottom-left corners cut by --cut. clip-path also cuts the 1px border, so the
@@ -2872,7 +3254,8 @@ h5,
 .score-entry-panel,
 .scoreboard-row,
 .current-score-readout,
-.score-player-card {
+.score-player-card,
+.campaign-stage-card {
   --cut: 12px;
   --cut-line: var(--line);
   position: relative;
@@ -2900,7 +3283,8 @@ h5,
 .score-entry-panel::after,
 .scoreboard-row::after,
 .current-score-readout::after,
-.score-player-card::after {
+.score-player-card::after,
+.campaign-stage-card::after {
   content: "";
   position: absolute;
   inset: -1px;
@@ -2925,7 +3309,8 @@ h5,
 .profile-avatar[data-size="normal"],
 .party-member,
 .music-track-card,
-.score-player-card {
+.score-player-card,
+.campaign-stage-card {
   --cut: 10px;
 }
 
@@ -3376,6 +3761,101 @@ h5,
     gap: 12px;
   }
 
+  /* Campaign: the ladder becomes a scroll-snapped strip above the briefing. */
+  .campaign-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .campaign-dialog .dialog-scroll-region {
+    max-height: calc(100dvh - 104px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  .campaign-ladder {
+    grid-auto-columns: minmax(136px, 44%);
+    grid-auto-flow: column;
+    gap: 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .campaign-ladder li {
+    scroll-snap-align: start;
+  }
+
+  .campaign-ladder li:not(:last-child)::after {
+    top: 50%;
+    left: 100%;
+    width: 10px;
+    height: 1px;
+  }
+
+  .campaign-stage-card {
+    grid-template-areas:
+      "number mark"
+      "portrait name";
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 8px;
+    height: 100%;
+    padding: 8px;
+  }
+
+  .campaign-stage-number {
+    grid-area: number;
+  }
+
+  .campaign-stage-portrait {
+    grid-area: portrait;
+    width: 30px;
+    height: 30px;
+  }
+
+  .campaign-stage-name {
+    grid-area: name;
+  }
+
+  .campaign-stage-card .campaign-stars,
+  .campaign-stage-mark {
+    grid-area: mark;
+    justify-self: end;
+  }
+
+  .campaign-stage-name strong {
+    font-size: 11px;
+  }
+
+  .campaign-stage-name small {
+    font-size: 10px;
+  }
+
+  .campaign-briefing {
+    border-left: 0;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    padding-left: 0;
+    padding-top: 12px;
+  }
+
+  .campaign-briefing-portrait,
+  .campaign-result-portrait {
+    width: 56px;
+    height: 56px;
+  }
+
+  .campaign-briefing-head h4 {
+    font-size: 20px;
+  }
+
+  /* Keep Start reachable without scrolling the briefing. */
+  .campaign-start {
+    position: sticky;
+    bottom: 0;
+    align-self: stretch;
+    background: linear-gradient(rgba(34, 211, 238, 0.14), rgba(34, 211, 238, 0.14)), var(--panel-strong);
+    box-shadow: 0 -10px 16px var(--panel-strong);
+  }
+
   .profile-dialog-content {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -3636,6 +4116,16 @@ h5,
 
   .trait-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Short stage facts stay two-up so the briefing fits above the fold. */
+  .trait-grid.campaign-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Four modes don't fit the phone pill; Friend moves to the game menu. */
+  :where(.command-row) .command-button-friend {
+    display: none;
   }
 
   .control-strip {

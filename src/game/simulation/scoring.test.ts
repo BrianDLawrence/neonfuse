@@ -52,4 +52,12 @@ describe("calculateRoundScore", () => {
 
     expect(score).toBe(4690);
   });
+
+  it("scores campaign rounds like a local match", () => {
+    const round = { winner: "player" as const, durationMs: 45_000, blocksCleared: 9 };
+
+    expect(calculateRoundScore({ mode: "campaign", ...round })).toBe(
+      calculateRoundScore({ mode: "player-vs-bot", ...round })
+    );
+  });
 });

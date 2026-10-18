@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import type { AudioDirector, AudioEventName, MusicIntensity } from "@/audio";
 import type { GameEvents, TouchControlsLayoutState, TouchInputState } from "../createGame";
-import { DEFAULT_GAME_MODE, type GameMode } from "../modes";
+import { DEFAULT_GAME_MODE, hasHumanPlayer, type GameMode } from "../modes";
 import {
   BombView,
   DangerOverlay,
@@ -32,6 +32,7 @@ import {
   type BotPowerupTarget,
   type BotProfile
 } from "../simulation/bots";
+import { getCampaignStage, getStageOpponents, type CampaignStage } from "../simulation/campaign";
 import { getDangerTiles, type BombThreat } from "../simulation/danger";
 import {
   applyPowerup,
@@ -102,6 +103,7 @@ export class ArenaScene extends Phaser.Scene {
   private dangerOverlay?: DangerOverlay;
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
   private currentMode: GameMode = DEFAULT_GAME_MODE;
+  private currentStage: CampaignStage | null = null;
   private roundOver = false;
   private roundActive = false;
   private matchStartedAt = 0;
@@ -159,7 +161,7 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    if (this.roundOver || !this.roundActive || this.currentMode !== "player-vs-bot") {
+    if (this.roundOver || !this.roundActive || !hasHumanPlayer(this.currentMode)) {
       return;
     }
 
@@ -186,9 +188,17 @@ export class ArenaScene extends Phaser.Scene {
     this.startMode(mode);
   }
 
-  private startMode(mode: GameMode) {
+  private startMode(requestedMode: GameMode) {
+    // A campaign round needs a known stage; without one it plays as a local match.
+    const stage =
+      requestedMode === "campaign"
+        ? getCampaignStage(this.shellEvents?.getCampaignStage?.() ?? null)
+        : null;
+    const mode = requestedMode === "campaign" && !stage ? "player-vs-bot" : requestedMode;
+
     this.setMusicIntensity("calm");
     this.currentMode = mode;
+    this.currentStage = stage;
     this.clearRoundObjects();
     this.arena = createInitialArena();
     this.roundOver = false;
@@ -203,7 +213,11 @@ export class ArenaScene extends Phaser.Scene {
     const botAProfile = BOT_PROFILES[botSelection["bot-a"]];
     const botBProfile = BOT_PROFILES[botSelection["bot-b"]];
 
-    if (mode === "player-vs-bot") {
+    if (stage) {
+      // Act 1 stages are 1v1 on the standard board; the stage picks the opponent.
+      this.spawnActor("player", { x: 1, y: 1 });
+      this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, getStageOpponents(stage)[0]);
+    } else if (mode === "player-vs-bot") {
       this.spawnActor("player", { x: 1, y: 1 });
       this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, botAProfile);
     } else {
@@ -516,7 +530,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.emitBotHud();
 
-    if (this.currentMode === "player-vs-bot") {
+    if (hasHumanPlayer(this.currentMode)) {
       const playerHit = hitActors.some((actor) => actor.id === "player");
       const botHit = hitActors.some((actor) => actor.kind === "bot");
 
@@ -549,7 +563,7 @@ export class ArenaScene extends Phaser.Scene {
     this.roundActive = false;
     this.botMoveEvent?.remove(false);
 
-    if (this.currentMode === "player-vs-bot") {
+    if (hasHumanPlayer(this.currentMode)) {
       if (winner === "player") {
         this.wins += 1;
         this.shellEvents?.onRoundStatusChange?.("Win");
@@ -580,7 +594,8 @@ export class ArenaScene extends Phaser.Scene {
       mode: this.currentMode,
       winner,
       durationMs: Math.round(this.time.now - this.matchStartedAt),
-      blocksCleared: this.blocksCleared
+      blocksCleared: this.blocksCleared,
+      ...(this.currentStage ? { stageId: this.currentStage.id } : {})
     });
   }
 
@@ -878,7 +893,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private findOpponentFor(actor: CombatActor) {
-    if (this.currentMode === "player-vs-bot") {
+    if (hasHumanPlayer(this.currentMode)) {
       return actor.kind === "bot" ? this.actors.get("player") : this.getLiveBots()[0];
     }
 

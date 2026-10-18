@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { isStageUnlocked } from "@/game/simulation/campaign";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { fetchHighScores, wouldQualifyForLeaderboard } from "@/lib/leaderboard";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
+import { loadCampaignProgress } from "@/lib/player-career";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { matchResultSchema } from "@/lib/schemas/match";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
     winner: payload.winner,
     durationMs: payload.durationMs,
     blocksCleared: payload.blocksCleared,
+    ...(payload.stageId ? { stageId: payload.stageId } : {}),
     score,
     createdAt: new Date()
   };
@@ -75,6 +78,17 @@ export async function POST(request: Request) {
   }
 
   await ensureGameIndexes(db);
+
+  // Re-derive progress from stored rounds; a result for a stage the player has
+  // not reached yet is rejected before anything is written.
+  if (payload.mode === "campaign" && payload.stageId) {
+    const progress = await loadCampaignProgress(db, player);
+
+    if (!isStageUnlocked(progress, payload.stageId)) {
+      return NextResponse.json({ ok: false, error: "Stage is not unlocked" }, { status: 403 });
+    }
+  }
+
   const result = await db.collection("matches").insertOne(match);
   await db.collection("visitors").updateOne(
     { visitorId: payload.visitorId },

@@ -4,6 +4,8 @@ Neon Fuse is a browser-based 2D bomber game.
 
 See the [interactive capability map](capability-map.html) for a code-reviewed view of implemented functionality, planned systems, and current hardening priorities.
 
+See [SINGLE_PLAYER.md](SINGLE_PLAYER.md) for the planned Campaign and Versus modes.
+
 - Next.js owns app routing, API routes, deployment, and server-only integrations.
 - React owns HUD, menus, match setup, result screens, and settings.
 - Phaser owns the active game canvas, rendering, animation, input plumbing, camera, and effects.

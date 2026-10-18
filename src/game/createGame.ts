@@ -6,6 +6,7 @@ import { PreloadScene } from "./scenes/PreloadScene";
 import { DEFAULT_GAME_MODE, type GameMode } from "./modes";
 import type { Direction } from "./simulation/arena";
 import type { BotId, BotSelection } from "./simulation/bots";
+import type { CampaignStageId } from "./simulation/campaign";
 import type { PowerupDropRates } from "./simulation/powerups";
 import type { ScoreWinner } from "./simulation/scoring";
 
@@ -31,6 +32,8 @@ export type RoundCompletePayload = {
   winner: ScoreWinner;
   durationMs: number;
   blocksCleared: number;
+  /** Present when mode === "campaign". */
+  stageId?: CampaignStageId;
 };
 
 export type GameEvents = {
@@ -41,6 +44,8 @@ export type GameEvents = {
   onRoundComplete?: (payload: RoundCompletePayload) => void;
   getPowerupDropRates?: () => PowerupDropRates;
   getBotSelection?: () => BotSelection;
+  /** Read when a round starts; Phaser resolves the stage from the pure campaign table. */
+  getCampaignStage?: () => CampaignStageId | null;
 };
 
 type CreateGameOptions = {
