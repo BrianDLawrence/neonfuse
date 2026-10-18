@@ -76,6 +76,54 @@ test.describe("game shell", () => {
     await expect(stageChip).toContainText("Fuse Rush");
   });
 
+  test("Act 2 stays locked until Act 1 is cleared", async ({ page }) => {
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Campaign" }).click();
+    const campaign = page.getByRole("dialog", { name: "Campaign" });
+    const acts = campaign.getByRole("group", { name: "Acts" });
+
+    await expect(acts.getByRole("button", { name: /Act 2/ })).toHaveAttribute("data-locked", "true");
+    await acts.getByRole("button", { name: /Act 2/ }).click();
+
+    await expect(campaign.getByRole("list", { name: "Act 2 stages" })).toBeVisible();
+    await expect(campaign.getByText(/Clear Act 1 \(finish stage 1-4\)/)).toBeVisible();
+    await expect(campaign.getByRole("button", { name: "Start stage" })).toBeDisabled();
+  });
+
+  test("the Act 2 gauntlet puts two bots on the board", async ({ page }) => {
+    await page.addInitScript(() => {
+      const cleared = { stars: 1, bestTimeMs: 90_000 };
+      window.localStorage.setItem(
+        "neon-fuse:campaign-progress",
+        JSON.stringify({
+          stages: {
+            "1-1": cleared,
+            "1-2": cleared,
+            "1-3": cleared,
+            "1-4": cleared,
+            "2-1": cleared,
+            "2-2": cleared,
+            "2-3": cleared,
+            "2-4": cleared
+          }
+        })
+      );
+    });
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Campaign" }).click();
+    const campaign = page.getByRole("dialog", { name: "Campaign" });
+    const gauntlet = campaign.getByRole("list", { name: "Act 2 stages" }).getByRole("button", { name: /2-5/ });
+
+    await expect(gauntlet).toHaveAttribute("data-state", "next");
+    await expect(campaign.locator(".trait-pill", { hasText: "Format" })).toContainText("1v2");
+    await campaign.getByRole("button", { name: "Start stage" }).click();
+
+    await expect(page.locator(".hud-chip-stage")).toContainText("Gauntlet");
+    await expect(page.locator(".hud-chip-bots")).toContainText("2/2");
+  });
+
   test("the game menu opens with Escape-to-close and returns focus", async ({ page }) => {
     await openShell(page);
 

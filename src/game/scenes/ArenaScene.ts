@@ -15,7 +15,9 @@ import {
   ARENA_COLS,
   ARENA_ROWS,
   CELL_SIZE,
+  createArena,
   createInitialArena,
+  getSpawnPoints,
   type Direction,
   directionToDelta,
   type GridPoint,
@@ -32,18 +34,25 @@ import {
   type BotPowerupTarget,
   type BotProfile
 } from "../simulation/bots";
-import { getCampaignStage, getStageOpponents, type CampaignStage } from "../simulation/campaign";
+import {
+  DEFAULT_BOT_FUSE_MS,
+  getCampaignStage,
+  resolveStageBot,
+  resolveStageModifiers,
+  type CampaignStage
+} from "../simulation/campaign";
 import { getDangerTiles, type BombThreat } from "../simulation/danger";
 import {
   applyPowerup,
   choosePowerupDrop,
   createInitialLoadout,
   type ActorLoadout,
+  type PowerupDropRates,
   type PowerupType
 } from "../simulation/powerups";
+import { resolveRoundWinner } from "../simulation/round";
 
 const PLAYER_FUSE_MS = 1400;
-const BOT_FUSE_MS = 1800;
 const BOT_AI_TICK_MS = 120;
 const BASE_BOT_MOVE_MS = 560;
 const BOT_MOVE_JITTER_MS = 90;
@@ -104,6 +113,10 @@ export class ArenaScene extends Phaser.Scene {
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
   private currentMode: GameMode = DEFAULT_GAME_MODE;
   private currentStage: CampaignStage | null = null;
+  // Campaign stage modifiers; the defaults reproduce local and skirmish rounds.
+  private botFuseMs = DEFAULT_BOT_FUSE_MS;
+  private botMoveScale = 1;
+  private stageDropRates: PowerupDropRates | null = null;
   private roundOver = false;
   private roundActive = false;
   private matchStartedAt = 0;
@@ -200,7 +213,12 @@ export class ArenaScene extends Phaser.Scene {
     this.currentMode = mode;
     this.currentStage = stage;
     this.clearRoundObjects();
-    this.arena = createInitialArena();
+    this.arena = stage ? createArena(stage.arena) : createInitialArena();
+
+    const modifiers = stage ? resolveStageModifiers(stage) : null;
+    this.botFuseMs = modifiers?.botFuseMs ?? DEFAULT_BOT_FUSE_MS;
+    this.botMoveScale = modifiers?.botMoveScale ?? 1;
+    this.stageDropRates = modifiers?.powerupDropRates ?? null;
     this.roundOver = false;
     this.roundActive = false;
     this.blocksCleared = 0;
@@ -213,16 +231,21 @@ export class ArenaScene extends Phaser.Scene {
     const botAProfile = BOT_PROFILES[botSelection["bot-a"]];
     const botBProfile = BOT_PROFILES[botSelection["bot-b"]];
 
+    const spawns = getSpawnPoints(this.arena);
+
     if (stage) {
-      // Act 1 stages are 1v1 on the standard board; the stage picks the opponent.
-      this.spawnActor("player", { x: 1, y: 1 });
-      this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, getStageOpponents(stage)[0]);
+      // The stage picks the opponents (two for a gauntlet) and their tuning.
+      this.spawnActor("player", spawns[0]);
+      stage.bots.forEach((spec, index) => {
+        const { profile, loadout } = resolveStageBot(spec);
+        this.spawnActor(index === 0 ? "bot-a" : "bot-b", spawns[index + 1], profile, loadout);
+      });
     } else if (mode === "player-vs-bot") {
-      this.spawnActor("player", { x: 1, y: 1 });
-      this.spawnActor("bot-a", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, botAProfile);
+      this.spawnActor("player", spawns[0]);
+      this.spawnActor("bot-a", spawns[1], botAProfile);
     } else {
-      this.spawnActor("bot-a", { x: 1, y: 1 }, botAProfile);
-      this.spawnActor("bot-b", { x: ARENA_COLS - 2, y: ARENA_ROWS - 2 }, botBProfile);
+      this.spawnActor("bot-a", spawns[0], botAProfile);
+      this.spawnActor("bot-b", spawns[1], botBProfile);
     }
 
     this.emitLoadout();
@@ -458,7 +481,7 @@ export class ArenaScene extends Phaser.Scene {
     blocks.forEach((blockTile) => {
       const powerup = choosePowerupDrop(
         blockTile,
-        this.shellEvents?.getPowerupDropRates?.()
+        this.stageDropRates ?? this.shellEvents?.getPowerupDropRates?.()
       );
 
       if (!powerup) {
@@ -530,27 +553,12 @@ export class ArenaScene extends Phaser.Scene {
 
     this.emitBotHud();
 
-    if (hasHumanPlayer(this.currentMode)) {
-      const playerHit = hitActors.some((actor) => actor.id === "player");
-      const botHit = hitActors.some((actor) => actor.kind === "bot");
+    const outcome = resolveRoundWinner(
+      Array.from(this.actors.values()).map((actor) => ({ id: actor.id, alive: actor.alive }))
+    );
 
-      if (playerHit && botHit) {
-        this.completeRound("draw");
-      } else if (botHit) {
-        this.completeRound("player");
-      } else if (playerHit) {
-        this.completeRound("bot");
-      }
-
-      return;
-    }
-
-    const liveBots = this.getLiveBots();
-
-    if (liveBots.length === 0) {
-      this.completeRound("draw");
-    } else if (liveBots.length === 1) {
-      this.completeRound(liveBots[0].id);
+    if (outcome) {
+      this.completeRound(outcome);
     }
   }
 
@@ -599,7 +607,12 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
-  private spawnActor(id: ActorId, tile: GridPoint, profile?: BotProfile) {
+  private spawnActor(
+    id: ActorId,
+    tile: GridPoint,
+    profile?: BotProfile,
+    loadout: ActorLoadout = createInitialLoadout()
+  ) {
     const world = this.tileToWorld(tile);
     const kind = id === "player" ? "player" : "bot";
     const character = kind === "player" ? "spark" : profile?.id ?? DEFAULT_BOT_SELECTION["bot-a"];
@@ -614,7 +627,7 @@ export class ArenaScene extends Phaser.Scene {
       tile,
       view,
       alive: true,
-      loadout: createInitialLoadout(),
+      loadout,
       profile,
       nextMoveAt: this.time.now + 280,
       turn: 0
@@ -670,7 +683,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     if (intent.type === "plant-bomb") {
-      this.plantBombAt(bot.id, { ...bot.tile }, bot.loadout.blast, BOT_FUSE_MS);
+      this.plantBombAt(bot.id, { ...bot.tile }, bot.loadout.blast, this.botFuseMs);
       this.shellEvents?.onRoundStatusChange?.("Danger");
 
       if (intent.moveTo && this.canActorMoveTo(bot, intent.moveTo)) {
@@ -857,7 +870,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private getBotMoveDelay(bot: CombatActor) {
-    return Math.max(260, BASE_BOT_MOVE_MS - bot.loadout.speed * 70);
+    return Math.round(Math.max(260, BASE_BOT_MOVE_MS - bot.loadout.speed * 70) * this.botMoveScale);
   }
 
   private getBotNextMoveDelay(bot: CombatActor) {

@@ -1,7 +1,10 @@
 # Single-Player Modes — Design
 
-Status: **Phase 1 (Campaign foundation, Act 1) implemented**; Phases 2–4 are
-still design. Phase 1 notes: on phones (≤760px) Friend moved from the mode pill
+Status: **Phases 1 (Act 1) and 2 (Act 2: Overclock) implemented**; Phases 3–4
+are still design. Phase 2 notes: `createArena` already accepts any odd size, but
+ArenaScene still renders the fixed 13×11 board, so a test pins every stage to
+13×11 until Phase 3. Bots don't model fuse timing (they flee any bomb), so stage
+data keeps `botFuseMs` at 1500 or more even though the bound allows 1200. Phase 1 notes: on phones (≤760px) Friend moved from the mode pill
 into the game menu, since four segments did not fit; locked stages stay
 selectable (to read how they unlock) and disable Start rather than using
 `aria-disabled` on the card.

@@ -897,10 +897,20 @@ export function GameShell({
                   <strong>{speed}</strong>
                 </div>
                 {campaignStage ? (
-                  <div className="hud-chip hud-chip-stage">
-                    <span>Stage {campaignStage.id}</span>
-                    <strong>{opponentProfile.name}</strong>
-                  </div>
+                  <>
+                    <div className="hud-chip hud-chip-stage">
+                      <span>Stage {campaignStage.id}</span>
+                      <strong>{campaignStage.bots.length > 1 ? campaignStage.title : opponentProfile.name}</strong>
+                    </div>
+                    {campaignStage.bots.length > 1 ? (
+                      <div className="hud-chip hud-chip-bots">
+                        <span>Bots</span>
+                        <strong>
+                          {botHud.filter((bot) => bot.alive).length}/{botHud.length}
+                        </strong>
+                      </div>
+                    ) : null}
+                  </>
                 ) : (
                   <div className="hud-chip hud-chip-record">
                     <span>Record</span>
