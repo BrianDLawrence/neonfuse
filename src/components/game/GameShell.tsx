@@ -9,6 +9,7 @@ import {
   type CampaignRoundResult
 } from "./CampaignScreen";
 import { DuelGame } from "./DuelGame";
+import { VersusScreen } from "./VersusScreen";
 import { FusebotPortrait } from "./FusebotPortrait";
 import { RoundBanner } from "./RoundBanner";
 import { ShellMenu } from "./ShellMenu";
@@ -35,6 +36,7 @@ import {
   type CampaignProgress,
   type CampaignStageId
 } from "@/game/simulation/campaign";
+import { selectVersusOpponent } from "@/game/simulation/versus";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { fetchWithActivityRenewal, type ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
@@ -211,6 +213,9 @@ export function GameShell({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPartyOpen, setIsPartyOpen] = useState(false);
   const [isCampaignOpen, setIsCampaignOpen] = useState(false);
+  const [isVersusOpen, setIsVersusOpen] = useState(false);
+  // Session-only: the stored preference stays the plain slot A bot.
+  const [versusOverclocked, setVersusOverclocked] = useState(false);
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress>(EMPTY_CAMPAIGN_PROGRESS);
   const [campaignResult, setCampaignResult] = useState<CampaignRoundResult | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
@@ -285,6 +290,7 @@ export function GameShell({
       !isProfileOpen &&
       !isPartyOpen &&
       !isCampaignOpen &&
+      !isVersusOpen &&
       !campaignResult
     ) {
       return undefined;
@@ -293,6 +299,7 @@ export function GameShell({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsCampaignOpen(false);
+        setIsVersusOpen(false);
         setCampaignResult(null);
         setIsAdminOpen(false);
         setIsBotLabOpen(false);
@@ -313,7 +320,8 @@ export function GameShell({
     isHighScoresOpen,
     isMusicOpen,
     isPartyOpen,
-    isProfileOpen
+    isProfileOpen,
+    isVersusOpen
   ]);
 
   useEffect(() => {
@@ -601,6 +609,7 @@ export function GameShell({
       resultsTimerRef.current = null;
     }
     setIsCampaignOpen(false);
+    setIsVersusOpen(false);
     setCampaignResult(null);
     setModeCommand((currentCommand) => ({
       mode,
@@ -612,6 +621,21 @@ export function GameShell({
   const handleCampaignStageStart = useCallback(
     (stageId: CampaignStageId) => handleModeStart("campaign", stageId),
     [handleModeStart]
+  );
+  const handleVersusFight = useCallback(
+    (profileId: BotProfileId, overclocked: boolean) => {
+      const nextSelection = selectVersusOpponent(botSelection, profileId);
+
+      if (nextSelection !== botSelection) {
+        setBotSelection(nextSelection);
+        setSelectedBotInfo(profileId);
+        void persistProfilePreferences({ botSelection: nextSelection });
+      }
+
+      setVersusOverclocked(overclocked);
+      handleModeStart("player-vs-bot");
+    },
+    [botSelection, handleModeStart, persistProfilePreferences]
   );
   const handleOpenCampaignMap = useCallback(() => {
     setCampaignResult(null);
@@ -840,6 +864,7 @@ export function GameShell({
       <section className="game-stage" aria-label="Neon Fuse arena">
         <PhaserGame
           botSelection={botSelection}
+          versusOverclocked={versusOverclocked}
           modeCommand={modeCommand}
           powerupDropRates={powerupDropRates}
           touchControlsEnabled={touchControlsEnabled}
@@ -939,13 +964,14 @@ export function GameShell({
               <span className="label-compact">Campaign</span>
             </button>
             <button
+              aria-haspopup="dialog"
               aria-pressed={modeCommand.mode === "player-vs-bot"}
               className="command-button secondary"
-              onClick={() => handleModeStart("player-vs-bot")}
+              onClick={() => setIsVersusOpen(true)}
               type="button"
             >
-              <span className="label-full">Local Match</span>
-              <span className="label-compact">Local</span>
+              <span className="label-full">Versus</span>
+              <span className="label-compact">Versus</span>
             </button>
             <button
               aria-pressed={modeCommand.mode === "bot-skirmish"}
@@ -1030,6 +1056,16 @@ export function GameShell({
           <CampaignScreen
             onClose={() => setIsCampaignOpen(false)}
             onStart={handleCampaignStageStart}
+            progress={campaignProgress}
+          />
+        ) : null}
+
+        {isVersusOpen ? (
+          <VersusScreen
+            initialOpponent={botSelection["bot-a"]}
+            initialOverclocked={versusOverclocked}
+            onClose={() => setIsVersusOpen(false)}
+            onFight={handleVersusFight}
             progress={campaignProgress}
           />
         ) : null}
@@ -1298,7 +1334,7 @@ export function GameShell({
               ? `Clear stage ${campaignStage.id}, par ${formatClock(campaignStage.parTimeMs)}`
               : modeCommand.mode === "bot-skirmish"
                 ? "Last bot standing"
-                : `Blast ${opponentProfile.name}`}
+                : `Blast ${opponentProfile.name}${versusOverclocked ? " (Overclocked)" : ""}`}
           </span>
           <span className="key-chip">Pulsing tiles: about to blow</span>
         </div>

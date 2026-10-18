@@ -23,7 +23,7 @@ test.describe("game shell", () => {
     test.slow();
     await openShell(page);
 
-    await expect(page.getByRole("button", { name: /Local/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Versus" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("status").filter({ hasText: "Get ready" })).toBeVisible();
     await expect(statusChip(page)).toHaveText("Live", { timeout: 60_000 });
 
@@ -35,6 +35,51 @@ test.describe("game shell", () => {
 
     // Planting lights the fuse, which the arena reports as the round status.
     await expect(statusChip(page)).toHaveText("Fuse");
+  });
+
+  test("Versus opens an opponent picker and starts a fight with the chosen bot", async ({ page }) => {
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Versus" }).click();
+    const versus = page.getByRole("dialog", { name: "Versus" });
+    await expect(versus).toBeVisible();
+
+    const roster = versus.getByRole("group", { name: "Opponents" });
+    await expect(roster.getByRole("button")).toHaveCount(4);
+    await roster.getByRole("button", { name: /Volt Warden/ }).click();
+    await expect(versus.getByRole("button", { name: /Overclocked/ })).toBeDisabled();
+    await expect(versus.getByText("Clear campaign stage 2-3 to unlock.")).toBeVisible();
+
+    await versus.getByRole("button", { name: "Fight Volt Warden" }).click();
+
+    await expect(versus).toBeHidden();
+    await expect(page.getByRole("button", { name: "Versus" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".key-chip", { hasText: "Goal" })).toContainText("Blast Volt Warden");
+  });
+
+  test("clearing a bot's Act 2 stage unlocks its Overclocked variant in Versus", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "neon-fuse:campaign-progress",
+        JSON.stringify({ stages: { "2-3": { stars: 1, bestTimeMs: 90_000 } } })
+      );
+    });
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Versus" }).click();
+    const versus = page.getByRole("dialog", { name: "Versus" });
+    const roster = versus.getByRole("group", { name: "Opponents" });
+
+    await expect(roster.getByRole("button", { name: /Volt Warden/ })).toContainText("Overclock ready");
+    await expect(roster.getByRole("button", { name: /Fuse Rush/ })).not.toContainText("Overclock ready");
+
+    await roster.getByRole("button", { name: /Volt Warden/ }).click();
+    const overclock = versus.getByRole("button", { name: /Overclocked/ });
+    await overclock.click();
+    await expect(overclock).toHaveAttribute("aria-pressed", "true");
+    await versus.getByRole("button", { name: "Fight Volt Warden" }).click();
+
+    await expect(page.locator(".key-chip", { hasText: "Goal" })).toContainText("Blast Volt Warden (Overclocked)");
   });
 
   test("Bot Skirmish swaps the player loadout for bot readouts", async ({ page }) => {

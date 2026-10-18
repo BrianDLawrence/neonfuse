@@ -332,14 +332,19 @@ export function resolveStageBot(spec: StageBotSpec): { profile: BotProfile; load
   return { profile: { ...base, traits }, loadout };
 }
 
-/** The stage's rule modifiers with defaults filled in and every value clamped to its bounds. */
-export function resolveStageModifiers(stage: CampaignStage): {
+export type ResolvedModifiers = {
   botFuseMs: number;
   botMoveScale: number;
   powerupDropRates: PowerupDropRates | null;
-} {
-  const { botFuseMs, botMoveScale, powerupDropRates } = stage.modifiers;
+};
 
+/** The stage's rule modifiers with defaults filled in and every value clamped to its bounds. */
+export function resolveStageModifiers(stage: CampaignStage): ResolvedModifiers {
+  return clampModifiers(stage.modifiers);
+}
+
+/** Fills in defaults and clamps any modifier set (stage or Versus) to its bounds. */
+export function clampModifiers({ botFuseMs, botMoveScale, powerupDropRates }: StageModifiers): ResolvedModifiers {
   return {
     botFuseMs: Math.round(clamp(botFuseMs ?? DEFAULT_BOT_FUSE_MS, BOT_FUSE_BOUNDS.min, BOT_FUSE_BOUNDS.max)),
     botMoveScale: clamp(botMoveScale ?? 1, BOT_MOVE_SCALE_BOUNDS.min, BOT_MOVE_SCALE_BOUNDS.max),

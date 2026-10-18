@@ -58,6 +58,8 @@ h5,
 .bot-roster-button strong,
 .bot-slot-row,
 .campaign-act-tab strong,
+.versus-oc-badge,
+.versus-overclock strong,
 .campaign-briefing-stage,
 .campaign-goals-heading > span,
 .campaign-intel strong,
@@ -2579,6 +2581,10 @@ h5,
     animation: none;
   }
 
+  .versus-overclock-switch::after {
+    transition: none;
+  }
+
   .round-banner,
   .round-banner[data-kind] {
     animation-name: round-banner-fade;
@@ -3301,6 +3307,140 @@ h5,
   min-height: 44px;
 }
 
+/* Versus: the roster as large cards beside Bot Lab's detail panel. The one
+   loud element is the Overclocked switch, in --amber once armed. */
+.versus-roster {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.versus-card {
+  gap: 12px;
+  padding: 12px;
+}
+
+.bot-profile-icon.versus-card-portrait {
+  width: 56px;
+  height: 56px;
+}
+
+.versus-card[aria-pressed="true"] {
+  border-color: var(--line-strong);
+}
+
+.versus-card:focus-visible,
+.versus-overclock:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.versus-oc-badge {
+  display: inline-block;
+  margin-top: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 999px;
+  color: var(--amber);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 7px;
+  text-transform: uppercase;
+}
+
+.versus-detail .campaign-intel {
+  margin-top: 14px;
+}
+
+.versus-detail[data-overclocked="true"] .bot-detail-title p {
+  color: var(--amber);
+}
+
+.versus-overclock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.06);
+  color: var(--text);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.versus-overclock[aria-pressed="true"] {
+  border-color: var(--amber);
+  background: rgba(245, 158, 11, 0.14);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.18);
+}
+
+.versus-overclock:disabled {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: transparent;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.versus-overclock strong,
+.versus-overclock small {
+  display: block;
+}
+
+.versus-overclock strong {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.versus-overclock small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.versus-overclock-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 999px;
+  background: rgba(8, 10, 18, 0.8);
+}
+
+.versus-overclock-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 160ms ease-out;
+}
+
+.versus-overclock[aria-pressed="true"] .versus-overclock-switch::after {
+  background: var(--amber);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.7);
+  transform: translateX(16px);
+}
+
+.versus-overclock:disabled .versus-overclock-switch {
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.versus-fight {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+}
+
 /* Overdrive surfaces for the secondary screens (profile, party, tracks,
    high scores, sign-in). Cards get the HUD chip's chamfer: top-right and
    bottom-left corners cut by --cut. clip-path also cuts the 1px border, so the
@@ -3824,6 +3964,35 @@ h5,
   .bot-lab-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  /* Versus: a 2x2 roster above the detail panel; Fight stays reachable. */
+  .versus-roster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .bot-profile-icon.versus-card-portrait {
+    width: 40px;
+    height: 40px;
+  }
+
+  .versus-oc-badge {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+
+  .versus-detail .trait-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .versus-fight {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(rgba(34, 211, 238, 0.14), rgba(34, 211, 238, 0.14)), var(--panel-strong);
+    box-shadow: 0 -10px 16px var(--panel-strong);
   }
 
   /* Campaign: the ladder becomes a scroll-snapped strip above the briefing. */

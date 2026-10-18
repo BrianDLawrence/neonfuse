@@ -31,7 +31,7 @@ type HighScoresScreenProps = {
 
 const MODES: Array<{ value: HighScoreMode; label: string }> = [
   { value: "all", label: "All" },
-  { value: "player-vs-bot", label: "Local" },
+  { value: "player-vs-bot", label: "Versus" },
   { value: "bot-skirmish", label: "Bots" }
 ];
 
@@ -268,7 +268,7 @@ export function HighScoresScreen({
 
             {result ? (
               <div className="score-facts">
-                <span>{result.mode === "bot-skirmish" ? "Bot Skirmish" : "Local Match"}</span>
+                <span>{result.mode === "bot-skirmish" ? "Bot Skirmish" : result.mode === "campaign" ? "Campaign" : "Versus"}</span>
                 <span>Winner {describeWinner(result.winner)}</span>
                 <span>{result.blocksCleared} blocks</span>
                 <span>{formatDuration(result.durationMs)}</span>

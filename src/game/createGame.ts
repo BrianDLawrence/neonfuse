@@ -46,6 +46,8 @@ export type GameEvents = {
   getBotSelection?: () => BotSelection;
   /** Read when a round starts; Phaser resolves the stage from the pure campaign table. */
   getCampaignStage?: () => CampaignStageId | null;
+  /** Read when a Versus round starts: fight slot A's bot as its Overclocked variant. */
+  getVersusOverclock?: () => boolean;
 };
 
 type CreateGameOptions = {
