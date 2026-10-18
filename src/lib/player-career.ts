@@ -1,4 +1,10 @@
 import type { Db, Filter } from "mongodb";
+import {
+  deriveCampaignProgress,
+  getCampaignStage,
+  getStageOpponents,
+  type CampaignProgress
+} from "@/game/simulation/campaign";
 import type { PlayerIdentity } from "@/lib/player-identity";
 import {
   EMPTY_PROFILE_MATCH_STATS,
@@ -18,11 +24,15 @@ export type DuelCareerRecord = {
 
 type LocalMatchDocument = LocalCareerRecord & {
   accountId: string;
-  mode: "player-vs-bot";
+  mode: "player-vs-bot" | "campaign";
+  stageId?: string;
   durationMs: number;
   blocksCleared: number;
   createdAt: Date;
 };
+
+// Campaign rounds are local matches too, so they count toward stats and XP.
+const LOCAL_MODES = { $in: ["player-vs-bot", "campaign"] };
 
 type DuelResultDocument = DuelCareerRecord & {
   roundId: string;
@@ -91,7 +101,7 @@ export async function loadPlayerCareer(db: Db, player: PlayerIdentity): Promise<
     db
       .collection<LocalMatchDocument>("matches")
       .find(
-        { accountId: accountFilter(player), mode: "player-vs-bot" } as Filter<LocalMatchDocument>,
+        { accountId: accountFilter(player), mode: LOCAL_MODES } as Filter<LocalMatchDocument>,
         { projection: { winner: 1, score: 1 } }
       )
       .toArray(),
@@ -108,6 +118,35 @@ export async function loadPlayerCareer(db: Db, player: PlayerIdentity): Promise<
   return summarizePlayerCareer(localMatches, duels, player.id);
 }
 
+function localOpponentName(match: Pick<LocalMatchDocument, "mode" | "stageId">): string {
+  const stage = match.mode === "campaign" ? getCampaignStage(match.stageId) : null;
+  return stage ? `Stage ${stage.id}: ${getStageOpponents(stage)[0].name}` : "Arena Bot";
+}
+
+/**
+ * Derives campaign progress from the player's stored campaign wins rather than a
+ * stored counter, so retries and replays can never double count.
+ */
+export async function loadCampaignProgress(db: Db, player: PlayerIdentity): Promise<CampaignProgress> {
+  const wins = await db
+    .collection<LocalMatchDocument>("matches")
+    .find(
+      { accountId: accountFilter(player), mode: "campaign", winner: "player" } as Filter<LocalMatchDocument>,
+      { projection: { stageId: 1, winner: 1, durationMs: 1, blocksCleared: 1 } }
+    )
+    .sort({ createdAt: 1 })
+    .toArray();
+
+  return deriveCampaignProgress(
+    wins.map((match) => ({
+      stageId: String(match.stageId ?? ""),
+      winner: match.winner,
+      durationMs: Number(match.durationMs),
+      blocksCleared: Number(match.blocksCleared)
+    }))
+  );
+}
+
 export async function loadPlayerHistory(
   db: Db,
   player: PlayerIdentity,
@@ -121,7 +160,7 @@ export async function loadPlayerHistory(
       .find(
         {
           accountId: accountFilter(player),
-          mode: "player-vs-bot",
+          mode: LOCAL_MODES,
           ...(createdAt ? { createdAt } : {})
         } as Filter<LocalMatchDocument>
       )
@@ -160,7 +199,7 @@ export async function loadPlayerHistory(
       id: `local-${match._id.toString()}`,
       kind: "local",
       result: localResult(match.winner),
-      opponentName: "Arena Bot",
+      opponentName: localOpponentName(match),
       durationMs: match.durationMs,
       score: match.score,
       reason: null,

@@ -47,6 +47,35 @@ test.describe("game shell", () => {
     await expect(page.locator(".hud-chip", { hasText: "Bombs" })).toHaveCount(0);
   });
 
+  test("Campaign opens on stage 1-1, keeps 1-2 locked, and starts the stage", async ({ page }) => {
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Campaign" }).click();
+
+    const campaign = page.getByRole("dialog", { name: "Campaign" });
+    await expect(campaign).toBeVisible();
+
+    const ladder = campaign.getByRole("list", { name: "Act 1 stages" });
+    const firstStage = ladder.getByRole("button", { name: /1-1/ });
+    const secondStage = ladder.getByRole("button", { name: /1-2/ });
+    await expect(firstStage).toHaveAttribute("data-state", "next");
+    await expect(firstStage).toHaveAttribute("aria-pressed", "true");
+    await expect(secondStage).toHaveAttribute("data-state", "locked");
+
+    await secondStage.click();
+    await expect(campaign.getByText("Clear stage 1-1 to unlock this stage.")).toBeVisible();
+    await expect(campaign.getByRole("button", { name: "Start stage" })).toBeDisabled();
+
+    await firstStage.click();
+    await campaign.getByRole("button", { name: "Start stage" }).click();
+
+    await expect(campaign).toBeHidden();
+    await expect(page.getByRole("button", { name: "Campaign" })).toHaveAttribute("aria-pressed", "true");
+    const stageChip = page.locator(".hud-chip-stage");
+    await expect(stageChip).toContainText("Stage 1-1");
+    await expect(stageChip).toContainText("Fuse Rush");
+  });
+
   test("the game menu opens with Escape-to-close and returns focus", async ({ page }) => {
     await openShell(page);
 

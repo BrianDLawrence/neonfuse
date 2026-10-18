@@ -1,6 +1,10 @@
 # Single-Player Modes — Design
 
-Status: **design**, campaign first. Nothing here is implemented yet.
+Status: **Phase 1 (Campaign foundation, Act 1) implemented**; Phases 2–4 are
+still design. Phase 1 notes: on phones (≤760px) Friend moved from the mode pill
+into the game menu, since four segments did not fit; locked stages stay
+selectable (to read how they unlock) and disable Start rather than using
+`aria-disabled` on the card.
 
 Today single player is one mode, `player-vs-bot` ("Local Match"): one round on
 the fixed 13×11 board against whichever bot sits in Bot Lab slot A (Fuse Rush by

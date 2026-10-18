@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/mongoIndexes", () => ({ ensureGameIndexes: vi.fn() }));
 vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: vi.fn() }));
 vi.mock("@/lib/player-identity", () => ({ getAuthenticatedPlayer: vi.fn() }));
-vi.mock("@/lib/player-career", () => ({ loadPlayerCareer: vi.fn() }));
+vi.mock("@/lib/player-career", () => ({ loadPlayerCareer: vi.fn(), loadCampaignProgress: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 vi.mock("@/lib/player-profiles", () => ({
   getOrCreatePlayerProfile: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock("@/lib/player-profiles", () => ({
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
-import { loadPlayerCareer } from "@/lib/player-career";
+import { loadCampaignProgress, loadPlayerCareer } from "@/lib/player-career";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { GET, PATCH } from "./route";
@@ -43,6 +43,9 @@ beforeEach(() => {
     duel: { played: 0, wins: 0, losses: 0, draws: 0 },
     bestScore: 4500,
     bestWinStreak: 0
+  });
+  vi.mocked(loadCampaignProgress).mockResolvedValue({
+    stages: { "1-1": { stars: 2, bestTimeMs: 48_000 } }
   });
 });
 
@@ -83,6 +86,19 @@ describe("profile route", () => {
     expect(loadPlayerCareer).toHaveBeenCalledWith(db, player);
     expect(payload.profile.stats.bestScore).toBe(4500);
     expect(payload.profile.progression.unlockedTitles).toContain("arena-breaker");
+  });
+
+  it("returns campaign progress derived from stored campaign rounds", async () => {
+    vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
+      created: false,
+      profile: { playerId: player.id, stats: {}, progression: storedProgression } as never
+    });
+
+    const response = await GET(new Request("http://localhost/api/profile"));
+    const payload = await response.json();
+
+    expect(loadCampaignProgress).toHaveBeenCalledWith(db, player);
+    expect(payload.campaign.stages["1-1"]).toEqual({ stars: 2, bestTimeMs: 48_000 });
   });
 
   it("applies a valid preference patch to the authenticated player only", async () => {

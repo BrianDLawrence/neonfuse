@@ -11,7 +11,8 @@ export type ScoreInput = {
 
 const MODE_BONUS: Record<GameMode, number> = {
   "player-vs-bot": 1000,
-  "bot-skirmish": 700
+  "bot-skirmish": 700,
+  campaign: 1000
 };
 
 const WINNER_BONUS: Record<ScoreWinner, number> = {

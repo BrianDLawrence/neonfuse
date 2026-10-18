@@ -7,7 +7,7 @@ export type HighScoreEntry = {
   visitorId: string;
   playerName: string;
   score: number;
-  mode: "player-vs-bot" | "bot-skirmish";
+  mode: "player-vs-bot" | "bot-skirmish" | "campaign";
   winner: "player" | "bot" | "bot-a" | "bot-b" | "draw";
   durationMs: number;
   blocksCleared: number;

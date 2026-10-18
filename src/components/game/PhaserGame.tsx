@@ -12,6 +12,7 @@ import type {
 import type { GameMode } from "@/game/modes";
 import type { Direction } from "@/game/simulation/arena";
 import type { BotSelection } from "@/game/simulation/bots";
+import type { CampaignStageId } from "@/game/simulation/campaign";
 import type { PowerupDropRates } from "@/game/simulation/powerups";
 
 type Loadout = {
@@ -36,6 +37,7 @@ export type TouchControlsApi = {
 type PhaserGameProps = {
   modeCommand: {
     mode: GameMode;
+    stageId?: CampaignStageId;
     sequence: number;
   };
   botSelection: BotSelection;
@@ -64,6 +66,7 @@ export function PhaserGame({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const initialModeRef = useRef(modeCommand.mode);
+  const campaignStageRef = useRef<CampaignStageId | null>(modeCommand.stageId ?? null);
   const roundStatusChangeRef = useRef(onRoundStatusChange);
   const loadoutChangeRef = useRef(onLoadoutChange);
   const botHudChangeRef = useRef(onBotHudChange);
@@ -97,13 +100,16 @@ export function PhaserGame({
   ]);
 
   useEffect(() => {
+    // Set before the emit: ArenaScene pulls the stage when the new round starts.
+    campaignStageRef.current = modeCommand.stageId ?? null;
+
     if (!gameRef.current) {
       return;
     }
 
     gameRef.current.registry.set("gameMode", modeCommand.mode);
     gameRef.current.events.emit("mode-change", modeCommand.mode);
-  }, [modeCommand.mode, modeCommand.sequence]);
+  }, [modeCommand.mode, modeCommand.sequence, modeCommand.stageId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -126,7 +132,8 @@ export function PhaserGame({
           onMatchStatsChange: (stats) => matchStatsChangeRef.current?.(stats),
           onRoundComplete: (payload) => roundCompleteRef.current?.(payload),
           getPowerupDropRates: () => powerupDropRatesRef.current,
-          getBotSelection: () => botSelectionRef.current
+          getBotSelection: () => botSelectionRef.current,
+          getCampaignStage: () => campaignStageRef.current
         }
       });
       gameRef.current = game;

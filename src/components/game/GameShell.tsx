@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+import {
+  CampaignResultPanel,
+  CampaignScreen,
+  formatClock,
+  type CampaignRoundResult
+} from "./CampaignScreen";
 import { DuelGame } from "./DuelGame";
 import { FusebotPortrait } from "./FusebotPortrait";
 import { RoundBanner } from "./RoundBanner";
@@ -19,11 +25,24 @@ import type { PlayerTitleId } from "@/game/simulation/progression";
 import { BUILTIN_MUSIC_TRACKS } from "@/audio/musicTracks";
 import type { MusicTrack } from "@/audio/types";
 import type { BotHudState, RoundCompletePayload } from "@/game/createGame";
-import { DEFAULT_GAME_MODE, type GameMode } from "@/game/modes";
+import { DEFAULT_GAME_MODE, hasHumanPlayer, type GameMode } from "@/game/modes";
+import {
+  EMPTY_CAMPAIGN_PROGRESS,
+  applyStageResult,
+  getCampaignStage,
+  getStageOpponents,
+  sanitizeCampaignProgress,
+  type CampaignProgress,
+  type CampaignStageId
+} from "@/game/simulation/campaign";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { fetchWithActivityRenewal, type ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
-import { MUSIC_TRACK_STORAGE_KEY, VISITOR_STORAGE_KEY } from "@/lib/client-storage";
+import {
+  CAMPAIGN_PROGRESS_STORAGE_KEY,
+  MUSIC_TRACK_STORAGE_KEY,
+  VISITOR_STORAGE_KEY
+} from "@/lib/client-storage";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import {
   DEFAULT_PROFILE_PREFERENCES,
@@ -86,6 +105,24 @@ function readStoredMusicTrack(): MusicTrack | null {
     return stored ? (JSON.parse(stored) as MusicTrack) : null;
   } catch {
     return null;
+  }
+}
+
+function readStoredCampaignProgress(): CampaignProgress {
+  try {
+    const stored = window.localStorage.getItem(CAMPAIGN_PROGRESS_STORAGE_KEY);
+    return stored ? sanitizeCampaignProgress(JSON.parse(stored)) : EMPTY_CAMPAIGN_PROGRESS;
+  } catch {
+    return EMPTY_CAMPAIGN_PROGRESS;
+  }
+}
+
+// Mirror for offline and Mongo-less play; the server-derived value wins when it loads.
+function writeStoredCampaignProgress(progress: CampaignProgress) {
+  try {
+    window.localStorage.setItem(CAMPAIGN_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+  } catch {
+    // Progress still applies for this session when storage is unavailable.
   }
 }
 
@@ -156,7 +193,11 @@ export function GameShell({
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [botHud, setBotHud] = useState<BotHudState[]>([]);
-  const [modeCommand, setModeCommand] = useState<{ mode: GameMode; sequence: number }>({
+  const [modeCommand, setModeCommand] = useState<{
+    mode: GameMode;
+    stageId?: CampaignStageId;
+    sequence: number;
+  }>({
     mode: DEFAULT_GAME_MODE,
     sequence: 0
   });
@@ -169,6 +210,9 @@ export function GameShell({
   const [isHighScoresOpen, setIsHighScoresOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPartyOpen, setIsPartyOpen] = useState(false);
+  const [isCampaignOpen, setIsCampaignOpen] = useState(false);
+  const [campaignProgress, setCampaignProgress] = useState<CampaignProgress>(EMPTY_CAMPAIGN_PROGRESS);
+  const [campaignResult, setCampaignResult] = useState<CampaignRoundResult | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<RoundScoreResult | null>(null);
   const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
@@ -184,6 +228,7 @@ export function GameShell({
   const sfxVolumeRef = useRef(sfxVolume);
   const selectedTrackRef = useRef(selectedTrack);
   const visitorIdRef = useRef<string | null>(null);
+  const campaignProgressRef = useRef<CampaignProgress>(EMPTY_CAMPAIGN_PROGRESS);
   const profileSaveSequenceRef = useRef(0);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
   const touchControlsEnabled = useTouchControlsEnabled();
@@ -219,6 +264,10 @@ export function GameShell({
 
   // Local storage remains the immediate fallback while the signed-in profile loads.
   useEffect(() => {
+    const storedProgress = readStoredCampaignProgress();
+    campaignProgressRef.current = storedProgress;
+    setCampaignProgress(storedProgress);
+
     const stored = readStoredMusicTrack();
 
     if (stored) {
@@ -228,12 +277,23 @@ export function GameShell({
   }, []);
 
   useEffect(() => {
-    if (!isAdminOpen && !isBotLabOpen && !isHighScoresOpen && !isMusicOpen && !isProfileOpen && !isPartyOpen) {
+    if (
+      !isAdminOpen &&
+      !isBotLabOpen &&
+      !isHighScoresOpen &&
+      !isMusicOpen &&
+      !isProfileOpen &&
+      !isPartyOpen &&
+      !isCampaignOpen &&
+      !campaignResult
+    ) {
       return undefined;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        setIsCampaignOpen(false);
+        setCampaignResult(null);
         setIsAdminOpen(false);
         setIsBotLabOpen(false);
         setIsMusicOpen(false);
@@ -245,7 +305,16 @@ export function GameShell({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAdminOpen, isBotLabOpen, isHighScoresOpen, isMusicOpen, isPartyOpen, isProfileOpen]);
+  }, [
+    campaignResult,
+    isAdminOpen,
+    isBotLabOpen,
+    isCampaignOpen,
+    isHighScoresOpen,
+    isMusicOpen,
+    isPartyOpen,
+    isProfileOpen
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -259,6 +328,7 @@ export function GameShell({
           ok?: boolean;
           created?: boolean;
           profile?: PlayerProfile;
+          campaign?: unknown;
           error?: string;
         };
 
@@ -291,6 +361,13 @@ export function GameShell({
 
         setPlayerProfile(profile);
         setProfileSyncStatus("saved");
+
+        if (payload.campaign) {
+          const serverProgress = sanitizeCampaignProgress(payload.campaign);
+          campaignProgressRef.current = serverProgress;
+          setCampaignProgress(serverProgress);
+          writeStoredCampaignProgress(serverProgress);
+        }
         setMusicEnabled(profile.preferences.musicEnabled);
         setMusicVolume(profile.preferences.musicVolume);
         setSfxVolume(profile.preferences.sfxVolume);
@@ -518,16 +595,27 @@ export function GameShell({
     void persistProfilePreferences({ botSelection: nextSelection });
     setSelectedBotInfo(profileId);
   }, [botSelection, persistProfilePreferences]);
-  const handleModeStart = useCallback((mode: GameMode) => {
+  const handleModeStart = useCallback((mode: GameMode, stageId?: CampaignStageId) => {
     if (resultsTimerRef.current !== null) {
       window.clearTimeout(resultsTimerRef.current);
       resultsTimerRef.current = null;
     }
+    setIsCampaignOpen(false);
+    setCampaignResult(null);
     setModeCommand((currentCommand) => ({
       mode,
+      stageId: mode === "campaign" ? stageId : undefined,
       sequence: currentCommand.sequence + 1
     }));
     setRoundStatus("Warmup");
+  }, []);
+  const handleCampaignStageStart = useCallback(
+    (stageId: CampaignStageId) => handleModeStart("campaign", stageId),
+    [handleModeStart]
+  );
+  const handleOpenCampaignMap = useCallback(() => {
+    setCampaignResult(null);
+    setIsCampaignOpen(true);
   }, []);
   const handleRoundComplete = useCallback((payload: RoundCompletePayload) => {
     const nextVisitorId = visitorIdRef.current ?? readOrCreateVisitorId();
@@ -547,9 +635,29 @@ export function GameShell({
     if (resultsTimerRef.current !== null) {
       window.clearTimeout(resultsTimerRef.current);
     }
+
+    const { stageId } = payload;
+    let campaignRound: CampaignRoundResult | null = null;
+
+    if (payload.mode === "campaign" && stageId) {
+      const winner = payload.winner === "player" || payload.winner === "bot" ? payload.winner : "draw";
+      const progressBefore = campaignProgressRef.current;
+      const round = { winner, durationMs: payload.durationMs, blocksCleared: payload.blocksCleared } as const;
+      const progressAfter = applyStageResult(progressBefore, stageId, round);
+      campaignRound = { ...round, stageId, progressBefore };
+      campaignProgressRef.current = progressAfter;
+      setCampaignProgress(progressAfter);
+      writeStoredCampaignProgress(progressAfter);
+    }
+
     resultsTimerRef.current = window.setTimeout(() => {
       resultsTimerRef.current = null;
-      setIsHighScoresOpen(true);
+
+      if (campaignRound) {
+        setCampaignResult(campaignRound);
+      } else {
+        setIsHighScoresOpen(true);
+      }
     }, RESULTS_DIALOG_DELAY_MS);
 
     async function saveMatch() {
@@ -719,7 +827,11 @@ export function GameShell({
     botSelection
   };
   const profileDisplayName = playerProfile?.identity.displayName ?? accountName;
-  const opponentProfile = BOT_PROFILES[botSelection["bot-a"]];
+  const campaignStage = modeCommand.mode === "campaign" ? getCampaignStage(modeCommand.stageId) : null;
+  const opponentProfile = campaignStage
+    ? getStageOpponents(campaignStage)[0]
+    : BOT_PROFILES[botSelection["bot-a"]];
+  const playerOnBoard = hasHumanPlayer(modeCommand.mode);
 
   if (isDuelOpen) return <DuelGame activityAuth={activityAuth} onLeave={() => setIsDuelOpen(false)} />;
 
@@ -784,24 +896,41 @@ export function GameShell({
                   </span>
                   <strong>{speed}</strong>
                 </div>
-                <div className="hud-chip hud-chip-record">
-                  <span>Record</span>
-                  <strong>
-                    {wins}-{losses}
-                  </strong>
-                </div>
+                {campaignStage ? (
+                  <div className="hud-chip hud-chip-stage">
+                    <span>Stage {campaignStage.id}</span>
+                    <strong>{opponentProfile.name}</strong>
+                  </div>
+                ) : (
+                  <div className="hud-chip hud-chip-record">
+                    <span>Record</span>
+                    <strong>
+                      {wins}-{losses}
+                    </strong>
+                  </div>
+                )}
               </>
             )}
           </div>
         </div>
 
-        <RoundBanner opponent={opponentProfile} status={roundStatus} />
+        <RoundBanner opponent={opponentProfile} stageId={campaignStage?.id} status={roundStatus} />
 
         <aside className="match-actions" aria-label="Match actions">
           <div className="command-row" role="group" aria-label="Match mode">
             <button
-              aria-pressed={modeCommand.mode === "player-vs-bot"}
+              aria-haspopup="dialog"
+              aria-pressed={modeCommand.mode === "campaign"}
               className="command-button"
+              onClick={() => setIsCampaignOpen(true)}
+              type="button"
+            >
+              <span className="label-full">Campaign</span>
+              <span className="label-compact">Campaign</span>
+            </button>
+            <button
+              aria-pressed={modeCommand.mode === "player-vs-bot"}
+              className="command-button secondary"
               onClick={() => handleModeStart("player-vs-bot")}
               type="button"
             >
@@ -819,7 +948,7 @@ export function GameShell({
             </button>
             <button
               aria-pressed={false}
-              className="command-button secondary"
+              className="command-button secondary command-button-friend"
               onClick={() => setIsDuelOpen(true)}
               type="button"
             >
@@ -872,6 +1001,7 @@ export function GameShell({
             <ShellMenu
               items={[
                 { label: "Profile", onSelect: () => setIsProfileOpen(true) },
+                { label: "Play with a friend", onSelect: () => setIsDuelOpen(true) },
                 ...(connectionLabel && activityAuth && onInviteFriends
                   ? [{ label: "Discord party", onSelect: () => setIsPartyOpen(true) }]
                   : []),
@@ -885,6 +1015,23 @@ export function GameShell({
             />
           </nav>
         </aside>
+
+        {isCampaignOpen ? (
+          <CampaignScreen
+            onClose={() => setIsCampaignOpen(false)}
+            onStart={handleCampaignStageStart}
+            progress={campaignProgress}
+          />
+        ) : null}
+
+        {campaignResult ? (
+          <CampaignResultPanel
+            onClose={() => setCampaignResult(null)}
+            onOpenMap={handleOpenCampaignMap}
+            onPlayStage={handleCampaignStageStart}
+            result={campaignResult}
+          />
+        ) : null}
 
         {isProfileOpen ? (
           <ProfileScreen
@@ -1126,7 +1273,7 @@ export function GameShell({
         ) : null}
 
         <div className="control-strip">
-          {modeCommand.mode === "player-vs-bot" ? (
+          {playerOnBoard ? (
             <>
               <span className="key-chip">Arrow Keys / WASD: Move</span>
               <span className="key-chip">Space: Bomb</span>
@@ -1136,13 +1283,18 @@ export function GameShell({
           )}
           <span className="key-chip">R: Reset</span>
           <span className="key-chip">
-            Goal: {modeCommand.mode === "bot-skirmish" ? "Last bot standing" : `Blast ${opponentProfile.name}`}
+            Goal:{" "}
+            {campaignStage
+              ? `Clear stage ${campaignStage.id}, par ${formatClock(campaignStage.parTimeMs)}`
+              : modeCommand.mode === "bot-skirmish"
+                ? "Last bot standing"
+                : `Blast ${opponentProfile.name}`}
           </span>
           <span className="key-chip">Pulsing tiles: about to blow</span>
         </div>
 
         <aside className="touch-controls" aria-label="Touch controls">
-          {modeCommand.mode === "player-vs-bot" ? (
+          {playerOnBoard ? (
             <div className="touch-pad" role="group" aria-label="Move">
               {TOUCH_DIRECTIONS.map(({ dir, label, glyph }) => (
                 <button
@@ -1163,7 +1315,7 @@ export function GameShell({
           ) : null}
 
           <div className="touch-action-cluster">
-            {modeCommand.mode === "player-vs-bot" ? (
+            {playerOnBoard ? (
               <button
                 aria-label="Plant bomb"
                 className="touch-button touch-button-bomb"
