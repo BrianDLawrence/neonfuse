@@ -1,19 +1,37 @@
 import { describe, expect, it } from "vitest";
 import {
+  CAMPAIGN_ACTS,
   CAMPAIGN_STAGES,
   CAMPAIGN_STAGE_IDS,
+  DEFAULT_BOT_FUSE_MS,
   EMPTY_CAMPAIGN_PROGRESS,
   applyStageResult,
   deriveCampaignProgress,
+  getActStages,
   getCampaignStage,
   getNextStage,
+  isActUnlocked,
   isCampaignStageId,
   isStageUnlocked,
+  resolveStageBot,
+  resolveStageModifiers,
   sanitizeCampaignProgress,
   scoreStageResult,
-  type CampaignProgress
+  type CampaignProgress,
+  type CampaignStage,
+  type CampaignStageId
 } from "./campaign";
-import { BOT_PROFILES } from "./bots";
+import { createArena, getSpawnPoints, isValidArenaSize } from "./arena";
+import { BOT_PROFILES, chooseBotTurn } from "./bots";
+import { MAX_LOADOUT, createInitialLoadout } from "./powerups";
+
+function clearThrough(lastId: CampaignStageId): CampaignProgress {
+  const ids = CAMPAIGN_STAGE_IDS.slice(0, CAMPAIGN_STAGE_IDS.indexOf(lastId) + 1);
+  return ids.reduce<CampaignProgress>(
+    (current, id) => applyStageResult(current, id, { winner: "player", durationMs: 120_000, blocksCleared: 0 }),
+    EMPTY_CAMPAIGN_PROGRESS
+  );
+}
 
 const firstStage = CAMPAIGN_STAGES[0];
 const win = { winner: "player" as const, durationMs: 120_000, blocksCleared: 0 };
@@ -24,7 +42,7 @@ describe("campaign stage table", () => {
   });
 
   it("runs Act 1 against the four base bots in teaching order", () => {
-    expect(CAMPAIGN_STAGES.map((stage) => stage.bots.map((bot) => bot.profileId))).toEqual([
+    expect(getActStages(1).map((stage) => stage.bots.map((bot) => bot.profileId))).toEqual([
       ["fuse-rush"],
       ["circuit-shade"],
       ["volt-warden"],
@@ -32,8 +50,29 @@ describe("campaign stage table", () => {
     ]);
   });
 
-  it("only references known bots and knockout objectives", () => {
+  it("orders stages by act and gives every act at least one stage", () => {
+    const acts = CAMPAIGN_STAGES.map((stage) => stage.act);
+
+    expect(acts).toEqual([...acts].sort());
+    CAMPAIGN_ACTS.forEach((act) => expect(getActStages(act.id).length).toBeGreaterThan(0));
+  });
+
+  it("ends Act 2 with a two-bot gauntlet and keeps every other stage 1v1", () => {
+    const gauntlets = CAMPAIGN_STAGES.filter((stage) => stage.bots.length > 1).map((stage) => stage.id);
+
+    expect(gauntlets).toEqual(["2-5"]);
+    expect(getCampaignStage("2-5")?.bots.map((bot) => bot.profileId)).toEqual(["fuse-rush", "circuit-shade"]);
+  });
+
+  it("only references known bots, valid boards, in-bound modifiers and knockout objectives", () => {
     for (const stage of CAMPAIGN_STAGES) {
+      const modifiers = resolveStageModifiers(stage);
+
+      expect(isValidArenaSize(stage.arena.cols, stage.arena.rows)).toBe(true);
+      expect(stage.bots.length).toBeGreaterThanOrEqual(1);
+      expect(stage.bots.length).toBeLessThanOrEqual(2);
+      expect(modifiers.botFuseMs).toBe(stage.modifiers.botFuseMs ?? DEFAULT_BOT_FUSE_MS);
+      expect(modifiers.botMoveScale).toBe(stage.modifiers.botMoveScale ?? 1);
       expect(stage.objective).toBe("knockout");
       expect(stage.roundsToWin).toBeGreaterThanOrEqual(1);
       expect(stage.parTimeMs).toBeGreaterThan(0);
@@ -62,6 +101,13 @@ describe("stage unlocks", () => {
     expect(isStageUnlocked(progress, "1-2")).toBe(true);
     expect(isStageUnlocked(progress, "1-3")).toBe(false);
     expect(getNextStage(progress)?.id).toBe("1-2");
+  });
+
+  it("opens Act 2 only after the last Act 1 stage is cleared", () => {
+    expect(isActUnlocked(EMPTY_CAMPAIGN_PROGRESS, 1)).toBe(true);
+    expect(isActUnlocked(clearThrough("1-3"), 2)).toBe(false);
+    expect(isActUnlocked(clearThrough("1-4"), 2)).toBe(true);
+    expect(getNextStage(clearThrough("1-4"))?.id).toBe("2-1");
   });
 
   it("returns no next stage once the ladder is cleared", () => {
@@ -158,4 +204,104 @@ describe("sanitizeCampaignProgress", () => {
       })
     ).toEqual({ stages: { "1-1": { stars: 2, bestTimeMs: 41_000 } } });
   });
+});
+
+describe("resolveStageBot", () => {
+  it("returns the base profile and default loadout when the spec has no tuning", () => {
+    const { profile, loadout } = resolveStageBot({ profileId: "volt-warden" });
+
+    expect(profile).toEqual(BOT_PROFILES["volt-warden"]);
+    expect(loadout).toEqual(createInitialLoadout());
+  });
+
+  it("applies trait deltas and clamps them to 0-10", () => {
+    const { profile } = resolveStageBot({
+      profileId: "fuse-rush",
+      traitDelta: { aggression: 5, patience: -9, riskTolerance: 0.4 }
+    });
+
+    expect(profile.traits.aggression).toBe(10);
+    expect(profile.traits.patience).toBe(0);
+    expect(profile.traits.riskTolerance).toBe(BOT_PROFILES["fuse-rush"].traits.riskTolerance);
+  });
+
+  it("clamps the starting loadout between the default loadout and MAX_LOADOUT", () => {
+    const { loadout } = resolveStageBot({
+      profileId: "fuse-rush",
+      startingLoadout: { bombs: 99, blast: 0, speed: 2 }
+    });
+
+    expect(loadout).toEqual({ bombs: MAX_LOADOUT.bombs, blast: createInitialLoadout().blast, speed: 2 });
+  });
+
+  it("never mutates the shared base profile", () => {
+    const before = structuredClone(BOT_PROFILES["glitch-bloom"]);
+    resolveStageBot({ profileId: "glitch-bloom", traitDelta: { aggression: 3 } });
+
+    expect(BOT_PROFILES["glitch-bloom"]).toEqual(before);
+  });
+
+  it("gives the Overclocked stages a stronger opening loadout", () => {
+    const overclocked = getCampaignStage("2-1") as CampaignStage;
+
+    expect(resolveStageBot(overclocked.bots[0]).loadout.bombs).toBe(2);
+  });
+});
+
+describe("resolveStageModifiers", () => {
+  const base = getCampaignStage("1-1") as CampaignStage;
+
+  it("fills in today's defaults for an unmodified stage", () => {
+    expect(resolveStageModifiers(base)).toEqual({
+      botFuseMs: DEFAULT_BOT_FUSE_MS,
+      botMoveScale: 1,
+      powerupDropRates: null
+    });
+  });
+
+  it("clamps out-of-range values to their bounds", () => {
+    const wild = {
+      ...base,
+      modifiers: { botFuseMs: 100, botMoveScale: 9, powerupDropRates: { bomb: 0, blast: 4.6, speed: 40 } }
+    };
+
+    expect(resolveStageModifiers(wild)).toEqual({
+      botFuseMs: 1200,
+      botMoveScale: 1.3,
+      powerupDropRates: { bomb: 1, blast: 5, speed: 10 }
+    });
+  });
+});
+
+describe("stage boards", () => {
+  // ArenaScene still renders a fixed 13x11 board; Phase 3 (Megagrid) lifts this.
+  it("keeps every stage on the standard 13x11 board until rendering supports other sizes", () => {
+    CAMPAIGN_STAGES.forEach((stage) => expect([stage.arena.cols, stage.arena.rows]).toEqual([13, 11]));
+  });
+});
+
+describe("Act 2 boards", () => {
+  it.each(getActStages(2).map((stage) => [stage.id, stage] as const))(
+    "lets the stage %s bots act from their spawn instead of waiting forever",
+    (_id, stage) => {
+      const arena = createArena(stage.arena);
+      const spawns = getSpawnPoints(arena);
+
+      stage.bots.forEach((spec, index) => {
+        const { profile, loadout } = resolveStageBot(spec);
+        const intents = Array.from({ length: 24 }, (_, turn) =>
+          chooseBotTurn({
+            arena,
+            actor: { id: index === 0 ? "bot-a" : "bot-b", tile: spawns[index + 1], alive: true, loadout, profile, turn },
+            opponentTile: spawns[0],
+            bombs: [],
+            activeBombCount: 0,
+            decisionSeed: turn * 101
+          })
+        );
+
+        expect(intents.some((intent) => intent.type !== "wait")).toBe(true);
+      });
+    }
+  );
 });

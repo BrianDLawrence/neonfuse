@@ -1,23 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FusebotPortrait } from "./FusebotPortrait";
+import type { ArenaPresetId } from "@/game/simulation/arena";
 import {
+  CAMPAIGN_ACTS,
   CAMPAIGN_STAGES,
   applyStageResult,
+  getActStages,
   getCampaignStage,
   getNextStage,
   getPreviousStage,
   getStageOpponents,
+  isActUnlocked,
   isStageCleared,
   isStageUnlocked,
+  resolveStageBot,
+  resolveStageModifiers,
   scoreStageResult,
+  type CampaignActId,
   type CampaignProgress,
   type CampaignStage,
   type CampaignStageId,
   type RoundFacts,
   type StageStars
 } from "@/game/simulation/campaign";
+import { createInitialLoadout } from "@/game/simulation/powerups";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 
 type StageState = "cleared" | "next" | "open" | "locked";
@@ -31,6 +39,70 @@ function stageState(progress: CampaignProgress, stage: CampaignStage, nextId: Ca
   if (isStageCleared(progress, stage.id)) return "cleared";
   if (stage.id === nextId) return "next";
   return isStageUnlocked(progress, stage.id) ? "open" : "locked";
+}
+
+const PRESET_LABELS: Record<ArenaPresetId, string> = {
+  standard: "Standard",
+  "open-core": "Open Core",
+  maze: "Maze"
+};
+
+/** "Fuse Rush", or "Fuse Rush + Circuit Shade" for a gauntlet. */
+export function stageOpponentLabel(stage: CampaignStage) {
+  return getStageOpponents(stage)
+    .map((bot) => bot.name)
+    .join(" + ");
+}
+
+function actTitle(act: CampaignActId) {
+  const entry = CAMPAIGN_ACTS.find((candidate) => candidate.id === act);
+  return entry ? `Act ${act}: ${entry.title}` : `Act ${act}`;
+}
+
+/** Board, format, par and best, then whatever the stage changes from a normal round. */
+function stageFacts(stage: CampaignStage, bestTimeMs: number | null): Array<{ label: string; value: string }> {
+  const modifiers = resolveStageModifiers(stage);
+  const initial = createInitialLoadout();
+  const tuned = stage.bots.map((spec) => resolveStageBot(spec).loadout);
+  const facts = [
+    { label: "Board", value: `${stage.arena.cols}×${stage.arena.rows}` },
+    { label: "Format", value: `1v${stage.bots.length}` },
+    { label: "Par", value: formatClock(stage.parTimeMs) },
+    { label: "Best", value: bestTimeMs === null ? "None" : formatClock(bestTimeMs) }
+  ];
+
+  if (stage.arena.preset !== "standard") {
+    facts.push({ label: "Layout", value: PRESET_LABELS[stage.arena.preset] });
+  }
+
+  const botBombs = Math.max(...tuned.map((loadout) => loadout.bombs));
+  const botBlast = Math.max(...tuned.map((loadout) => loadout.blast));
+
+  if (botBombs > initial.bombs) facts.push({ label: "Bot bombs", value: String(botBombs) });
+  if (botBlast > initial.blast) facts.push({ label: "Bot blast", value: String(botBlast) });
+  if (stage.modifiers.botFuseMs !== undefined) {
+    facts.push({ label: "Bot fuse", value: `${(modifiers.botFuseMs / 1000).toFixed(1)}s` });
+  }
+  if (modifiers.botMoveScale < 1) {
+    facts.push({ label: "Bot pace", value: `+${Math.round((1 / modifiers.botMoveScale - 1) * 100)}%` });
+  }
+  if (modifiers.powerupDropRates) {
+    const rates = modifiers.powerupDropRates;
+    const top = (Object.keys(rates) as Array<keyof typeof rates>).sort((a, b) => rates[b] - rates[a])[0];
+    facts.push({ label: "Drops", value: `Mostly ${top[0].toUpperCase()}${top.slice(1)}` });
+  }
+
+  return facts;
+}
+
+function StagePortraits({ stage, className }: Readonly<{ stage: CampaignStage; className: string }>) {
+  return (
+    <span className="campaign-portraits" data-count={stage.bots.length}>
+      {getStageOpponents(stage).map((bot) => (
+        <FusebotPortrait character={bot.id} className={className} key={bot.id} />
+      ))}
+    </span>
+  );
 }
 
 function stageAfter(id: CampaignStageId): CampaignStage | null {
@@ -57,7 +129,7 @@ function StageMark({ state, stars }: Readonly<{ state: StageState; stars: StageS
   return null;
 }
 
-/** The Act 1 ladder plus a briefing for the selected stage. */
+/** Act tabs, the selected act's ladder, and a briefing for the selected stage. */
 export function CampaignScreen({
   progress,
   onStart,
@@ -69,11 +141,25 @@ export function CampaignScreen({
 }>) {
   const nextId = getNextStage(progress)?.id ?? null;
   const [selectedId, setSelectedId] = useState<CampaignStageId>(nextId ?? CAMPAIGN_STAGES[0].id);
+  const ladderRef = useRef<HTMLOListElement>(null);
   const stage = getCampaignStage(selectedId) ?? CAMPAIGN_STAGES[0];
-  const opponent = getStageOpponents(stage)[0];
+  const opponents = getStageOpponents(stage);
+  const gauntlet = opponents.length > 1;
   const record = progress.stages[stage.id];
   const locked = !isStageUnlocked(progress, stage.id);
   const previous = getPreviousStage(stage.id);
+  // On phones the ladder is a horizontal strip; keep the selected card in view.
+  useEffect(() => {
+    ladderRef.current
+      ?.querySelector<HTMLElement>('[aria-pressed="true"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [selectedId]);
+
+  const selectAct = (act: CampaignActId) => {
+    const stages = getActStages(act);
+    const next = stages.find((candidate) => candidate.id === nextId);
+    setSelectedId((next ?? stages[0]).id);
+  };
 
   return (
     <div className="admin-dialog-backdrop" onClick={onClose}>
@@ -89,18 +175,38 @@ export function CampaignScreen({
           <div className="admin-panel-header">
             <h3 id="campaign-title">Campaign</h3>
             <div className="admin-panel-header-actions">
-              <span>Act 1: Circuit Ladder</span>
+              <span>{actTitle(stage.act)}</span>
               <button aria-label="Close campaign" className="dialog-icon-button" onClick={onClose} type="button">
                 Close
               </button>
             </div>
           </div>
 
+          <div aria-label="Acts" className="campaign-acts" role="group">
+            {CAMPAIGN_ACTS.map((act) => {
+              const actLocked = !isActUnlocked(progress, act.id);
+
+              return (
+                <button
+                  aria-pressed={act.id === stage.act}
+                  className="campaign-act-tab"
+                  data-locked={actLocked}
+                  key={act.id}
+                  onClick={() => selectAct(act.id)}
+                  type="button"
+                >
+                  <strong>Act {act.id}</strong>
+                  <small>{actLocked ? "Locked" : act.title}</small>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="campaign-grid dialog-scroll-region">
-            <ol aria-label="Act 1 stages" className="campaign-ladder">
-              {CAMPAIGN_STAGES.map((candidate) => {
+            <ol aria-label={`Act ${stage.act} stages`} className="campaign-ladder" ref={ladderRef}>
+              {getActStages(stage.act).map((candidate) => {
                 const state = stageState(progress, candidate, nextId);
-                const bot = getStageOpponents(candidate)[0];
+                const candidateGauntlet = candidate.bots.length > 1;
 
                 return (
                   <li data-state={state} key={candidate.id}>
@@ -112,10 +218,10 @@ export function CampaignScreen({
                       type="button"
                     >
                       <span className="campaign-stage-number">{candidate.id}</span>
-                      <FusebotPortrait character={bot.id} className="campaign-stage-portrait" />
+                      <StagePortraits className="campaign-stage-portrait" stage={candidate} />
                       <span className="campaign-stage-name">
-                        <strong>{bot.name}</strong>
-                        <small>{candidate.title}</small>
+                        <strong>{candidateGauntlet ? candidate.title : stageOpponentLabel(candidate)}</strong>
+                        <small>{candidateGauntlet ? stageOpponentLabel(candidate) : candidate.title}</small>
                       </span>
                       <StageMark stars={progress.stages[candidate.id]?.stars ?? 0} state={state} />
                     </button>
@@ -126,38 +232,31 @@ export function CampaignScreen({
 
             <section aria-label="Stage briefing" aria-live="polite" className="campaign-briefing">
               <div className="campaign-briefing-head">
-                <FusebotPortrait character={opponent.id} className="campaign-briefing-portrait" />
+                <StagePortraits className="campaign-briefing-portrait" stage={stage} />
                 <div>
-                  <p className="campaign-briefing-stage">Stage {stage.id}</p>
-                  <h4>{opponent.name}</h4>
-                  <p>{opponent.tagline}</p>
+                  <p className="campaign-briefing-stage">
+                    Stage {stage.id}: {stage.title}
+                  </p>
+                  <h4>{stageOpponentLabel(stage)}</h4>
+                  <p>{gauntlet ? "Two bots at once. Last one standing wins." : opponents[0].tagline}</p>
                 </div>
               </div>
 
               <p className="campaign-brief">{stage.brief}</p>
-              <p className="campaign-intel">
-                <strong>Intel</strong> {opponent.quirk}
-              </p>
+              {opponents.map((bot) => (
+                <p className="campaign-intel" key={bot.id}>
+                  <strong>Intel</strong> {gauntlet ? `${bot.name}: ` : ""}
+                  {bot.quirk}
+                </p>
+              ))}
 
               <div className="trait-grid campaign-facts">
-                <div className="trait-pill">
-                  <span>Board</span>
-                  <strong>
-                    {stage.arena.cols}×{stage.arena.rows}
-                  </strong>
-                </div>
-                <div className="trait-pill">
-                  <span>Format</span>
-                  <strong>1v1</strong>
-                </div>
-                <div className="trait-pill">
-                  <span>Par</span>
-                  <strong>{formatClock(stage.parTimeMs)}</strong>
-                </div>
-                <div className="trait-pill">
-                  <span>Best</span>
-                  <strong>{record ? formatClock(record.bestTimeMs) : "None"}</strong>
-                </div>
+                {stageFacts(stage, record?.bestTimeMs ?? null).map((fact) => (
+                  <div className="trait-pill" key={fact.label}>
+                    <span>{fact.label}</span>
+                    <strong>{fact.value}</strong>
+                  </div>
+                ))}
               </div>
 
               <div className="campaign-goals">
@@ -173,7 +272,11 @@ export function CampaignScreen({
               </div>
 
               {locked && previous ? (
-                <p className="campaign-lock-note">Clear stage {previous.id} to unlock this stage.</p>
+                <p className="campaign-lock-note">
+                  {previous.act !== stage.act
+                    ? `Clear Act ${previous.act} (finish stage ${previous.id}) to unlock ${actTitle(stage.act)}.`
+                    : `Clear stage ${previous.id} to unlock this stage.`}
+                </p>
               ) : null}
 
               <button
@@ -223,7 +326,7 @@ export function CampaignResultPanel({
       ? following
       : null;
   const actCompleteNow =
-    !following && won && !isStageCleared(result.progressBefore, stage.id);
+    won && !isStageCleared(result.progressBefore, stage.id) && (!following || following.act !== stage.act);
   const nextToPlay = won && following && isStageUnlocked(progressAfter, following.id) ? following : null;
   const title = won ? `Stage ${stage.id} cleared` : result.winner === "draw" ? "Draw" : "Knocked out";
   const score = calculateRoundScore({ mode: "campaign", ...result });
@@ -243,7 +346,7 @@ export function CampaignResultPanel({
             <FusebotPortrait character={won ? "spark" : opponent.id} className="campaign-result-portrait" />
             <div>
               <p className="campaign-briefing-stage">
-                Stage {stage.id}: {opponent.name}
+                Stage {stage.id}: {stageOpponentLabel(stage)}
               </p>
               <h3 id="campaign-result-title">{title}</h3>
             </div>
@@ -272,12 +375,17 @@ export function CampaignResultPanel({
             </div>
           </div>
 
-          {unlockedNow ? (
+          {actCompleteNow ? (
             <p className="campaign-callout">
-              Stage {unlockedNow.id} unlocked: {getStageOpponents(unlockedNow)[0].name} is waiting.
+              {actTitle(stage.act)} complete.
+              {unlockedNow ? ` ${actTitle(unlockedNow.act)} is open.` : " That's the whole campaign for now."}
+            </p>
+          ) : unlockedNow ? (
+            <p className="campaign-callout">
+              Stage {unlockedNow.id} unlocked: {stageOpponentLabel(unlockedNow)} {unlockedNow.bots.length > 1 ? "are" : "is"}{" "}
+              waiting.
             </p>
           ) : null}
-          {actCompleteNow ? <p className="campaign-callout">Act 1 complete. Every Fusebot on the ladder is down.</p> : null}
           {!won ? (
             <p className="campaign-intel">
               <strong>Intel</strong> {opponent.quirk}
