@@ -22,22 +22,25 @@
     "dev:server": "npm run build:server && node --env-file-if-exists=.env.local dist/realtime/server/index.js"
   },
   "dependencies": {
-    "@better-auth/mongo-adapter": "1.7.3",
+    "@better-auth/mongo-adapter": "1.7.14",
     "@discord/embedded-app-sdk": "^2.5.0",
-    "better-auth": "1.7.3",
+    "better-auth": "1.7.14",
     "mongodb": "^7.6.0",
-    "next": "^15.5.27",
+    "next": "^15.5.28",
     "phaser": "^3.88.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "ws": "^8.21.3",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "overrides": {
-    "@better-auth/core": "1.7.3",
+    "@better-auth/core": "1.7.14",
     "nanoid": "3.3.19",
     "postcss": "8.5.28",
-    "sharp": "0.35.5"
+    "sharp": "0.35.5",
+    "@discord/embedded-app-sdk": {
+      "zod": "4.6.7"
+    }
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
