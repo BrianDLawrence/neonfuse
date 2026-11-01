@@ -5,6 +5,7 @@ import {
   getStageOpponents,
   type CampaignProgress
 } from "@/game/simulation/campaign";
+import { deriveDailyProgress, getDailyChallenge, getDailyOpponents, type DailyProgress } from "@/game/simulation/daily";
 import type { PlayerIdentity } from "@/lib/player-identity";
 import {
   EMPTY_PROFILE_MATCH_STATS,
@@ -24,15 +25,17 @@ export type DuelCareerRecord = {
 
 type LocalMatchDocument = LocalCareerRecord & {
   accountId: string;
-  mode: "player-vs-bot" | "campaign";
+  mode: "player-vs-bot" | "campaign" | "daily";
   stageId?: string;
+  dateKey?: string;
   durationMs: number;
   blocksCleared: number;
   createdAt: Date;
 };
 
-// Campaign rounds are local matches too, so they count toward stats and XP.
-const LOCAL_MODES = { $in: ["player-vs-bot", "campaign"] };
+// Campaign and Daily Fuse rounds are local matches too, so they count toward stats and XP.
+export const LOCAL_MATCH_MODES = ["player-vs-bot", "campaign", "daily"] as const;
+const LOCAL_MODES = { $in: [...LOCAL_MATCH_MODES] };
 
 type DuelResultDocument = DuelCareerRecord & {
   roundId: string;
@@ -118,7 +121,13 @@ export async function loadPlayerCareer(db: Db, player: PlayerIdentity): Promise<
   return summarizePlayerCareer(localMatches, duels, player.id);
 }
 
-function localOpponentName(match: Pick<LocalMatchDocument, "mode" | "stageId">): string {
+function localOpponentName(match: Pick<LocalMatchDocument, "mode" | "stageId" | "dateKey">): string {
+  const daily = match.mode === "daily" ? getDailyChallenge(match.dateKey) : null;
+
+  if (daily) {
+    return `Daily Fuse: ${getDailyOpponents(daily).map((bot) => bot.name).join(" + ")}`;
+  }
+
   const stage = match.mode === "campaign" ? getCampaignStage(match.stageId) : null;
   return stage ? `Stage ${stage.id}: ${getStageOpponents(stage)[0].name}` : "Arena Bot";
 }
@@ -144,6 +153,25 @@ export async function loadCampaignProgress(db: Db, player: PlayerIdentity): Prom
       durationMs: Number(match.durationMs),
       blocksCleared: Number(match.blocksCleared)
     }))
+  );
+}
+
+/**
+ * Derives the Daily Fuse streak from the player's stored daily wins, the same way
+ * campaign progress is derived, so replays never double count a day.
+ */
+export async function loadDailyProgress(db: Db, player: PlayerIdentity): Promise<DailyProgress> {
+  const wins = await db
+    .collection<LocalMatchDocument>("matches")
+    .find(
+      { accountId: accountFilter(player), mode: "daily", winner: "player" } as Filter<LocalMatchDocument>,
+      { projection: { dateKey: 1, durationMs: 1 } }
+    )
+    .sort({ createdAt: 1 })
+    .toArray();
+
+  return deriveDailyProgress(
+    wins.map((match) => ({ dateKey: String(match.dateKey ?? ""), durationMs: Number(match.durationMs) }))
   );
 }
 

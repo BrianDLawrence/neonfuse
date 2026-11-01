@@ -60,4 +60,12 @@ describe("calculateRoundScore", () => {
       calculateRoundScore({ mode: "player-vs-bot", ...round })
     );
   });
+
+  it("scores Daily Fuse rounds like a local match", () => {
+    const round = { winner: "player" as const, durationMs: 45_000, blocksCleared: 9 };
+
+    expect(calculateRoundScore({ mode: "daily", ...round })).toBe(
+      calculateRoundScore({ mode: "player-vs-bot", ...round })
+    );
+  });
 });

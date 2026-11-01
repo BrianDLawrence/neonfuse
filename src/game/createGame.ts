@@ -34,6 +34,8 @@ export type RoundCompletePayload = {
   blocksCleared: number;
   /** Present when mode === "campaign". */
   stageId?: CampaignStageId;
+  /** Present when mode === "daily": the UTC day the round was played for. */
+  dateKey?: string;
 };
 
 export type GameEvents = {
@@ -46,6 +48,8 @@ export type GameEvents = {
   getBotSelection?: () => BotSelection;
   /** Read when a round starts; Phaser resolves the stage from the pure campaign table. */
   getCampaignStage?: () => CampaignStageId | null;
+  /** Read when a Daily Fuse round starts; Phaser builds the challenge from the pure daily rules. */
+  getDailyDateKey?: () => string | null;
   /** Read when a Versus round starts: fight slot A's bot as its Overclocked variant. */
   getVersusOverclock?: () => boolean;
 };

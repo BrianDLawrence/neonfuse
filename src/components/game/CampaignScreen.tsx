@@ -7,6 +7,7 @@ import {
   CAMPAIGN_ACTS,
   CAMPAIGN_STAGES,
   applyStageResult,
+  clampModifiers,
   getActStages,
   getCampaignStage,
   getNextStage,
@@ -16,13 +17,14 @@ import {
   isStageCleared,
   isStageUnlocked,
   resolveStageBot,
-  resolveStageModifiers,
   scoreStageResult,
   type CampaignActId,
   type CampaignProgress,
   type CampaignStage,
   type CampaignStageId,
   type RoundFacts,
+  type StageBotSpec,
+  type StageModifiers,
   type StageStars
 } from "@/game/simulation/campaign";
 import { createInitialLoadout } from "@/game/simulation/powerups";
@@ -41,7 +43,7 @@ function stageState(progress: CampaignProgress, stage: CampaignStage, nextId: Ca
   return isStageUnlocked(progress, stage.id) ? "open" : "locked";
 }
 
-const PRESET_LABELS: Record<ArenaPresetId, string> = {
+export const PRESET_LABELS: Record<ArenaPresetId, string> = {
   standard: "Standard",
   "open-core": "Open Core",
   maze: "Maze"
@@ -59,12 +61,41 @@ function actTitle(act: CampaignActId) {
   return entry ? `Act ${act}: ${entry.title}` : `Act ${act}`;
 }
 
-/** Board, format, par and best, then whatever the stage changes from a normal round. */
-function stageFacts(stage: CampaignStage, bestTimeMs: number | null): Array<{ label: string; value: string }> {
-  const modifiers = resolveStageModifiers(stage);
+type Fact = { label: string; value: string };
+
+/** What a stage's or Daily Fuse day's tuning changes from a normal round. */
+export function tuningFacts(bots: StageBotSpec[], declared: StageModifiers): Fact[] {
+  const modifiers = clampModifiers(declared);
   const initial = createInitialLoadout();
-  const tuned = stage.bots.map((spec) => resolveStageBot(spec).loadout);
-  const facts = [
+  const tuned = bots.map((spec) => resolveStageBot(spec).loadout);
+  const facts: Fact[] = [];
+  const botBombs = Math.max(...tuned.map((loadout) => loadout.bombs));
+  const botBlast = Math.max(...tuned.map((loadout) => loadout.blast));
+
+  if (botBombs > initial.bombs) facts.push({ label: "Bot bombs", value: String(botBombs) });
+  if (botBlast > initial.blast) facts.push({ label: "Bot blast", value: String(botBlast) });
+  if (declared.botFuseMs !== undefined) {
+    facts.push({ label: "Bot fuse", value: `${(modifiers.botFuseMs / 1000).toFixed(1)}s` });
+  }
+  if (modifiers.botMoveScale < 1) {
+    facts.push({ label: "Bot pace", value: `+${Math.round((1 / modifiers.botMoveScale - 1) * 100)}%` });
+  } else if (modifiers.botMoveScale > 1) {
+    facts.push({ label: "Bot pace", value: `−${Math.round((1 - 1 / modifiers.botMoveScale) * 100)}%` });
+  }
+  if (modifiers.powerupDropRates) {
+    const rates = modifiers.powerupDropRates;
+    const types = Object.keys(rates) as Array<keyof typeof rates>;
+    const top = [...types].sort((a, b) => rates[b] - rates[a])[0];
+    const even = types.every((type) => rates[type] === rates[top]);
+    facts.push({ label: "Drops", value: even ? "More of all" : `Mostly ${top[0].toUpperCase()}${top.slice(1)}` });
+  }
+
+  return facts;
+}
+
+/** Board, format, par and best, then whatever the stage changes from a normal round. */
+function stageFacts(stage: CampaignStage, bestTimeMs: number | null): Fact[] {
+  const facts: Fact[] = [
     { label: "Board", value: `${stage.arena.cols}×${stage.arena.rows}` },
     { label: "Format", value: `1v${stage.bots.length}` },
     { label: "Par", value: formatClock(stage.parTimeMs) },
@@ -75,24 +106,7 @@ function stageFacts(stage: CampaignStage, bestTimeMs: number | null): Array<{ la
     facts.push({ label: "Layout", value: PRESET_LABELS[stage.arena.preset] });
   }
 
-  const botBombs = Math.max(...tuned.map((loadout) => loadout.bombs));
-  const botBlast = Math.max(...tuned.map((loadout) => loadout.blast));
-
-  if (botBombs > initial.bombs) facts.push({ label: "Bot bombs", value: String(botBombs) });
-  if (botBlast > initial.blast) facts.push({ label: "Bot blast", value: String(botBlast) });
-  if (stage.modifiers.botFuseMs !== undefined) {
-    facts.push({ label: "Bot fuse", value: `${(modifiers.botFuseMs / 1000).toFixed(1)}s` });
-  }
-  if (modifiers.botMoveScale < 1) {
-    facts.push({ label: "Bot pace", value: `+${Math.round((1 / modifiers.botMoveScale - 1) * 100)}%` });
-  }
-  if (modifiers.powerupDropRates) {
-    const rates = modifiers.powerupDropRates;
-    const top = (Object.keys(rates) as Array<keyof typeof rates>).sort((a, b) => rates[b] - rates[a])[0];
-    facts.push({ label: "Drops", value: `Mostly ${top[0].toUpperCase()}${top.slice(1)}` });
-  }
-
-  return facts;
+  return [...facts, ...tuningFacts(stage.bots, stage.modifiers)];
 }
 
 function StagePortraits({ stage, className }: Readonly<{ stage: CampaignStage; className: string }>) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isStageUnlocked } from "@/game/simulation/campaign";
+import { isDailyKeyInWindow } from "@/game/simulation/daily";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { fetchHighScores, wouldQualifyForLeaderboard } from "@/lib/leaderboard";
 import { tryGetMongoDb } from "@/lib/mongodb";
@@ -49,7 +50,18 @@ export async function POST(request: Request) {
   }
 
   const payload = parsed.data;
+
+  // Daily Fuse days are UTC dates; one day either side tolerates local clocks.
+  if (payload.mode === "daily" && payload.dateKey && !isDailyKeyInWindow(payload.dateKey, Date.now())) {
+    return NextResponse.json(
+      { ok: false, error: "Daily Fuse date is outside the current window" },
+      { status: 400 }
+    );
+  }
+
   const score = calculateRoundScore(payload);
+  // Daily Fuse rounds are personal and unranked, so they never reach the leaderboard.
+  const ranked = payload.mode !== "daily";
 
   const match = {
     accountId: player.id,
@@ -59,6 +71,7 @@ export async function POST(request: Request) {
     durationMs: payload.durationMs,
     blocksCleared: payload.blocksCleared,
     ...(payload.stageId ? { stageId: payload.stageId } : {}),
+    ...(payload.dateKey ? { dateKey: payload.dateKey } : {}),
     score,
     createdAt: new Date()
   };
@@ -72,7 +85,7 @@ export async function POST(request: Request) {
       mongo,
       match,
       score,
-      qualifiesForLeaderboard: true,
+      qualifiesForLeaderboard: ranked,
       topScores: []
     });
   }
@@ -104,8 +117,8 @@ export async function POST(request: Request) {
     { upsert: true }
   );
 
-  const topScores = await fetchHighScores(db, "all", 10);
-  const qualifiesForLeaderboard = await wouldQualifyForLeaderboard(db, "all", score, 10);
+  const topScores = ranked ? await fetchHighScores(db, "all", 10) : [];
+  const qualifiesForLeaderboard = ranked && (await wouldQualifyForLeaderboard(db, "all", score, 10));
 
   return NextResponse.json({
     ok: true,
