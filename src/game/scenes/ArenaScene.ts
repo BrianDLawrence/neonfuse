@@ -50,6 +50,7 @@ import {
   resolveStageModifiers,
   type CampaignStage
 } from "../simulation/campaign";
+import { getDailyChallenge, resolveDailyModifiers, type DailyChallenge } from "../simulation/daily";
 import { getDangerTiles, type BombThreat } from "../simulation/danger";
 import {
   applyPowerup,
@@ -129,7 +130,8 @@ export class ArenaScene extends Phaser.Scene {
   private blockSprites = new Map<string, Phaser.GameObjects.Image>();
   private currentMode: GameMode = DEFAULT_GAME_MODE;
   private currentStage: CampaignStage | null = null;
-  // Campaign stage modifiers; the defaults reproduce local and skirmish rounds.
+  private currentDaily: DailyChallenge | null = null;
+  // Campaign stage and Daily Fuse modifiers; the defaults reproduce local and skirmish rounds.
   private botFuseMs = DEFAULT_BOT_FUSE_MS;
   private botMoveScale = 1;
   private stageDropRates: PowerupDropRates | null = null;
@@ -224,18 +226,31 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private startMode(requestedMode: GameMode) {
-    // A campaign round needs a known stage; without one it plays as a local match.
+    // A campaign or Daily Fuse round needs a known stage or day; without one it
+    // plays as a local match.
     const stage =
       requestedMode === "campaign"
         ? getCampaignStage(this.shellEvents?.getCampaignStage?.() ?? null)
         : null;
-    const mode = requestedMode === "campaign" && !stage ? "player-vs-bot" : requestedMode;
+    const daily =
+      requestedMode === "daily"
+        ? getDailyChallenge(this.shellEvents?.getDailyDateKey?.() ?? null)
+        : null;
+    const mode =
+      (requestedMode === "campaign" && !stage) || (requestedMode === "daily" && !daily)
+        ? "player-vs-bot"
+        : requestedMode;
 
     this.setMusicIntensity("calm");
     this.currentMode = mode;
     this.currentStage = stage;
+    this.currentDaily = daily;
     this.clearRoundObjects();
-    this.arena = stage ? createArena(stage.arena) : createInitialArena();
+    this.arena = stage
+      ? createArena(stage.arena)
+      : daily
+        ? createArena(daily.arena, daily.arenaSeed)
+        : createInitialArena();
 
     const botSelection = this.shellEvents?.getBotSelection?.() ?? DEFAULT_BOT_SELECTION;
     // Versus fights slot A's bot, as its Overclocked variant when the shell asks.
@@ -243,14 +258,19 @@ export class ArenaScene extends Phaser.Scene {
       mode === "player-vs-bot"
         ? resolveVersusOpponent(botSelection["bot-a"], this.shellEvents?.getVersusOverclock?.() ?? false)
         : null;
-    const modifiers = stage ? resolveStageModifiers(stage) : (versusOpponent?.modifiers ?? null);
+    const modifiers = stage
+      ? resolveStageModifiers(stage)
+      : daily
+        ? resolveDailyModifiers(daily)
+        : (versusOpponent?.modifiers ?? null);
     this.botFuseMs = modifiers?.botFuseMs ?? DEFAULT_BOT_FUSE_MS;
     this.botMoveScale = modifiers?.botMoveScale ?? 1;
     this.stageDropRates = modifiers?.powerupDropRates ?? null;
     this.roundOver = false;
     this.roundActive = false;
     this.blocksCleared = 0;
-    this.roundSeed = Phaser.Math.Between(1, 1_000_000);
+    // A Daily Fuse day seeds the bots' decisions too, so every retry faces the same day.
+    this.roundSeed = daily ? (daily.seed % 1_000_000) + 1 : Phaser.Math.Between(1, 1_000_000);
     this.touchBombQueued = false;
     this.lastTouchStepAt = Number.NEGATIVE_INFINITY;
     this.drawArena();
@@ -260,10 +280,12 @@ export class ArenaScene extends Phaser.Scene {
 
     const spawns = getSpawnPoints(this.arena);
 
-    if (stage) {
-      // The stage picks the opponents (two for a gauntlet) and their tuning.
+    const scriptedBots = stage?.bots ?? daily?.bots ?? null;
+
+    if (scriptedBots) {
+      // The stage or day picks the opponents (two for a gauntlet) and their tuning.
       this.spawnActor("player", spawns[0]);
-      stage.bots.forEach((spec, index) => {
+      scriptedBots.forEach((spec, index) => {
         const { profile, loadout } = resolveStageBot(spec);
         this.spawnActor(index === 0 ? "bot-a" : "bot-b", spawns[index + 1], profile, loadout);
       });
@@ -736,7 +758,8 @@ export class ArenaScene extends Phaser.Scene {
       winner,
       durationMs: Math.round(this.time.now - this.matchStartedAt),
       blocksCleared: this.blocksCleared,
-      ...(this.currentStage ? { stageId: this.currentStage.id } : {})
+      ...(this.currentStage ? { stageId: this.currentStage.id } : {}),
+      ...(this.currentDaily ? { dateKey: this.currentDaily.dateKey } : {})
     });
   }
 

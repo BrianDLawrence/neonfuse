@@ -8,6 +8,8 @@ export type ShellMenuItem = {
   onSelect: () => void;
   /** Toggle items (Music) report their state with aria-pressed. */
   pressed?: boolean;
+  /** A short read-only state shown at the end of the item ("Ready", "Streak 3"). */
+  status?: string;
 };
 
 /**
@@ -92,6 +94,7 @@ export function ShellMenu({
               {item.pressed === undefined ? null : (
                 <span className="shell-menu-state">{item.pressed ? "On" : "Off"}</span>
               )}
+              {item.status ? <span className="shell-menu-state">{item.status}</span> : null}
             </button>
           ))}
         </div>

@@ -38,6 +38,7 @@ type PhaserGameProps = {
   modeCommand: {
     mode: GameMode;
     stageId?: CampaignStageId;
+    dateKey?: string;
     sequence: number;
   };
   botSelection: BotSelection;
@@ -69,6 +70,7 @@ export function PhaserGame({
   const gameRef = useRef<Phaser.Game | null>(null);
   const initialModeRef = useRef(modeCommand.mode);
   const campaignStageRef = useRef<CampaignStageId | null>(modeCommand.stageId ?? null);
+  const dailyDateKeyRef = useRef<string | null>(modeCommand.dateKey ?? null);
   const roundStatusChangeRef = useRef(onRoundStatusChange);
   const loadoutChangeRef = useRef(onLoadoutChange);
   const botHudChangeRef = useRef(onBotHudChange);
@@ -105,8 +107,9 @@ export function PhaserGame({
   ]);
 
   useEffect(() => {
-    // Set before the emit: ArenaScene pulls the stage when the new round starts.
+    // Set before the emit: ArenaScene pulls the stage or day when the new round starts.
     campaignStageRef.current = modeCommand.stageId ?? null;
+    dailyDateKeyRef.current = modeCommand.dateKey ?? null;
 
     if (!gameRef.current) {
       return;
@@ -114,7 +117,7 @@ export function PhaserGame({
 
     gameRef.current.registry.set("gameMode", modeCommand.mode);
     gameRef.current.events.emit("mode-change", modeCommand.mode);
-  }, [modeCommand.mode, modeCommand.sequence, modeCommand.stageId]);
+  }, [modeCommand.mode, modeCommand.sequence, modeCommand.stageId, modeCommand.dateKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -139,6 +142,7 @@ export function PhaserGame({
           getPowerupDropRates: () => powerupDropRatesRef.current,
           getBotSelection: () => botSelectionRef.current,
           getCampaignStage: () => campaignStageRef.current,
+          getDailyDateKey: () => dailyDateKeyRef.current,
           getVersusOverclock: () => versusOverclockedRef.current
         }
       });

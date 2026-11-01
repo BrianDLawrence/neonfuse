@@ -3,7 +3,7 @@ import type { Db } from "mongodb";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
 import { getAuthenticatedPlayer, type PlayerIdentity } from "@/lib/player-identity";
-import { loadCampaignProgress, loadPlayerCareer } from "@/lib/player-career";
+import { loadCampaignProgress, loadDailyProgress, loadPlayerCareer } from "@/lib/player-career";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
 import { playerProfilePatchSchema } from "@/lib/schemas/profile";
 import { calculatePlayerProgression } from "@/game/simulation/progression";
@@ -50,9 +50,10 @@ export async function GET(request: Request) {
   }
 
   const result = await getOrCreatePlayerProfile(context.db, context.player);
-  const [stats, campaign] = await Promise.all([
+  const [stats, campaign, daily] = await Promise.all([
     loadPlayerCareer(context.db, context.player),
-    loadCampaignProgress(context.db, context.player)
+    loadCampaignProgress(context.db, context.player),
+    loadDailyProgress(context.db, context.player)
   ]);
   const progression = calculatePlayerProgression(
     stats,
@@ -63,7 +64,8 @@ export async function GET(request: Request) {
     ok: true,
     ...result,
     profile: { ...result.profile, stats, progression },
-    campaign
+    campaign,
+    daily
   });
 }
 

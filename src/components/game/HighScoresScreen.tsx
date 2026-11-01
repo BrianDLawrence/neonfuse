@@ -35,6 +35,13 @@ const MODES: Array<{ value: HighScoreMode; label: string }> = [
   { value: "bot-skirmish", label: "Bots" }
 ];
 
+const MODE_LABELS: Record<GameMode, string> = {
+  "player-vs-bot": "Versus",
+  "bot-skirmish": "Bot Skirmish",
+  campaign: "Campaign",
+  daily: "Daily Fuse"
+};
+
 function formatDuration(durationMs: number) {
   return `${Math.max(0, Math.round(durationMs / 1000))}s`;
 }
@@ -268,7 +275,7 @@ export function HighScoresScreen({
 
             {result ? (
               <div className="score-facts">
-                <span>{result.mode === "bot-skirmish" ? "Bot Skirmish" : result.mode === "campaign" ? "Campaign" : "Versus"}</span>
+                <span>{MODE_LABELS[result.mode]}</span>
                 <span>Winner {describeWinner(result.winner)}</span>
                 <span>{result.blocksCleared} blocks</span>
                 <span>{formatDuration(result.durationMs)}</span>
@@ -283,7 +290,9 @@ export function HighScoresScreen({
 
             {result && !result.qualifiesForLeaderboard && result.status === "ready" ? (
               <p className="score-message" aria-live="polite">
-                Score saved. It did not crack the top board.
+                {result.mode === "daily"
+                  ? "Score saved. Daily Fuse rounds are unranked and stay off the board."
+                  : "Score saved. It did not crack the top board."}
               </p>
             ) : null}
 

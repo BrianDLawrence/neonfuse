@@ -1,7 +1,8 @@
 # Single-Player Modes — Design
 
 Status: **all four phases implemented** (Campaign Acts 1–3 and the Versus
-picker), and the act-clear achievements have shipped. Notes from the build:
+picker), and the act-clear achievements have shipped. **Daily Fuse** has shipped
+too; see [section 9](#9-daily-fuse). Notes from the build:
 - Achievements: clearing every stage of an act earns "Ladder Climber" (Act 1),
   "Overclocked" (Act 2) or "Megagrid" (Act 3), each with an equippable title of
   the same name. They are derived in `calculatePlayerProgression` from the
@@ -406,3 +407,110 @@ Overclocked variant unlocks.
 | Server-persisted or local-only progress? | Server-derived from `matches` with a local mirror, matching career totals. |
 | New bot personalities for Acts 2–3? | Not needed for the plan as written. A final boss would need a new `BotProfileId`, Fusebot art, and a profile-schema enum update. |
 | Achievements/titles for clears? | **Shipped.** Yes, in Phase 1 or 2: "Ladder Climber" (Act 1), "Overclocked" (Act 2), "Megagrid" (Act 3), derived like the existing achievements. |
+
+---
+
+## 9. Daily Fuse
+
+One seeded challenge per day, with a rotating modifier and a streak counter.
+It is personal, unranked and cosmetic: it gates nothing and never reaches the
+leaderboard.
+
+### Rules (`src/game/simulation/daily.ts`)
+
+- `getDailyChallenge(dateKey)` builds the day from a `YYYY-MM-DD` key, and
+  returns null for a malformed key. Nothing in the module reads the clock; the
+  caller passes the date in.
+- The **modifier** rotates by day number through `DAILY_MODIFIERS` (8 entries),
+  so it changes every day, and the 8-day cycle keeps any one modifier from
+  settling on a fixed weekday. Each entry
+  uses the bounded stage values (`botFuseMs`, `botMoveScale`,
+  `powerupDropRates`) and goes through `clampModifiers`. Bot fuses stay at
+  1500ms or more, because bots don't model fuse timing.
+- **Board, layout and bots** come from an FNV-1a hash of the date feeding a
+  seeded generator:
+  - Boards are odd sizes from 11×9 to 19×15, weighted toward sizes that keep
+    the fit-to-screen camera: up to 13 columns and 13 rows fit on 390px+ phones
+    and 1280×720 laptops. Three larger boards (15×13, 17×13, 19×15) are
+    occasional Megagrid days where phones follow the player. A unit test checks
+    that at least 70% of a year's days fit on phones and 90% on a laptop.
+    Phones narrower than 390px follow the player even on 13×11, as they already
+    do in Versus.
+  - The layout is one of `standard`, `open-core` or `maze`. The arena seed is
+    one of five values, because `createArena`'s soft-block pattern repeats every
+    five, so day-to-day variety comes mostly from size, layout, bots and
+    modifier.
+  - One bot, or two distinct bots on about a quarter of the days with at least
+    a standard board's worth of cells. Trait deltas are −1 to +1, and solo bots
+    sometimes start with 2 bombs or 3 blast. Everything goes through
+    `resolveStageBot`.
+- The scene also seeds the bots' decisions from the day, so a retry faces the
+  same bots.
+- `deriveDailyProgress(wins)` folds stored daily wins into `DailyProgress`:
+  distinct days cleared, longest streak, the run ending at the last clear, best
+  time, and the three most recent cleared days with their fastest time (enough
+  to answer "is today cleared?" across the date window). It sorts and
+  deduplicates first, so replays, gaps and out-of-order rows give the same
+  result. `getCurrentStreak(progress, todayKey)` keeps a streak alive until the
+  end of the day after the last clear.
+
+### The day is UTC
+
+"Today" is the **UTC** calendar date, so every player shares one challenge.
+The browser computes the key with `utcDateKey(new Date())` when Daily Fuse
+opens. The server accepts a submitted `dateKey` only within one day of its own
+UTC date (`isDailyKeyInWindow`). That tolerates players whose local evening is
+already tomorrow in UTC, slightly wrong clocks, and a round that spans midnight;
+anything staler or further ahead is rejected with a 400 before MongoDB is
+touched. The briefing tells players that a new fuse lights at midnight UTC.
+
+### Wiring
+
+- Mode `daily` (`hasHumanPlayer` is true). The React mode command carries a
+  `dateKey`, which crosses the boundary through `GameEvents.getDailyDateKey`.
+  `ArenaScene.startMode` builds everything else from `getDailyChallenge`,
+  sharing the campaign path's scripted bots and modifiers. A missing or invalid
+  key plays as Versus. `RoundCompletePayload` reports the `dateKey`.
+- `POST /api/matches` accepts `mode: "daily"` with a required, well-formed
+  `dateKey` (Zod; the key is rejected on every other mode), then checks the date
+  window. Winners are `player | bot | draw`. The round scores through
+  `MODE_BONUS` like a local match, but the route skips the leaderboard lookup
+  and reports `qualifiesForLeaderboard: false`.
+- `POST /api/high-scores` refuses a daily match (403), so a client can't post
+  one by match ID. The high-score mode schema is unchanged.
+- Progress is derived from stored daily wins by `loadDailyProgress` (no new
+  collection; the existing `{ accountId, mode, createdAt }` index covers it) and
+  returned as `daily` by `GET /api/profile`. Daily rounds count as local matches
+  in career stats and XP, and history labels them "Daily Fuse: <bot>".
+- The browser mirrors progress under `neon-fuse:daily-progress` for Mongo-less
+  runs. The server-derived value wins when the profile loads.
+
+### UI
+
+- **Entry point:** the game menu (`ShellMenu`), on every screen size, with a
+  "Ready" or "Streak N" status. On desktop, an inline "Daily Fuse" link sits
+  with High Scores and shows an `--amber` pip until today is cleared. The mode
+  row already holds three segments on phones (Friend lives in the menu there),
+  so a fifth mode button would not fit at 360px. Daily isn't a campaign stage,
+  so it doesn't go on the Campaign screen either.
+- **Briefing (`DailyScreen`):** today's rule as the one loud `--amber` card,
+  the opponents with their intel, board facts, the current streak as a large
+  numeral, longest streak, days cleared and best time, and Play (or Replay once
+  cleared). At ≤760px it is one column and Play sticks to the bottom.
+- **Result (`DailyResultPanel`):** replaces the High Scores dialog after a
+  daily round, with time, blocks, streak and score, a streak or best-time
+  callout, and Play again or Retry plus Daily briefing.
+- The HUD shows a `Daily Fuse · <modifier>` stage chip, the goal line names
+  the opponents and rule, and `RoundBanner` says "Daily Fuse cleared".
+
+### Trust level
+
+Daily results are client-reported, exactly like Local Match: the browser runs
+the round and posts the outcome. The server checks the shape and the date
+window, but not the outcome itself. A player can replay as often as they like
+(only the best time per day is kept), and the window lets them claim tomorrow
+up to a day early. That is acceptable because Daily Fuse is a personal habit
+tracker. Streaks are not called verified, are not leaderboard material, and
+must not gate anything scarce. Making them competitive would need the
+authoritative-server path that duels use.
+

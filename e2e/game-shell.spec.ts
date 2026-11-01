@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
+import { getDailyChallenge, getDailyOpponents, type DailyChallenge } from "@/game/simulation/daily";
 import { signIn, stubHighScores, TEST_PILOT } from "./fixtures";
+
+// Daily Fuse tests pin the page clock, so the expected challenge never shifts at
+// midnight UTC. The day is in the past so the stubbed session stays unexpired.
+const DAILY_DAY = "2026-03-14";
+const DAILY_CHALLENGE = getDailyChallenge(DAILY_DAY) as DailyChallenge;
+
+async function pinDailyClock(page: Page) {
+  await page.clock.setFixedTime(new Date(`${DAILY_DAY}T15:00:00Z`));
+}
 
 async function openShell(page: Page) {
   await signIn(page);
@@ -196,6 +206,64 @@ test.describe("game shell", () => {
 
     await expect(page.locator(".hud-chip-stage")).toContainText("Stage 3-1");
     await expect(statusChip(page)).toHaveText(/^[123]$|Fuse!|Live/);
+  });
+
+  test("Daily Fuse opens today's briefing from the game menu and starts the round", async ({ page }) => {
+    await pinDailyClock(page);
+    await openShell(page);
+
+    await openMenuItem(page, "Daily Fuse");
+
+    const daily = page.getByRole("dialog", { name: "Daily Fuse" });
+    await expect(daily).toBeVisible();
+    await expect(daily.locator(".daily-modifier-label")).toHaveText(DAILY_CHALLENGE.modifier.label);
+    for (const bot of getDailyOpponents(DAILY_CHALLENGE)) {
+      await expect(daily.getByRole("heading", { level: 4 })).toContainText(bot.name);
+    }
+    await expect(daily.locator(".trait-pill", { hasText: "Board" })).toContainText(
+      `${DAILY_CHALLENGE.arena.cols}×${DAILY_CHALLENGE.arena.rows}`
+    );
+    await expect(daily.locator(".daily-status")).toContainText("Not cleared yet");
+    await expect(daily.locator(".daily-note")).toContainText("unranked");
+
+    await daily.getByRole("button", { name: "Play today's fuse" }).click();
+
+    await expect(daily).toBeHidden();
+    const chip = page.locator(".hud-chip-daily");
+    await expect(chip).toContainText("Daily Fuse");
+    await expect(chip).toContainText(DAILY_CHALLENGE.modifier.label);
+    await expect(statusChip(page)).toHaveText(/^Warmup$|^[123]$|Fuse!|Live/);
+  });
+
+  test("Daily Fuse shows a stored streak and today's clear", async ({ page }) => {
+    await page.addInitScript((day) => {
+      window.localStorage.setItem(
+        "neon-fuse:daily-progress",
+        JSON.stringify({
+          totalClears: 5,
+          longestStreak: 4,
+          runLength: 3,
+          lastClearedKey: day,
+          bestTimeMs: 41_000,
+          recent: { [day]: 52_000 }
+        })
+      );
+    }, DAILY_DAY);
+    await pinDailyClock(page);
+    await openShell(page);
+
+    await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.locator(".shell-menu-item", { hasText: "Daily Fuse" })).toContainText("Streak 3");
+    await page.locator(".shell-menu-item", { hasText: "Daily Fuse" }).click();
+
+    const daily = page.getByRole("dialog", { name: "Daily Fuse" });
+    await expect(daily.locator(".daily-streak-count")).toHaveText("3");
+    await expect(daily.locator(".daily-status")).toContainText("Cleared today in 0:52");
+    await expect(daily.locator(".trait-pill", { hasText: "Longest" })).toContainText("4 days");
+    await expect(daily.getByRole("button", { name: "Replay today's fuse" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(daily).toBeHidden();
   });
 
   test("the game menu opens with Escape-to-close and returns focus", async ({ page }) => {

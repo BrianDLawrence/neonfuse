@@ -138,6 +138,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Daily Fuse results are personal and unranked.
+  if (match.mode === "daily") {
+    return NextResponse.json(
+      { ok: false, error: "Daily Fuse rounds are not on the leaderboard" },
+      { status: 403 }
+    );
+  }
+
   const entry = {
     accountId: player.id,
     matchId: parsed.data.matchId,

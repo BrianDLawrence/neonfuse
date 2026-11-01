@@ -17,7 +17,7 @@ type Banner = {
  * Maps the round status the arena already reports (GameEvents.onRoundStatusChange)
  * to a full-width banner. Statuses with no big moment ("Live", "Blast", ...) show none.
  */
-function bannerFor(status: string, opponent: BotProfile, stageId?: string): Banner | null {
+function bannerFor(status: string, opponent: BotProfile, clearedLabel?: string): Banner | null {
   if (/^[123]$/.test(status)) {
     return { kind: "count", title: status, caption: "Get ready" };
   }
@@ -30,7 +30,7 @@ function bannerFor(status: string, opponent: BotProfile, stageId?: string): Bann
     return {
       kind: "win",
       title: "KO!",
-      caption: stageId ? `Stage ${stageId} cleared` : `You beat ${opponent.name}`,
+      caption: clearedLabel ? `${clearedLabel} cleared` : `You beat ${opponent.name}`,
       character: "spark"
     };
   }
@@ -61,9 +61,14 @@ function bannerFor(status: string, opponent: BotProfile, stageId?: string): Bann
 export function RoundBanner({
   status,
   opponent,
-  stageId
-}: Readonly<{ status: string; opponent: BotProfile; stageId?: string }>) {
-  const banner = bannerFor(status, opponent, stageId);
+  clearedLabel
+}: Readonly<{
+  status: string;
+  opponent: BotProfile;
+  /** Names what a win clears ("Stage 1-3", "Daily Fuse"); plain rounds name the opponent. */
+  clearedLabel?: string;
+}>) {
+  const banner = bannerFor(status, opponent, clearedLabel);
 
   return (
     <div aria-live="polite" className="round-banner-region" role="status">

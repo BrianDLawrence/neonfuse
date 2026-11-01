@@ -8,6 +8,7 @@ import {
   formatClock,
   type CampaignRoundResult
 } from "./CampaignScreen";
+import { DailyResultPanel, DailyScreen, dailyOpponentLabel, type DailyRoundResult } from "./DailyScreen";
 import { DuelGame } from "./DuelGame";
 import { VersusScreen } from "./VersusScreen";
 import { FusebotPortrait } from "./FusebotPortrait";
@@ -36,12 +37,23 @@ import {
   type CampaignProgress,
   type CampaignStageId
 } from "@/game/simulation/campaign";
+import {
+  EMPTY_DAILY_PROGRESS,
+  applyDailyWin,
+  getCurrentStreak,
+  getDailyChallenge,
+  isDailyCleared,
+  sanitizeDailyProgress,
+  utcDateKey,
+  type DailyProgress
+} from "@/game/simulation/daily";
 import { selectVersusOpponent } from "@/game/simulation/versus";
 import { calculateRoundScore } from "@/game/simulation/scoring";
 import { fetchWithActivityRenewal, type ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 import {
   CAMPAIGN_PROGRESS_STORAGE_KEY,
+  DAILY_PROGRESS_STORAGE_KEY,
   MUSIC_TRACK_STORAGE_KEY,
   VISITOR_STORAGE_KEY
 } from "@/lib/client-storage";
@@ -128,6 +140,29 @@ function writeStoredCampaignProgress(progress: CampaignProgress) {
   }
 }
 
+function readStoredDailyProgress(): DailyProgress {
+  try {
+    const stored = window.localStorage.getItem(DAILY_PROGRESS_STORAGE_KEY);
+    return stored ? sanitizeDailyProgress(JSON.parse(stored)) : EMPTY_DAILY_PROGRESS;
+  } catch {
+    return EMPTY_DAILY_PROGRESS;
+  }
+}
+
+// Same mirror as campaign progress: the server-derived streak wins when it loads.
+function writeStoredDailyProgress(progress: DailyProgress) {
+  try {
+    window.localStorage.setItem(DAILY_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+  } catch {
+    // The streak still applies for this session when storage is unavailable.
+  }
+}
+
+/** Today's Daily Fuse day. The day is UTC so every player shares one challenge. */
+function readTodayKey() {
+  return utcDateKey(new Date());
+}
+
 function createVisitorId() {
   if (window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
@@ -198,6 +233,7 @@ export function GameShell({
   const [modeCommand, setModeCommand] = useState<{
     mode: GameMode;
     stageId?: CampaignStageId;
+    dateKey?: string;
     sequence: number;
   }>({
     mode: DEFAULT_GAME_MODE,
@@ -218,6 +254,10 @@ export function GameShell({
   const [versusOverclocked, setVersusOverclocked] = useState(false);
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress>(EMPTY_CAMPAIGN_PROGRESS);
   const [campaignResult, setCampaignResult] = useState<CampaignRoundResult | null>(null);
+  const [isDailyOpen, setIsDailyOpen] = useState(false);
+  const [todayKey, setTodayKey] = useState<string | null>(null);
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress>(EMPTY_DAILY_PROGRESS);
+  const [dailyResult, setDailyResult] = useState<DailyRoundResult | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [scoreResult, setScoreResult] = useState<RoundScoreResult | null>(null);
   const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null);
@@ -234,6 +274,7 @@ export function GameShell({
   const selectedTrackRef = useRef(selectedTrack);
   const visitorIdRef = useRef<string | null>(null);
   const campaignProgressRef = useRef<CampaignProgress>(EMPTY_CAMPAIGN_PROGRESS);
+  const dailyProgressRef = useRef<DailyProgress>(EMPTY_DAILY_PROGRESS);
   const profileSaveSequenceRef = useRef(0);
   const selectedBotProfile = BOT_PROFILES[selectedBotInfo];
   const touchControlsEnabled = useTouchControlsEnabled();
@@ -273,6 +314,11 @@ export function GameShell({
     campaignProgressRef.current = storedProgress;
     setCampaignProgress(storedProgress);
 
+    const storedDaily = readStoredDailyProgress();
+    dailyProgressRef.current = storedDaily;
+    setDailyProgress(storedDaily);
+    setTodayKey(readTodayKey());
+
     const stored = readStoredMusicTrack();
 
     if (stored) {
@@ -291,7 +337,9 @@ export function GameShell({
       !isPartyOpen &&
       !isCampaignOpen &&
       !isVersusOpen &&
-      !campaignResult
+      !campaignResult &&
+      !isDailyOpen &&
+      !dailyResult
     ) {
       return undefined;
     }
@@ -301,6 +349,8 @@ export function GameShell({
         setIsCampaignOpen(false);
         setIsVersusOpen(false);
         setCampaignResult(null);
+        setIsDailyOpen(false);
+        setDailyResult(null);
         setIsAdminOpen(false);
         setIsBotLabOpen(false);
         setIsMusicOpen(false);
@@ -314,9 +364,11 @@ export function GameShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     campaignResult,
+    dailyResult,
     isAdminOpen,
     isBotLabOpen,
     isCampaignOpen,
+    isDailyOpen,
     isHighScoresOpen,
     isMusicOpen,
     isPartyOpen,
@@ -337,6 +389,7 @@ export function GameShell({
           created?: boolean;
           profile?: PlayerProfile;
           campaign?: unknown;
+          daily?: unknown;
           error?: string;
         };
 
@@ -375,6 +428,13 @@ export function GameShell({
           campaignProgressRef.current = serverProgress;
           setCampaignProgress(serverProgress);
           writeStoredCampaignProgress(serverProgress);
+        }
+
+        if (payload.daily) {
+          const serverDaily = sanitizeDailyProgress(payload.daily);
+          dailyProgressRef.current = serverDaily;
+          setDailyProgress(serverDaily);
+          writeStoredDailyProgress(serverDaily);
         }
         setMusicEnabled(profile.preferences.musicEnabled);
         setMusicVolume(profile.preferences.musicVolume);
@@ -603,25 +663,41 @@ export function GameShell({
     void persistProfilePreferences({ botSelection: nextSelection });
     setSelectedBotInfo(profileId);
   }, [botSelection, persistProfilePreferences]);
-  const handleModeStart = useCallback((mode: GameMode, stageId?: CampaignStageId) => {
-    if (resultsTimerRef.current !== null) {
-      window.clearTimeout(resultsTimerRef.current);
-      resultsTimerRef.current = null;
-    }
-    setIsCampaignOpen(false);
-    setIsVersusOpen(false);
-    setCampaignResult(null);
-    setModeCommand((currentCommand) => ({
-      mode,
-      stageId: mode === "campaign" ? stageId : undefined,
-      sequence: currentCommand.sequence + 1
-    }));
-    setRoundStatus("Warmup");
-  }, []);
+  const handleModeStart = useCallback(
+    (mode: GameMode, { stageId, dateKey }: { stageId?: CampaignStageId; dateKey?: string } = {}) => {
+      if (resultsTimerRef.current !== null) {
+        window.clearTimeout(resultsTimerRef.current);
+        resultsTimerRef.current = null;
+      }
+      setIsCampaignOpen(false);
+      setIsVersusOpen(false);
+      setCampaignResult(null);
+      setIsDailyOpen(false);
+      setDailyResult(null);
+      setModeCommand((currentCommand) => ({
+        mode,
+        stageId: mode === "campaign" ? stageId : undefined,
+        dateKey: mode === "daily" ? dateKey : undefined,
+        sequence: currentCommand.sequence + 1
+      }));
+      setRoundStatus("Warmup");
+    },
+    []
+  );
   const handleCampaignStageStart = useCallback(
-    (stageId: CampaignStageId) => handleModeStart("campaign", stageId),
+    (stageId: CampaignStageId) => handleModeStart("campaign", { stageId }),
     [handleModeStart]
   );
+  const handleDailyStart = useCallback(
+    (dateKey: string) => handleModeStart("daily", { dateKey }),
+    [handleModeStart]
+  );
+  const handleOpenDaily = useCallback(() => {
+    // Re-read the day on open, so a tab left open past midnight UTC moves on.
+    setTodayKey(readTodayKey());
+    setDailyResult(null);
+    setIsDailyOpen(true);
+  }, []);
   const handleVersusFight = useCallback(
     (profileId: BotProfileId, overclocked: boolean) => {
       const nextSelection = selectVersusOpponent(botSelection, profileId);
@@ -660,8 +736,9 @@ export function GameShell({
       window.clearTimeout(resultsTimerRef.current);
     }
 
-    const { stageId } = payload;
+    const { stageId, dateKey } = payload;
     let campaignRound: CampaignRoundResult | null = null;
+    let dailyRound: DailyRoundResult | null = null;
 
     if (payload.mode === "campaign" && stageId) {
       const winner = payload.winner === "player" || payload.winner === "bot" ? payload.winner : "draw";
@@ -674,11 +751,27 @@ export function GameShell({
       writeStoredCampaignProgress(progressAfter);
     }
 
+    if (payload.mode === "daily" && dateKey) {
+      const winner = payload.winner === "player" || payload.winner === "bot" ? payload.winner : "draw";
+      const progressBefore = dailyProgressRef.current;
+      dailyRound = { winner, durationMs: payload.durationMs, blocksCleared: payload.blocksCleared, dateKey, progressBefore };
+
+      if (winner === "player") {
+        const progressAfter = applyDailyWin(progressBefore, { dateKey, durationMs: payload.durationMs });
+        dailyProgressRef.current = progressAfter;
+        setDailyProgress(progressAfter);
+        writeStoredDailyProgress(progressAfter);
+      }
+    }
+
     resultsTimerRef.current = window.setTimeout(() => {
       resultsTimerRef.current = null;
 
       if (campaignRound) {
         setCampaignResult(campaignRound);
+      } else if (dailyRound) {
+        // Daily Fuse is unranked, so its results replace the leaderboard dialog.
+        setDailyResult(dailyRound);
       } else {
         setIsHighScoresOpen(true);
       }
@@ -852,9 +945,18 @@ export function GameShell({
   };
   const profileDisplayName = playerProfile?.identity.displayName ?? accountName;
   const campaignStage = modeCommand.mode === "campaign" ? getCampaignStage(modeCommand.stageId) : null;
+  const dailyChallenge = modeCommand.mode === "daily" ? getDailyChallenge(modeCommand.dateKey) : null;
   const opponentProfile = campaignStage
     ? getStageOpponents(campaignStage)[0]
-    : BOT_PROFILES[botSelection["bot-a"]];
+    : dailyChallenge
+      ? BOT_PROFILES[dailyChallenge.bots[0].profileId]
+      : BOT_PROFILES[botSelection["bot-a"]];
+  const scriptedBotCount = campaignStage?.bots.length ?? dailyChallenge?.bots.length ?? 1;
+  const dailyStreak = todayKey ? getCurrentStreak(dailyProgress, todayKey) : 0;
+  const dailyMenuStatus =
+    todayKey && isDailyCleared(dailyProgress, todayKey)
+      ? `Streak ${dailyStreak}`
+      : "Ready";
   const playerOnBoard = hasHumanPlayer(modeCommand.mode);
 
   if (isDuelOpen) return <DuelGame activityAuth={activityAuth} onLeave={() => setIsDuelOpen(false)} />;
@@ -921,13 +1023,21 @@ export function GameShell({
                   </span>
                   <strong>{speed}</strong>
                 </div>
-                {campaignStage ? (
+                {campaignStage || dailyChallenge ? (
                   <>
-                    <div className="hud-chip hud-chip-stage">
-                      <span>Stage {campaignStage.id}</span>
-                      <strong>{campaignStage.bots.length > 1 ? campaignStage.title : opponentProfile.name}</strong>
-                    </div>
-                    {campaignStage.bots.length > 1 ? (
+                    {campaignStage ? (
+                      <div className="hud-chip hud-chip-stage">
+                        <span>Stage {campaignStage.id}</span>
+                        <strong>{campaignStage.bots.length > 1 ? campaignStage.title : opponentProfile.name}</strong>
+                      </div>
+                    ) : null}
+                    {dailyChallenge ? (
+                      <div className="hud-chip hud-chip-stage hud-chip-daily">
+                        <span>Daily Fuse</span>
+                        <strong>{dailyChallenge.modifier.label}</strong>
+                      </div>
+                    ) : null}
+                    {scriptedBotCount > 1 ? (
                       <div className="hud-chip hud-chip-bots">
                         <span>Bots</span>
                         <strong>
@@ -949,7 +1059,11 @@ export function GameShell({
           </div>
         </div>
 
-        <RoundBanner opponent={opponentProfile} stageId={campaignStage?.id} status={roundStatus} />
+        <RoundBanner
+          clearedLabel={campaignStage ? `Stage ${campaignStage.id}` : dailyChallenge ? "Daily Fuse" : undefined}
+          opponent={opponentProfile}
+          status={roundStatus}
+        />
 
         <aside className="match-actions" aria-label="Match actions">
           <div className="command-row" role="group" aria-label="Match mode">
@@ -1004,6 +1118,15 @@ export function GameShell({
             <a className="admin-link match-link-secondary" href="#music" onClick={handleMusicLinkClick}>
               Tracks
             </a>
+            <button
+              aria-haspopup="dialog"
+              className="admin-link hud-link-button daily-link match-link-secondary"
+              data-cleared={todayKey ? isDailyCleared(dailyProgress, todayKey) : false}
+              onClick={handleOpenDaily}
+              type="button"
+            >
+              Daily Fuse
+            </button>
             <a className="admin-link match-link-secondary" href="#high-scores" onClick={handleHighScoresLinkClick}>
               High Scores
             </a>
@@ -1036,6 +1159,7 @@ export function GameShell({
             </button>
             <ShellMenu
               items={[
+                { label: "Daily Fuse", onSelect: handleOpenDaily, status: dailyMenuStatus },
                 { label: "Profile", onSelect: () => setIsProfileOpen(true) },
                 { label: "Play with a friend", onSelect: () => setIsDuelOpen(true) },
                 ...(connectionLabel && activityAuth && onInviteFriends
@@ -1067,6 +1191,24 @@ export function GameShell({
             onClose={() => setIsVersusOpen(false)}
             onFight={handleVersusFight}
             progress={campaignProgress}
+          />
+        ) : null}
+
+        {isDailyOpen && todayKey ? (
+          <DailyScreen
+            dateKey={todayKey}
+            onClose={() => setIsDailyOpen(false)}
+            onStart={handleDailyStart}
+            progress={dailyProgress}
+          />
+        ) : null}
+
+        {dailyResult ? (
+          <DailyResultPanel
+            onClose={() => setDailyResult(null)}
+            onOpenBriefing={handleOpenDaily}
+            onRetry={handleDailyStart}
+            result={dailyResult}
           />
         ) : null}
 
@@ -1332,7 +1474,9 @@ export function GameShell({
             Goal:{" "}
             {campaignStage
               ? `Clear stage ${campaignStage.id}, par ${formatClock(campaignStage.parTimeMs)}`
-              : modeCommand.mode === "bot-skirmish"
+              : dailyChallenge
+                ? `Beat ${dailyOpponentLabel(dailyChallenge)} under ${dailyChallenge.modifier.label}`
+                : modeCommand.mode === "bot-skirmish"
                 ? "Last bot standing"
                 : `Blast ${opponentProfile.name}${versusOverclocked ? " (Overclocked)" : ""}`}
           </span>
