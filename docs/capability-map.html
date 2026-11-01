@@ -196,6 +196,18 @@
         gap: 7px;
       }
 
+      .flow-track + .flow-caption {
+        margin: 18px 0 8px;
+      }
+
+      .flow-caption {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
       .flow-node {
         min-width: 0;
         border: 1px solid var(--line);
@@ -664,18 +676,19 @@
           <p class="brand-kicker">Neon Fuse / Product + Architecture</p>
           <h1>Capability Map</h1>
           <p>
-            A code-reviewed view of local play, Discord-native identity and parties, authoritative
-            realtime duels, persistent profiles, and the next bounded intelligence systems.
+            A code-reviewed view of the single-player campaign and Versus modes, Discord-native
+            identity and parties, authoritative realtime duels, persistent profiles, and the next
+            bounded intelligence systems.
           </p>
         </div>
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>25</strong>
+            <strong>30</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
-            <strong>4</strong>
+            <strong>5</strong>
           </div>
         </div>
       </header>
@@ -689,7 +702,8 @@
             </div>
             <p class="section-note">
               Local play still degrades gracefully; Discord duels use a dedicated authoritative
-              process and persist uniquely keyed results in MongoDB.
+              process and persist uniquely keyed results in MongoDB. Campaign results are
+              client-reported, so progress stays personal and unranked.
             </p>
           </div>
           <div class="flow-track" role="img" aria-label="Verified Discord identity flows through the Activity and game client into an authoritative WebSocket simulation and MongoDB">
@@ -718,6 +732,33 @@
               <strong>Profiles + duel results</strong>
             </div>
           </div>
+          <p class="flow-caption">Single-player campaign path</p>
+          <div class="flow-track" role="img" aria-label="Campaign stage data drives a local Phaser round, the browser reports the result, the server validates it against unlocked stages, and progress is derived from stored matches and unlocks Versus variants">
+            <div class="flow-node">
+              <span>Stage data</span>
+              <strong>12 stages, bounded tuning</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <span>Local round</span>
+              <strong>Phaser arena + bots</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <span>Result</span>
+              <strong>Client-reported facts</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node server-boundary">
+              <span>Validation</span>
+              <strong>Zod + unlock check</strong>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+              <span>Derived progress</span>
+              <strong>Stars, acts, Overclocked</strong>
+            </div>
+          </div>
         </section>
 
         <section class="map-section" aria-labelledby="capability-map-title">
@@ -739,8 +780,20 @@
                 <h3 class="lane-heading">Player experience / React</h3>
                 <div class="capability-grid">
                   <button class="capability-node" type="button" aria-pressed="true" data-capability="match-modes" data-status="implemented">
-                    <strong>Three match modes</strong>
-                    <span>Local bot match, spectator skirmish, Discord friend duel.</span>
+                    <strong>Four play modes</strong>
+                    <span>Campaign, Versus, spectator skirmish, Discord friend duel.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="campaign" data-status="implemented">
+                    <strong>Campaign</strong>
+                    <span>Three acts, 12 stages, star goals, gauntlets, big boards.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="versus" data-status="implemented">
+                    <strong>Versus picker</strong>
+                    <span>Pick any bot; clear its Act 2 stage to unlock Overclocked.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="campaign-rewards" data-status="planned">
+                    <strong>Campaign achievements</strong>
+                    <span>Act-clear titles. Designed, not yet derived in progression.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="bot-lab" data-status="implemented">
                     <strong>Bot Lab</strong>
@@ -755,7 +808,7 @@
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="touch" data-status="implemented">
                     <strong>Responsive controls</strong>
-                    <span>Keyboard, D-pad, bomb/reset actions, fitted arena.</span>
+                    <span>Keyboard, D-pad, bomb/reset actions, fitted or followed arena.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="scores" data-status="implemented">
                     <strong>High scores</strong>
@@ -783,7 +836,7 @@
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="career" data-status="implemented">
                     <strong>Career statistics</strong>
-                    <span>Verified duels, unranked local record, recent history.</span>
+                    <span>Verified duels, unranked local and campaign record, history.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="progression" data-status="implemented">
                     <strong>Player progression</strong>
@@ -801,7 +854,7 @@
                 <div class="capability-grid">
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="arena-rules" data-status="implemented">
                     <strong>Arena rules</strong>
-                    <span>Grid, walkability, blast propagation, danger.</span>
+                    <span>Sized grids, walkability, blast propagation, danger.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="bot-brain" data-status="implemented">
                     <strong>Utility bot brain</strong>
@@ -823,9 +876,17 @@
                     <strong>Overdrive art direction</strong>
                     <span>Fusebot characters, 2.5D arena, new blasts, self-hosted type.</span>
                   </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="arena-presets" data-status="implemented">
+                    <strong>Arena presets + stage tuning</strong>
+                    <span>Standard, Open Core, Maze; clamped bot tuning; gauntlet win rule.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="megagrid" data-status="implemented">
+                    <strong>Megagrid camera</strong>
+                    <span>Follow camera, minimap, edge arrows on boards up to 25×19.</span>
+                  </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="maps" data-status="planned">
                     <strong>Generated maps</strong>
-                    <span>Validated layouts and challenge metadata.</span>
+                    <span>Validated generated layouts and challenge metadata.</span>
                   </button>
                 </div>
               </section>
@@ -835,7 +896,11 @@
                 <div class="capability-grid">
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="matches-api" data-status="implemented">
                     <strong>Match persistence</strong>
-                    <span>Validated results, server score, visitor stats.</span>
+                    <span>Validated results incl. campaign stages, server score, visitor stats.</span>
+                  </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="campaign-progress" data-status="implemented">
+                    <strong>Campaign progress</strong>
+                    <span>Derived from stored wins; locked stages rejected; local mirror.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="leaderboard-api" data-status="implemented">
                     <strong>Leaderboard API</strong>
@@ -908,7 +973,7 @@
               <h2 id="review-title">What is strong, what should move next</h2>
             </div>
             <p class="section-note">
-              Identity, private Discord parties, layered abuse controls, bounded production health monitoring, and the Overdrive visual refresh are now in place; the next gains come from multi-process routing and regression coverage.
+              Identity, private Discord parties, layered abuse controls, production health monitoring, the Overdrive refresh, and the full single-player campaign are now in place; the next gains come from multiplayer breadth, regression coverage, and slimming the orchestration files.
             </p>
           </div>
           <div class="review-grid">
@@ -925,6 +990,7 @@
                 <li><span class="review-index">07</span><span><strong>Layered HTTP abuse controls.</strong> Authentication, Activity exchange, tickets, party discovery, and game-data writes use local and shared rate-limit buckets without storing raw client addresses.</span></li>
                 <li><span class="review-index">08</span><span><strong>Operational guardrails.</strong> Sanitized health/error telemetry, scheduled probes, graceful restarts, and enforced room/connection ceilings make the single-process launch topology observable.</span></li>
                 <li><span class="review-index">09</span><span><strong>Presentation kept apart from rules.</strong> The Overdrive refresh lives in <code>src/game/presentation</code> and the React shell; no simulation rule changed to deliver it.</span></li>
+                <li><span class="review-index">10</span><span><strong>Campaign as bounded data.</strong> Stages, unlocks, stars and Overclocked variants are plain tables over pure functions; every tuning value is clamped and progress is derived from stored matches, the same pattern future generated content must follow.</span></li>
               </ol>
             </section>
             <section class="review-column next">
@@ -932,9 +998,10 @@
               <h3>Review findings to address</h3>
               <ol class="review-list">
                 <li><span class="review-index">01</span><span><strong>Implement shared room routing before replica two.</strong> The launch service is explicitly capped at one process; horizontal scale still requires sticky/shared ownership and shared nonce replay storage.</span></li>
-                <li><span class="review-index">02</span><span><strong>Extend browser regression coverage.</strong> Playwright now covers the sign-in gate, local and skirmish rounds, the game menu, Profile, High Scores, Tracks, Bot Lab, and phone touch controls on desktop and phone. Still to automate: Activity lobby, party roster/invites, duel reconnect, profile sync, progression refresh, and result persistence.</span></li>
-                <li><span class="review-index">03</span><span><strong>Separate competitive rewards.</strong> Keep local achievements cosmetic until local match facts have an authoritative source.</span></li>
-                <li><span class="review-index">04</span><span><strong>Decompose orchestration.</strong> Continue extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
+                <li><span class="review-index">02</span><span><strong>Extend browser regression coverage.</strong> Playwright now covers the sign-in gate, local and skirmish rounds, Campaign (act locks, gauntlet, Megagrid), the Versus picker and Overclocked unlock, the game menu, Profile, High Scores, Tracks, Bot Lab, and phone touch controls on desktop and phone. Still to automate: Activity lobby, party roster/invites, duel reconnect, profile sync, progression refresh, and result persistence.</span></li>
+                <li><span class="review-index">03</span><span><strong>Separate competitive rewards.</strong> Keep local achievements, campaign stars and clear times cosmetic until local match facts have an authoritative source. Finish the designed Act-clear achievements on that basis.</span></li>
+                <li><span class="review-index">04</span><span><strong>Decompose orchestration.</strong> <code>ArenaScene</code> (about 1,100 lines) and <code>GameShell</code> (about 1,400) now carry campaign, Versus and Megagrid logic. Keep extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
+                <li><span class="review-index">05</span><span><strong>Teach bots about fuses.</strong> Bots flee any bomb and do not model fuse timing, so stage data keeps <code>botFuseMs</code> at 1500 or more even though the bound allows 1200. Fuse-aware bots would unlock harder tuning.</span></li>
               </ol>
             </section>
           </div>
@@ -942,7 +1009,7 @@
       </main>
 
       <footer class="capability-footer">
-        <p>Reviewed against repository code · 17 October 2026</p>
+        <p>Reviewed against repository code · 1 November 2026 · main @ 23a1dc3</p>
         <p>Solid = implemented · Dashed = planned</p>
       </footer>
     </div>
@@ -951,11 +1018,35 @@
       const capabilityDetails = {
         "match-modes": {
           status: "implemented",
-          title: "Three match modes",
-          summary: "Neon Fuse supports local player-versus-bot, watch-only Bot Skirmish, and a server-authoritative Discord friend duel.",
-          owner: "React setup + local Phaser arena + authoritative duel runtime",
-          code: ["src/game/modes.ts", "src/components/game/DuelGame.tsx", "server/rooms.ts"],
-          boundary: "Local modes remain client-run; friend duels accept commands while the server owns state and results."
+          title: "Four play modes",
+          summary: "Neon Fuse offers a staged Campaign, Versus against any bot, watch-only Bot Skirmish, and a server-authoritative Discord friend duel. On phones the Friend entry moves into the game menu.",
+          owner: "React mode row and menu + local Phaser arena + authoritative duel runtime",
+          code: ["src/game/modes.ts", "src/components/game/GameShell.tsx", "src/components/game/DuelGame.tsx", "server/rooms.ts"],
+          boundary: "Campaign, Versus and Skirmish run client-side; friend duels accept commands while the server owns state and results."
+        },
+        campaign: {
+          status: "implemented",
+          title: "Campaign",
+          summary: "Three acts (Circuit Ladder, Overclock, Megagrid) hold 12 stages. Each stage is data: opponent, arena size and preset, bounded modifiers, par time and block target for up to three stars. Clearing a stage unlocks the next; Act 2 adds tuned bots, layouts and a two-bot gauntlet, and Act 3 adds large boards.",
+          owner: "Pure stage table and rules + React campaign screen and result panel + Phaser scene",
+          code: ["src/game/simulation/campaign.ts", "src/components/game/CampaignScreen.tsx", "src/game/scenes/ArenaScene.ts"],
+          boundary: "Stars and clear times are personal and unranked. Stage tuning is clamped data (fuse 1200–2400ms, move scale 0.7–1.3), never executable logic."
+        },
+        versus: {
+          status: "implemented",
+          title: "Versus picker",
+          summary: "A roster dialog lets players fight any base bot at any time. Clearing a bot's Act 2 stage (2-1 to 2-4) unlocks its Overclocked variant, which uses one shared bounded tuning. The Overclocked toggle is session-only.",
+          owner: "Pure Versus rules + React roster dialog",
+          code: ["src/game/simulation/versus.ts", "src/components/game/VersusScreen.tsx"],
+          boundary: "Picking an opponent writes the existing Bot Lab slot, so stored preferences keep their shape. Base bots are never locked behind the campaign."
+        },
+        "campaign-rewards": {
+          status: "planned",
+          title: "Campaign achievements",
+          summary: "Act-clear milestones and titles (Ladder Climber, Overclocked, Megagrid) were designed alongside the campaign but are not in the achievement list yet.",
+          owner: "Future pure progression rules + profile UI",
+          code: ["docs/SINGLE_PLAYER.md", "src/game/simulation/progression.ts"],
+          boundary: "Derived from stored campaign wins like other achievements; client-reported results must not gate anything scarce."
         },
         "bot-lab": {
           status: "implemented",
@@ -976,7 +1067,7 @@
         touch: {
           status: "implemented",
           title: "Responsive controls",
-          summary: "Coarse-pointer devices receive a D-pad and action controls while pure layout geometry keeps the fixed arena visible.",
+          summary: "Coarse-pointer devices receive a D-pad and action controls while pure layout geometry keeps the arena visible, fitting it to the screen or following the player on large boards.",
           owner: "React input surface + pure layout calculation + Phaser adapter",
           code: ["src/game/simulation/layout.ts", "src/components/game/PhaserGame.tsx"],
           boundary: "Reserved band dimensions currently mirror CSS constants and should eventually be measured from the DOM."
@@ -1032,7 +1123,7 @@
         career: {
           status: "implemented",
           title: "Career statistics",
-          summary: "Profiles derive separate local and duel records, best local score, authoritative duel streaks, and a paginated recent-match history from durable result documents.",
+          summary: "Profiles derive separate local and duel records, best local score, authoritative duel streaks, and a paginated recent-match history from durable result documents. Campaign rounds count as local matches.",
           owner: "Pure career summarizer + authenticated history API + React profile UI",
           code: ["src/lib/player-career.ts", "src/app/api/profile/history/route.ts", "src/components/game/ProfileScreen.tsx"],
           boundary: "Local results are labeled unranked; verified duel totals come only from unique results written by the authoritative realtime server."
@@ -1064,7 +1155,7 @@
         "arena-rules": {
           status: "implemented",
           title: "Arena rules",
-          summary: "The fixed grid, hard and soft blocks, blast propagation, danger tiles, and movement rules are modeled as engine-independent data.",
+          summary: "Sized grids (13×11 by default, odd sizes up to 25×19), hard and soft blocks, blast propagation, danger tiles, and movement rules are modeled as engine-independent data.",
           owner: "Pure simulation modules",
           code: ["src/game/simulation/arena.ts", "src/game/simulation/blast.ts", "src/game/simulation/danger.ts"],
           boundary: "Simulation modules do not import React, Phaser, MongoDB, or browser I/O."
@@ -1096,15 +1187,31 @@
         bridge: {
           status: "implemented",
           title: "React ↔ Phaser bridge",
-          summary: "A narrow typed contract carries UI callbacks and selections while shared registry state handles touch input and audio control.",
+          summary: "A narrow typed contract carries UI callbacks, bot and campaign-stage selections, and round results while shared registry state handles touch input and audio control.",
           owner: "PhaserGame mount + createGame boundary",
           code: ["src/components/game/PhaserGame.tsx", "src/game/createGame.ts"],
           boundary: "New cross-layer state should extend this contract rather than introduce ad hoc globals."
         },
+        "arena-presets": {
+          status: "implemented",
+          title: "Arena presets + stage tuning",
+          summary: "Arenas are created from a size and a preset: Standard, Open Core (cleared centre) or Maze (dense soft blocks), always keeping spawn corners clear. Stage bots resolve through one clamping function, and a pure round-winner rule supports the two-bot gauntlet.",
+          owner: "Pure simulation modules",
+          code: ["src/game/simulation/arena.ts", "src/game/simulation/campaign.ts", "src/game/simulation/round.ts"],
+          boundary: "Presets change only soft-block placement; blast, danger and walkability rules are untouched. Layouts are hand-authored, not generated."
+        },
+        megagrid: {
+          status: "implemented",
+          title: "Megagrid camera",
+          summary: "Boards that would shrink below a readable tile size use a follow camera of about 11×9 tiles, a minimap, and edge arrows pointing at off-screen bots. Boards up to 13×11 keep the original fit-to-screen framing on every device.",
+          owner: "Pure camera planning + Phaser presentation",
+          code: ["src/game/simulation/layout.ts", "src/game/presentation/megagridView.ts", "src/game/scenes/ArenaScene.ts"],
+          boundary: "Presentation only. The minimap and indicators read simulation state and add no React↔Phaser traffic per frame."
+        },
         maps: {
           status: "planned",
           title: "Generated maps",
-          summary: "Future map and challenge generation can select known cells, layouts, and rule IDs from a validated schema.",
+          summary: "Hand-authored presets now ship (see Arena presets). Generating layouts and challenges from a validated schema, with a model proposing metadata, is still planned.",
           owner: "Future server generator + pure layout validation",
           code: ["docs/ARCHITECTURE.md", "src/game/simulation/arena.ts"],
           boundary: "A model proposes structured metadata; deterministic code validates and constructs the playable arena."
@@ -1112,10 +1219,18 @@
         "matches-api": {
           status: "implemented",
           title: "Match persistence",
-          summary: "The match endpoint validates payloads, recomputes score, records history, and updates anonymous visitor statistics when MongoDB is available.",
+          summary: "The match endpoint validates payloads (including a required known stage for campaign results), recomputes score, records history, and updates anonymous visitor statistics when MongoDB is available.",
           owner: "Next.js route + MongoDB infrastructure",
           code: ["src/app/api/matches/route.ts", "src/lib/schemas/match.ts"],
           boundary: "MONGODB_URI is read only by server modules and is never sent to the client."
+        },
+        "campaign-progress": {
+          status: "implemented",
+          title: "Campaign progress",
+          summary: "Progress is folded from the player's stored campaign wins rather than incremented, so retries never double count. The match route rejects results for stages that are not unlocked, the profile API returns the derived progress, and a localStorage mirror keeps Mongo-less runs advancing.",
+          owner: "Pure progress folding + Next.js routes + MongoDB + client storage",
+          code: ["src/lib/player-career.ts", "src/app/api/matches/route.ts", "src/app/api/profile/route.ts", "src/lib/client-storage.ts"],
+          boundary: "Results are client-reported like Local Match, so progress is personal and unranked and the server-derived value wins over the local mirror."
         },
         "leaderboard-api": {
           status: "implemented",
