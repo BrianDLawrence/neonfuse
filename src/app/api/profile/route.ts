@@ -56,7 +56,8 @@ export async function GET(request: Request) {
   ]);
   const progression = calculatePlayerProgression(
     stats,
-    result.profile.progression.equippedTitle
+    result.profile.progression.equippedTitle,
+    campaign
   );
   return NextResponse.json({
     ok: true,
@@ -88,11 +89,14 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const stats = await loadPlayerCareer(context.db, context.player);
+  const [stats, campaign] = await Promise.all([
+    loadPlayerCareer(context.db, context.player),
+    loadCampaignProgress(context.db, context.player)
+  ]);
   const requestedTitle = parsed.data.equippedTitle;
 
   if (requestedTitle) {
-    const availableProgression = calculatePlayerProgression(stats, requestedTitle);
+    const availableProgression = calculatePlayerProgression(stats, requestedTitle, campaign);
 
     if (availableProgression.equippedTitle !== requestedTitle) {
       return NextResponse.json({ ok: false, error: "Title is not unlocked" }, { status: 403 });
@@ -100,6 +104,10 @@ export async function PATCH(request: Request) {
   }
 
   const profile = await updatePlayerProfile(context.db, context.player, parsed.data);
-  const progression = calculatePlayerProgression(stats, profile.progression.equippedTitle);
+  const progression = calculatePlayerProgression(
+    stats,
+    profile.progression.equippedTitle,
+    campaign
+  );
   return NextResponse.json({ ok: true, profile: { ...profile, stats, progression } });
 }

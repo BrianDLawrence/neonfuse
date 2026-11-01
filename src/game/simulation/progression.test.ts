@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  EMPTY_CAMPAIGN_PROGRESS,
+  getActStages,
+  type CampaignActId,
+  type CampaignProgress
+} from "./campaign";
+import {
+  ACHIEVEMENTS,
+  ACHIEVEMENT_IDS,
   MAX_PLAYER_LEVEL,
+  PLAYER_TITLE_IDS,
   calculatePlayerProgression,
-  getLevelProgress
+  getLevelProgress,
+  isActCleared
 } from "./progression";
 
 const EMPTY_CAREER = {
@@ -11,6 +21,22 @@ const EMPTY_CAREER = {
   bestScore: 0,
   bestWinStreak: 0
 };
+
+function clearActs(acts: CampaignActId[], skip: string[] = []): CampaignProgress {
+  const stages: CampaignProgress["stages"] = {};
+
+  for (const act of acts) {
+    for (const stage of getActStages(act)) {
+      if (!skip.includes(stage.id)) {
+        stages[stage.id] = { stars: 1, bestTimeMs: 60_000 };
+      }
+    }
+  }
+
+  return { stages };
+}
+
+const CAMPAIGN_ACHIEVEMENTS = ["ladder-climber", "overclocked", "megagrid"] as const;
 
 describe("calculatePlayerProgression", () => {
   it("starts a new player at level one with the default title", () => {
@@ -89,5 +115,87 @@ describe("calculatePlayerProgression", () => {
     expect(getLevelProgress(0)).toEqual({ current: 0, required: 500, percent: 0 });
     expect(getLevelProgress(650)).toEqual({ current: 150, required: 500, percent: 30 });
     expect(getLevelProgress(progression.xp)).toEqual({ current: 500, required: 500, percent: 100 });
+  });
+
+  it("only awards act-clear achievements from campaign progress", () => {
+    const progression = calculatePlayerProgression(EMPTY_CAREER, null, EMPTY_CAMPAIGN_PROGRESS);
+
+    expect(progression.badges).toEqual([]);
+    expect(progression.unlockedTitles).toEqual(["fuse-initiate"]);
+  });
+
+  it("does not award an act that is only partially cleared", () => {
+    const progression = calculatePlayerProgression(
+      EMPTY_CAREER,
+      "ladder-climber",
+      clearActs([1], [getActStages(1)[0].id])
+    );
+
+    expect(progression.badges).not.toContain("ladder-climber");
+    expect(progression.unlockedTitles).not.toContain("ladder-climber");
+    expect(progression.equippedTitle).toBe("fuse-initiate");
+  });
+
+  it("does not award an act when only its last stage is cleared", () => {
+    const stages = getActStages(2);
+    const last = stages[stages.length - 1];
+    const progress: CampaignProgress = { stages: { [last.id]: { stars: 3, bestTimeMs: 1_000 } } };
+
+    expect(isActCleared(progress, 2)).toBe(false);
+    expect(calculatePlayerProgression(EMPTY_CAREER, null, progress).badges).toEqual([]);
+  });
+
+  it.each([
+    [1, "ladder-climber", "Ladder Climber"],
+    [2, "overclocked", "Overclocked"],
+    [3, "megagrid", "Megagrid"]
+  ] as const)("awards act %i when every stage is cleared", (act, id, name) => {
+    const progression = calculatePlayerProgression(EMPTY_CAREER, id, clearActs([act]));
+
+    expect(progression.badges).toEqual([id]);
+    expect(progression.unlockedTitles).toEqual(["fuse-initiate", id]);
+    expect(progression.equippedTitle).toBe(id);
+    expect(ACHIEVEMENTS[id]).toMatchObject({ name, titleId: id });
+  });
+
+  it("awards all three act achievements after a full campaign clear", () => {
+    const progression = calculatePlayerProgression(
+      EMPTY_CAREER,
+      "megagrid",
+      clearActs([1, 2, 3])
+    );
+
+    expect(progression.badges).toEqual([...CAMPAIGN_ACHIEVEMENTS]);
+    expect(progression.unlockedTitles).toEqual(["fuse-initiate", ...CAMPAIGN_ACHIEVEMENTS]);
+    expect(progression.equippedTitle).toBe("megagrid");
+  });
+
+  it("keeps career achievements independent of campaign progress", () => {
+    const career = {
+      local: { played: 1, wins: 1, losses: 0, draws: 0 },
+      duel: { played: 0, wins: 0, losses: 0, draws: 0 },
+      bestScore: 0,
+      bestWinStreak: 0
+    };
+    const withoutCampaign = calculatePlayerProgression(career);
+    const withCampaign = calculatePlayerProgression(career, null, clearActs([1, 2, 3]));
+
+    expect(withoutCampaign.badges).toEqual(["first-spark", "arena-breaker"]);
+    expect(withCampaign.badges).toEqual(["first-spark", "arena-breaker", ...CAMPAIGN_ACHIEVEMENTS]);
+    expect(withCampaign.xp).toBe(withoutCampaign.xp);
+  });
+
+  it("refuses an act title the player has not earned", () => {
+    expect(calculatePlayerProgression(EMPTY_CAREER, "megagrid").equippedTitle).toBe("fuse-initiate");
+    expect(
+      calculatePlayerProgression(EMPTY_CAREER, "megagrid", clearActs([1, 2])).equippedTitle
+    ).toBe("fuse-initiate");
+  });
+
+  it("keeps every achievement title registered", () => {
+    for (const id of ACHIEVEMENT_IDS) {
+      const titleId = ACHIEVEMENTS[id].titleId;
+      expect(titleId === null || PLAYER_TITLE_IDS.includes(titleId)).toBe(true);
+    }
   });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/mongoIndexes", () => ({ ensureGameIndexes: vi.fn() }));
 vi.mock("@/lib/mongodb", () => ({ tryGetMongoDb: vi.fn() }));
 vi.mock("@/lib/player-career", () => ({
+  loadCampaignProgress: vi.fn(),
   loadPlayerCareer: vi.fn(),
   loadPlayerHistory: vi.fn()
 }));
@@ -10,9 +11,10 @@ vi.mock("@/lib/player-identity", () => ({ getAuthenticatedPlayer: vi.fn() }));
 vi.mock("@/lib/player-profiles", () => ({ getOrCreatePlayerProfile: vi.fn() }));
 
 import { tryGetMongoDb } from "@/lib/mongodb";
-import { loadPlayerCareer, loadPlayerHistory } from "@/lib/player-career";
+import { loadCampaignProgress, loadPlayerCareer, loadPlayerHistory } from "@/lib/player-career";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { getOrCreatePlayerProfile } from "@/lib/player-profiles";
+import { getActStages } from "@/game/simulation/campaign";
 import { GET } from "./route";
 
 const player = { id: "player-a", displayName: "Alice", source: "web" as const };
@@ -28,6 +30,7 @@ beforeEach(() => {
     bestScore: 0,
     bestWinStreak: 1
   });
+  vi.mocked(loadCampaignProgress).mockResolvedValue({ stages: {} });
   vi.mocked(loadPlayerHistory).mockResolvedValue({ matches: [], nextCursor: null });
   vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
     created: false,
@@ -68,5 +71,30 @@ describe("profile history route", () => {
     expect(loadPlayerCareer).toHaveBeenCalledWith(db, player);
     expect(loadPlayerHistory).toHaveBeenCalledWith(db, player, 8, new Date(before));
     expect((await response.json()).progression.unlockedTitles).toContain("duel-certified");
+  });
+
+  it("keeps an equipped campaign title when the act is cleared", async () => {
+    vi.mocked(loadCampaignProgress).mockResolvedValue({
+      stages: Object.fromEntries(
+        getActStages(1).map((stage) => [stage.id, { stars: 1, bestTimeMs: 60_000 }])
+      )
+    });
+    vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
+      created: false,
+      profile: {
+        progression: {
+          xp: 0,
+          level: 1,
+          badges: [],
+          unlockedTitles: ["fuse-initiate"],
+          equippedTitle: "ladder-climber"
+        }
+      } as never
+    });
+
+    const { progression } = await (await GET(new Request("http://localhost/api/profile/history"))).json();
+
+    expect(progression.badges).toContain("ladder-climber");
+    expect(progression.equippedTitle).toBe("ladder-climber");
   });
 });

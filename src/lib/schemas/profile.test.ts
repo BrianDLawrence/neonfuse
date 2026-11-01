@@ -34,6 +34,12 @@ describe("playerProfilePatchSchema", () => {
     expect(playerProfilePatchSchema.safeParse({ equippedTitle: null }).success).toBe(false);
   });
 
+  it("accepts the campaign act titles", () => {
+    for (const equippedTitle of ["ladder-climber", "overclocked", "megagrid"]) {
+      expect(playerProfilePatchSchema.safeParse({ equippedTitle }).success).toBe(true);
+    }
+  });
+
   it("rejects out-of-range audio and unknown preference fields", () => {
     expect(
       playerProfilePatchSchema.safeParse({

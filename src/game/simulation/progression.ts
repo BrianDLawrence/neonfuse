@@ -1,3 +1,11 @@
+import {
+  EMPTY_CAMPAIGN_PROGRESS,
+  getActStages,
+  isStageCleared,
+  type CampaignActId,
+  type CampaignProgress
+} from "./campaign";
+
 export const XP_PER_LEVEL = 500;
 export const MAX_PLAYER_LEVEL = 50;
 
@@ -7,7 +15,10 @@ export const PLAYER_TITLE_IDS = [
   "duel-certified",
   "hot-streak",
   "high-voltage",
-  "grid-veteran"
+  "grid-veteran",
+  "ladder-climber",
+  "overclocked",
+  "megagrid"
 ] as const;
 
 export type PlayerTitleId = (typeof PLAYER_TITLE_IDS)[number];
@@ -18,7 +29,10 @@ export const ACHIEVEMENT_IDS = [
   "duel-certified",
   "three-alarm",
   "score-surge",
-  "arena-regular"
+  "arena-regular",
+  "ladder-climber",
+  "overclocked",
+  "megagrid"
 ] as const;
 
 export type AchievementId = (typeof ACHIEVEMENT_IDS)[number];
@@ -62,6 +76,18 @@ export const PLAYER_TITLES: Record<PlayerTitleId, { name: string; description: s
   "grid-veteran": {
     name: "Grid Veteran",
     description: "Completed 25 matches across all modes."
+  },
+  "ladder-climber": {
+    name: "Ladder Climber",
+    description: "Cleared every Circuit Ladder stage in Campaign."
+  },
+  overclocked: {
+    name: "Overclocked",
+    description: "Cleared every Overclock stage in Campaign."
+  },
+  megagrid: {
+    name: "Megagrid",
+    description: "Cleared every Megagrid stage in Campaign."
   }
 };
 
@@ -98,10 +124,44 @@ export const ACHIEVEMENTS: Record<
     name: "Arena Regular",
     description: "Complete 25 matches across all modes.",
     titleId: "grid-veteran"
+  },
+  "ladder-climber": {
+    name: "Ladder Climber",
+    description: "Clear every Circuit Ladder stage (Act 1).",
+    titleId: "ladder-climber"
+  },
+  overclocked: {
+    name: "Overclocked",
+    description: "Clear every Overclock stage (Act 2).",
+    titleId: "overclocked"
+  },
+  megagrid: {
+    name: "Megagrid",
+    description: "Clear every Megagrid stage (Act 3).",
+    titleId: "megagrid"
   }
 };
 
-function earnedAchievements(stats: ProgressionCareerStats): AchievementId[] {
+/** The campaign act whose full clear earns each campaign achievement. */
+const ACT_CLEAR_ACHIEVEMENTS: Record<
+  "ladder-climber" | "overclocked" | "megagrid",
+  CampaignActId
+> = {
+  "ladder-climber": 1,
+  overclocked: 2,
+  megagrid: 3
+};
+
+/** An act is cleared once every one of its stages has a stored clear. */
+export function isActCleared(progress: CampaignProgress, act: CampaignActId): boolean {
+  const stages = getActStages(act);
+  return stages.length > 0 && stages.every((stage) => isStageCleared(progress, stage.id));
+}
+
+function earnedAchievements(
+  stats: ProgressionCareerStats,
+  campaign: CampaignProgress
+): AchievementId[] {
   const totalPlayed = stats.local.played + stats.duel.played;
 
   return ACHIEVEMENT_IDS.filter((id) => {
@@ -118,6 +178,10 @@ function earnedAchievements(stats: ProgressionCareerStats): AchievementId[] {
         return stats.bestScore >= 7_500;
       case "arena-regular":
         return totalPlayed >= 25;
+      case "ladder-climber":
+      case "overclocked":
+      case "megagrid":
+        return isActCleared(campaign, ACT_CLEAR_ACHIEVEMENTS[id]);
     }
   });
 }
@@ -129,13 +193,18 @@ function calculateXp(stats: ProgressionCareerStats): number {
   return Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, localXp + duelXp));
 }
 
-/** Derives the complete profile progression view from durable career facts. */
+/**
+ * Derives the complete profile progression view from durable career facts.
+ * `campaign` is the progress derived from stored campaign matches; omit it only
+ * where no campaign data is available, since act-clear titles then stay locked.
+ */
 export function calculatePlayerProgression(
   stats: ProgressionCareerStats,
-  requestedTitle: PlayerTitleId | null = null
+  requestedTitle: PlayerTitleId | null = null,
+  campaign: CampaignProgress = EMPTY_CAMPAIGN_PROGRESS
 ): PlayerProgression {
   const xp = calculateXp(stats);
-  const badges = earnedAchievements(stats);
+  const badges = earnedAchievements(stats, campaign);
   const unlockedTitles = [
     "fuse-initiate" as const,
     ...badges.flatMap((id) => {

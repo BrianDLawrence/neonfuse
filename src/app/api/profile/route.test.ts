@@ -16,6 +16,7 @@ import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { loadCampaignProgress, loadPlayerCareer } from "@/lib/player-career";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { getOrCreatePlayerProfile, updatePlayerProfile } from "@/lib/player-profiles";
+import { getActStages } from "@/game/simulation/campaign";
 import { GET, PATCH } from "./route";
 
 const player = {
@@ -132,6 +133,68 @@ describe("profile route", () => {
 
     expect(response.status).toBe(403);
     expect(updatePlayerProfile).not.toHaveBeenCalled();
+  });
+
+  it("rejects a campaign act title until every stage of that act is cleared", async () => {
+    // beforeEach only clears stage 1-1, which is not the whole of Act 1.
+    const response = await PATCH(
+      new Request("http://localhost/api/profile", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ equippedTitle: "ladder-climber" })
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(loadCampaignProgress).toHaveBeenCalledWith(db, player);
+    expect(updatePlayerProfile).not.toHaveBeenCalled();
+  });
+
+  it("persists a campaign act title once the act is cleared", async () => {
+    vi.mocked(loadCampaignProgress).mockResolvedValue({
+      stages: Object.fromEntries(
+        getActStages(1).map((stage) => [stage.id, { stars: 1, bestTimeMs: 60_000 }])
+      )
+    });
+    vi.mocked(updatePlayerProfile).mockResolvedValue({
+      playerId: player.id,
+      progression: { ...storedProgression, equippedTitle: "ladder-climber" }
+    } as never);
+
+    const response = await PATCH(
+      new Request("http://localhost/api/profile", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ equippedTitle: "ladder-climber" })
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(updatePlayerProfile).toHaveBeenCalledWith(db, player, { equippedTitle: "ladder-climber" });
+    expect(payload.profile.progression.equippedTitle).toBe("ladder-climber");
+    expect(payload.profile.progression.unlockedTitles).toContain("ladder-climber");
+  });
+
+  it("derives act-clear badges on profile reads from stored campaign rounds", async () => {
+    vi.mocked(loadCampaignProgress).mockResolvedValue({
+      stages: Object.fromEntries(
+        getActStages(1).map((stage) => [stage.id, { stars: 1, bestTimeMs: 60_000 }])
+      )
+    });
+    vi.mocked(getOrCreatePlayerProfile).mockResolvedValue({
+      created: false,
+      profile: {
+        playerId: player.id,
+        stats: {},
+        progression: { ...storedProgression, equippedTitle: "ladder-climber" }
+      } as never
+    });
+
+    const payload = await (await GET(new Request("http://localhost/api/profile"))).json();
+
+    expect(payload.profile.progression.badges).toContain("ladder-climber");
+    expect(payload.profile.progression.equippedTitle).toBe("ladder-climber");
   });
 
   it("persists an equipped title after deriving its unlock from career facts", async () => {

@@ -221,6 +221,11 @@ test.describe("game shell", () => {
     await expect(profile.getByRole("heading", { name: TEST_PILOT })).toBeVisible();
     await expect(profile.getByRole("heading", { name: "Match Record" })).toBeVisible();
 
+    const achievements = profile.getByLabel("Achievement progress");
+    for (const name of ["Ladder Climber", "Overclocked", "Megagrid"]) {
+      await expect(achievements.getByText(name, { exact: true })).toBeVisible();
+    }
+
     await profile.getByRole("button", { name: "Close profile" }).click();
     await expect(profile).toBeHidden();
   });

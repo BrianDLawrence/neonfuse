@@ -1,7 +1,15 @@
 # Single-Player Modes — Design
 
 Status: **all four phases implemented** (Campaign Acts 1–3 and the Versus
-picker). Notes from the build:
+picker), and the act-clear achievements have shipped. Notes from the build:
+- Achievements: clearing every stage of an act earns "Ladder Climber" (Act 1),
+  "Overclocked" (Act 2) or "Megagrid" (Act 3), each with an equippable title of
+  the same name. They are derived in `calculatePlayerProgression` from the
+  `CampaignProgress` the server already derives from stored campaign matches, so
+  nothing new is stored. Campaign results are client-reported, so these stay
+  cosmetic: they gate nothing and do not touch leaderboards. The profile, history
+  and party-roster call sites all pass campaign progress; omitting it leaves the
+  act titles locked.
 - Versus: every bot's Overclocked variant unlocks by clearing its Act 2 stage
   (2-1 to 2-4) and uses one shared, bounded tuning (`VERSUS_OVERCLOCK`). The
   Overclocked toggle is session-only, so stored preferences are unchanged.
@@ -397,4 +405,4 @@ Overclocked variant unlocks.
 | Lock Versus opponents behind the campaign? | No. Base bots stay free; campaign unlocks Overclocked variants. |
 | Server-persisted or local-only progress? | Server-derived from `matches` with a local mirror, matching career totals. |
 | New bot personalities for Acts 2–3? | Not needed for the plan as written. A final boss would need a new `BotProfileId`, Fusebot art, and a profile-schema enum update. |
-| Achievements/titles for clears? | Yes, in Phase 1 or 2: "Ladder Climber" (Act 1), "Overclocked" (Act 2), "Megagrid" (Act 3), derived like the existing achievements. |
+| Achievements/titles for clears? | **Shipped.** Yes, in Phase 1 or 2: "Ladder Climber" (Act 1), "Overclocked" (Act 2), "Megagrid" (Act 3), derived like the existing achievements. |
