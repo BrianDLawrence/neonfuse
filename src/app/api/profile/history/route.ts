@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ensureGameIndexes } from "@/lib/mongoIndexes";
 import { tryGetMongoDb } from "@/lib/mongodb";
-import { loadPlayerCareer, loadPlayerHistory } from "@/lib/player-career";
+import { loadCampaignProgress, loadPlayerCareer, loadPlayerHistory } from "@/lib/player-career";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { getOrCreatePlayerProfile } from "@/lib/player-profiles";
 import { calculatePlayerProgression } from "@/game/simulation/progression";
@@ -42,8 +42,9 @@ export async function GET(request: Request) {
   }
 
   await ensureGameIndexes(db);
-  const [stats, history, { profile }] = await Promise.all([
+  const [stats, campaign, history, { profile }] = await Promise.all([
     loadPlayerCareer(db, player),
+    loadCampaignProgress(db, player),
     loadPlayerHistory(
       db,
       player,
@@ -53,6 +54,10 @@ export async function GET(request: Request) {
     getOrCreatePlayerProfile(db, player)
   ]);
 
-  const progression = calculatePlayerProgression(stats, profile.progression.equippedTitle);
+  const progression = calculatePlayerProgression(
+    stats,
+    profile.progression.equippedTitle,
+    campaign
+  );
   return NextResponse.json({ ok: true, stats, progression, ...history });
 }

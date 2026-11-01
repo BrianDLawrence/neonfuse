@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { discordPlayerId } from "@/lib/discord-identity";
+import { getActStages } from "@/game/simulation/campaign";
 import { buildDiscordPartyRoster } from "@/lib/discord-party";
 
 describe("buildDiscordPartyRoster", () => {
@@ -110,5 +111,39 @@ describe("buildDiscordPartyRoster", () => {
       displayName: "Current Player",
       isCurrentPlayer: true
     });
+  });
+
+  it("shows an equipped act title only once the member has cleared the act", () => {
+    const aliceId = discordPlayerId("discord-a");
+    const bobId = discordPlayerId("discord-b");
+    const actOneWins = getActStages(1).map((stage) => ({
+      accountId: aliceId,
+      stageId: stage.id,
+      winner: "player" as const,
+      durationMs: 60_000,
+      blocksCleared: 10
+    }));
+    const roster = buildDiscordPartyRoster({
+      discordUserIds: ["discord-a", "discord-b"],
+      currentDiscordUserId: "discord-a",
+      sessionsNewestFirst: [
+        { discordUserId: "discord-a", playerId: aliceId, displayName: "Alice" },
+        { discordUserId: "discord-b", playerId: bobId, displayName: "Bob" }
+      ],
+      profiles: [
+        { playerId: aliceId, progression: { equippedTitle: "ladder-climber" } },
+        { playerId: bobId, progression: { equippedTitle: "ladder-climber" } }
+      ],
+      localMatches: [],
+      duelsOldestFirst: [],
+      campaignWinsOldestFirst: actOneWins
+    });
+
+    expect(roster.members.find((member) => member.displayName === "Alice")?.title).toBe(
+      "Ladder Climber"
+    );
+    expect(roster.members.find((member) => member.displayName === "Bob")?.title).toBe(
+      "Fuse Initiate"
+    );
   });
 });
