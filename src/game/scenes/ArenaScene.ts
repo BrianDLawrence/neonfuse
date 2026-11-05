@@ -112,6 +112,7 @@ export class ArenaScene extends Phaser.Scene {
   private wasd?: Record<string, Phaser.Input.Keyboard.Key>;
   private touchInput?: TouchInputState;
   private touchBombQueued = false;
+  private keyboardBombQueued = false;
   private lastTouchStepAt = Number.NEGATIVE_INFINITY;
   private actors = new Map<ActorId, CombatActor>();
   private botMoveEvent?: Phaser.Time.TimerEvent;
@@ -168,6 +169,7 @@ export class ArenaScene extends Phaser.Scene {
     this.game.events.on("touch-bomb", this.handleTouchBomb, this);
     this.game.events.on("touch-reset", this.resetRound, this);
     this.input.keyboard?.on("keydown", this.unlockAudio, this);
+    this.input.keyboard?.on("keydown-SPACE", this.handleBombKey, this);
     this.input.on("pointerdown", this.unlockAudio, this);
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -175,6 +177,7 @@ export class ArenaScene extends Phaser.Scene {
       this.game.events.off("touch-bomb", this.handleTouchBomb, this);
       this.game.events.off("touch-reset", this.resetRound, this);
       this.input.keyboard?.off("keydown", this.unlockAudio, this);
+      this.input.keyboard?.off("keydown-SPACE", this.handleBombKey, this);
       this.input.off("pointerdown", this.unlockAudio, this);
       this.scale.off("resize", this.handleResize, this);
       this.indicators?.destroy();
@@ -192,6 +195,10 @@ export class ArenaScene extends Phaser.Scene {
     if (!this.cursors || !this.wasd) {
       return;
     }
+
+    // Taken every frame, so a press while the round is not live is dropped, not replayed later.
+    const bombPressed = this.keyboardBombQueued;
+    this.keyboardBombQueued = false;
 
     if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
       this.resetRound();
@@ -215,7 +222,7 @@ export class ArenaScene extends Phaser.Scene {
       this.tryMovePlayer(player, directionToDelta(direction));
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.wasd.SPACE) || this.consumeTouchBomb()) {
+    if (bombPressed || this.consumeTouchBomb()) {
       this.plantPlayerBomb(player);
     }
   }
@@ -352,6 +359,14 @@ export class ArenaScene extends Phaser.Scene {
 
   private handleTouchBomb() {
     this.touchBombQueued = true;
+  }
+
+  // Phaser drains key events once per frame, and a keyup in the same frame clears
+  // JustDown, so a quick tap would be lost. The keydown event itself always fires.
+  private handleBombKey(event: KeyboardEvent) {
+    if (!event.repeat) {
+      this.keyboardBombQueued = true;
+    }
   }
 
   private consumeTouchBomb(): boolean {
