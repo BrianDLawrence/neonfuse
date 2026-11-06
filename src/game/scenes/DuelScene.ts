@@ -30,6 +30,7 @@ export class DuelScene extends Phaser.Scene {
   private roundId = "";
   private keys?: Record<string, Phaser.Input.Keyboard.Key>;
   private lastStep = -Infinity;
+  private bombQueued = false;
   constructor(private readonly view: DuelView) { super("ArenaScene"); }
 
   create() {
@@ -37,8 +38,13 @@ export class DuelScene extends Phaser.Scene {
     drawArenaFloor(this, this.board, 0, 0);
     this.danger = new DangerOverlay(this);
     this.keys = this.input.keyboard?.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE", false) as Record<string, Phaser.Input.Keyboard.Key>;
+    // A keyup drained in the same frame clears JustDown, so queue the bomb from the keydown itself.
+    this.input.keyboard?.on("keydown-SPACE", this.queueBomb, this);
     this.scale.on("resize", this.fit, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.fit, this));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off("keydown-SPACE", this.queueBomb, this);
+      this.scale.off("resize", this.fit, this);
+    });
     this.fit();
     this.view.loaded();
   }
@@ -120,6 +126,8 @@ export class DuelScene extends Phaser.Scene {
       this.seenExplosions.add(blast.id);
       playExplosionEffect(this, blast, (tile) => this.world(tile));
     }
+    const bombPressed = this.bombQueued;
+    this.bombQueued = false;
     if (snapshot?.phase !== "playing" || !this.keys) return;
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(focused.tagName)) return;
@@ -131,8 +139,9 @@ export class DuelScene extends Phaser.Scene {
     if (direction && time - this.lastStep >= cadence) {
       this.view.input({ type: "move", direction }); this.lastStep = time;
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.view.input({ type: "bomb" });
+    if (bombPressed) this.view.input({ type: "bomb" });
   }
+  private queueBomb(event: KeyboardEvent) { if (!event.repeat) this.bombQueued = true; }
   private renderFighter(seat: number, tile: GridPoint, alive: boolean, isLocal: boolean) {
     const world = this.world(tile);
     const tileKey = `${tile.x},${tile.y}`;

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { getDailyChallenge, getDailyOpponents, type DailyChallenge } from "@/game/simulation/daily";
-import { signIn, stubHighScores, TEST_PILOT } from "./fixtures";
+import { bannerCaptions, recordRoundStatuses, roundStatuses, signIn, stubHighScores, TEST_PILOT } from "./fixtures";
 
 // Daily Fuse tests pin the page clock, so the expected challenge never shifts at
 // midnight UTC. The day is in the past so the stubbed session stays unexpired.
@@ -31,11 +31,17 @@ test.describe("game shell", () => {
     // The countdown runs on Phaser's game clock, which crawls under CI's software
     // WebGL (each 650ms tick took about 5s on GitHub runners), so allow extra time.
     test.slow();
+    await recordRoundStatuses(page);
     await openShell(page);
 
     await expect(page.getByRole("button", { name: "Versus" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByRole("status").filter({ hasText: "Get ready" })).toBeVisible();
-    await expect(statusChip(page)).toHaveText("Live", { timeout: 60_000 });
+    await expect.poll(() => roundStatuses(page), { timeout: 60_000 }).toContain("Live");
+    // Each tick lasts 650ms of arena time, so check the recorded sequence rather than
+    // racing the banner: it counted down 3-2-1 under "Get ready" before going live.
+    // Bots may already have reported "Danger" by now, so compare the opening only.
+    const beforePlant = await roundStatuses(page);
+    expect(beforePlant.slice(0, 6)).toEqual(["Warmup", "3", "2", "1", "Fuse!", "Live"]);
+    expect((await bannerCaptions(page)).slice(0, 4)).toEqual(["3 Get ready", "2 Get ready", "1 Get ready", "Fuse!"]);
 
     if (testInfo.project.name === "phone") {
       await page.getByRole("button", { name: "Plant bomb" }).tap();
@@ -43,8 +49,10 @@ test.describe("game shell", () => {
       await page.keyboard.press("Space");
     }
 
-    // Planting lights the fuse, which the arena reports as the round status.
-    await expect(statusChip(page)).toHaveText("Fuse");
+    // Planting lights the fuse, which the arena reports as the round status. The fuse
+    // burns for 1.4s and a bot may report "Danger" first, so read the recorded log.
+    // Only the player's bomb reports "Fuse"; bot bombs report "Danger".
+    await expect.poll(async () => (await roundStatuses(page)).slice(beforePlant.length)).toContain("Fuse");
   });
 
   test("Versus opens an opponent picker and starts a fight with the chosen bot", async ({ page }) => {

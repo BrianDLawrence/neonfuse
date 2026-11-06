@@ -36,6 +36,53 @@ export async function signIn(page: Page) {
   );
 }
 
+declare global {
+  interface Window {
+    __roundStatuses?: string[];
+    __bannerCaptions?: string[];
+  }
+}
+
+/**
+ * Records every round status the HUD shows, and every round-banner caption. The
+ * countdown ticks and a fuse last about a second, so polling for them races the
+ * arena clock on a loaded machine; the log keeps each transition in order.
+ */
+export async function recordRoundStatuses(page: Page) {
+  await page.addInitScript(() => {
+    const statuses: string[] = [];
+    const captions: string[] = [];
+    window.__roundStatuses = statuses;
+    window.__bannerCaptions = captions;
+    const observer = new MutationObserver(() => {
+      const chip = Array.from(document.querySelectorAll(".hud-chip")).find(
+        (element) => element.firstElementChild?.textContent === "Status"
+      );
+      const status = chip?.querySelector("strong")?.textContent;
+      if (status && status !== statuses[statuses.length - 1]) statuses.push(status);
+      const banner = document.querySelector(".round-banner");
+      const caption = banner
+        ? [".round-banner-title", ".round-banner-caption"]
+            .map((selector) => banner.querySelector(selector)?.textContent)
+            .filter(Boolean)
+            .join(" ")
+        : "";
+      if (caption && caption !== captions[captions.length - 1]) captions.push(caption);
+    });
+    document.addEventListener("DOMContentLoaded", () =>
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+    );
+  });
+}
+
+export function roundStatuses(page: Page) {
+  return page.evaluate(() => window.__roundStatuses ?? []);
+}
+
+export function bannerCaptions(page: Page) {
+  return page.evaluate(() => window.__bannerCaptions ?? []);
+}
+
 export const HIGH_SCORES: HighScoreEntry[] = [
   {
     rank: 1,
