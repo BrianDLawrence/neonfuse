@@ -15,7 +15,7 @@ export type DuelState = {
   powerups: { tile: GridPoint; type: PowerupType }[];
   nextBombId: number;
   winner: Seat | "draw" | null;
-  reason: "blast" | "forfeit" | "timeout" | null;
+  reason: "blast" | "forfeit" | "timeout" | "abandoned" | null;
 };
 
 /** Two seats is the friend duel; three or four take the remaining corners in `getSpawnPoints` order. */
