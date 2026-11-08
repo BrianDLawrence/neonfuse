@@ -83,6 +83,9 @@ h5,
 .music-track-tag,
 .music-track-title strong,
 .party-member-record > span,
+.brawl-seat-kind,
+.brawl-scoreboard-seat strong,
+.brawl-standing strong,
 .profile-career-metrics span,
 .profile-level-meter-label,
 .profile-match-kind,
@@ -1382,7 +1385,7 @@ h5,
 
 .profile-record-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 8px;
 }
 
@@ -1396,6 +1399,11 @@ h5,
 .profile-record[data-kind="local"] {
   border-left-color: var(--amber);
   background: rgba(245, 158, 11, 0.06);
+}
+
+.profile-record[data-kind="party"] {
+  border-left-color: var(--pink);
+  background: rgba(244, 63, 94, 0.06);
 }
 
 .profile-record span,
@@ -1504,6 +1512,10 @@ h5,
 
 .profile-match-kind[data-kind="local"] {
   color: var(--amber);
+}
+
+.profile-match-kind[data-kind="party"] {
+  color: var(--pink);
 }
 
 .profile-match-opponent,
@@ -2580,6 +2592,7 @@ h5,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .brawl-fuse-segment[data-lit="true"],
   .auth-lineup-slot,
   .campaign-result-stars .campaign-star[data-earned="true"] {
     animation: none;
@@ -3619,7 +3632,9 @@ h5,
 .score-player-card,
 .campaign-stage-card,
 .daily-modifier,
-.daily-streak {
+.daily-streak,
+.brawl-seat,
+.brawl-standing {
   --cut: 12px;
   --cut-line: var(--line);
   position: relative;
@@ -3650,7 +3665,9 @@ h5,
 .score-player-card::after,
 .campaign-stage-card::after,
 .daily-modifier::after,
-.daily-streak::after {
+.daily-streak::after,
+.brawl-seat::after,
+.brawl-standing::after {
   content: "";
   position: absolute;
   inset: -1px;
@@ -3906,6 +3923,87 @@ h5,
   .duel-touch-row { display: flex; }
 }
 
+/* Party Brawl: four seats, each with its colour. Bots are the same seats drawn
+   quieter (muted text, dashed edge). The series fuse is the one flourish: two
+   segments per seat that ignite in the seat colour when its holder wins a round. */
+.brawl-seat[data-seat="0"], .brawl-standing[data-seat="0"], .brawl-scoreboard-seat[data-seat="0"] { --seat-color: var(--cyan); }
+.brawl-seat[data-seat="1"], .brawl-standing[data-seat="1"], .brawl-scoreboard-seat[data-seat="1"] { --seat-color: var(--pink); }
+.brawl-seat[data-seat="2"], .brawl-standing[data-seat="2"], .brawl-scoreboard-seat[data-seat="2"] { --seat-color: var(--amber); }
+.brawl-seat[data-seat="3"], .brawl-standing[data-seat="3"], .brawl-scoreboard-seat[data-seat="3"] { --seat-color: var(--green); }
+.brawl-lobby { width: min(640px, calc(100% - 32px)); }
+.brawl-seats, .brawl-standings { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 10px; }
+.brawl-seats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.brawl-seat, .brawl-standing {
+  --cut: 10px;
+  --cut-line: var(--seat-color);
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 12px;
+  border: 1px solid var(--seat-color);
+  background: var(--panel);
+}
+.brawl-seat[data-kind="bot"] { --cut-line: var(--line); border: 1px dashed var(--line); }
+.brawl-seat[data-ready="true"] { box-shadow: inset 0 0 18px color-mix(in srgb, var(--green) 18%, transparent); }
+.brawl-portrait { width: 44px; height: 44px; grid-row: span 2; border-radius: 6px; }
+.brawl-seat[data-kind="bot"] .brawl-portrait { opacity: 0.72; }
+.brawl-seat-text { display: grid; gap: 3px; min-width: 0; }
+.brawl-seat-kind { color: var(--seat-color); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.brawl-seat[data-kind="bot"] .brawl-seat-kind { color: var(--muted); }
+.brawl-seat strong, .brawl-standing strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.brawl-seat small { color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.brawl-seat[data-ready="true"] small { color: var(--green); }
+.brawl-seat .brawl-fuse { grid-column: 2; }
+.brawl-standing { grid-template-columns: 44px minmax(0, 1fr) auto; }
+.brawl-standing .brawl-portrait { grid-row: auto; }
+.brawl-standing:first-child { box-shadow: 0 0 26px color-mix(in srgb, var(--seat-color) 30%, transparent); }
+.brawl-fuse { display: inline-flex; gap: 4px; }
+.brawl-fuse-segment {
+  width: 22px;
+  height: 6px;
+  background: var(--background-deep);
+  border: 1px solid var(--line);
+  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+}
+.brawl-fuse-segment[data-lit="true"] {
+  background: var(--seat-color);
+  border-color: var(--seat-color);
+  filter: drop-shadow(0 0 5px var(--seat-color));
+  animation: brawl-fuse-ignite 520ms ease-out;
+}
+@keyframes brawl-fuse-ignite {
+  from { filter: drop-shadow(0 0 14px var(--seat-color)) brightness(1.8); transform: scaleX(0.4); transform-origin: left; }
+  to { filter: drop-shadow(0 0 5px var(--seat-color)); transform: scaleX(1); transform-origin: left; }
+}
+.brawl-scoreboard {
+  position: absolute;
+  z-index: 10;
+  top: 100px;
+  left: 24px;
+  right: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  /* Like the duel: the first seat's side on the left, the second's on the right, clear of the board. */
+  grid-template-columns: minmax(0, 220px) 1fr minmax(0, 220px);
+  grid-auto-flow: column;
+  grid-template-rows: auto auto;
+  gap: 10px 12px;
+  pointer-events: none;
+}
+.brawl-scoreboard-seat[data-seat="0"] { grid-area: 1 / 1; }
+.brawl-scoreboard-seat[data-seat="2"] { grid-area: 2 / 1; }
+.brawl-scoreboard-seat[data-seat="1"] { grid-area: 1 / 3; text-align: right; }
+.brawl-scoreboard-seat[data-seat="3"] { grid-area: 2 / 3; text-align: right; }
+.brawl-scoreboard-seat { display: grid; gap: 3px; min-width: 0; border-top: 2px solid var(--seat-color); padding-top: 6px; }
+.brawl-scoreboard-seat strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--seat-color); }
+.brawl-scoreboard-seat small { color: var(--muted); font-size: 11px; }
+.brawl-scoreboard-seat[data-kind="bot"] { border-top-style: dashed; }
+.brawl-scoreboard-seat[data-out="true"] { opacity: 0.45; }
+.brawl-out-banner { border-color: var(--line-strong); color: var(--muted); }
+
 @media (max-width: 760px) {
   .command-row .command-button { min-width: 0; padding: 8px 6px; font-size: 10px; }
   .duel-header { padding: 12px; align-items: flex-start; }
@@ -3920,6 +4018,18 @@ h5,
   .duel-shell .command-button { font-size: 11px; }
   .duel-controls { left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); }
   .duel-help { font-size: 10px; }
+  .brawl-seats, .brawl-standings { gap: 8px; margin-top: 14px; }
+  .brawl-seat, .brawl-standing { grid-template-columns: 36px minmax(0, 1fr); gap: 2px 8px; padding: 8px; }
+  .brawl-standing { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .brawl-portrait { width: 36px; height: 36px; }
+  .brawl-seat small { font-size: 11px; }
+  .brawl-fuse-segment { width: 16px; }
+  .brawl-scoreboard { top: 105px; left: 12px; right: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; }
+  .brawl-scoreboard-seat[data-seat="0"] { grid-area: 1 / 1; }
+  .brawl-scoreboard-seat[data-seat="1"] { grid-area: 1 / 2; }
+  .brawl-scoreboard-seat[data-seat="2"] { grid-area: 2 / 1; }
+  .brawl-scoreboard-seat[data-seat="3"] { grid-area: 2 / 2; }
+  .brawl-scoreboard-seat { padding-top: 3px; }
 
   .auth-gate {
     padding: 14px;
@@ -4889,6 +4999,7 @@ h5,
   .duel-touch-row { flex: 1; }
   .duel-help { margin: 0; }
   .duel-connection-banner { top: 70px; }
+  .brawl-scoreboard { top: 70px; }
 
   .brand-lockup {
     display: none;

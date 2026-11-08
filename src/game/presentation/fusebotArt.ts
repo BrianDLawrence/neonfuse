@@ -382,11 +382,11 @@ export function drawFusebotGround(ctx: Ctx, id: FusebotId, size: number, isPlaye
 }
 
 /** The floating chevron and label above the local player. */
-export function drawPlayerMarker(ctx: Ctx, size: number, label: string) {
+export function drawPlayerMarker(ctx: Ctx, size: number, label: string, color = "#22d3ee") {
   const u = size / 100;
   ctx.save();
-  ctx.fillStyle = "#22d3ee";
-  ctx.shadowColor = "#22d3ee";
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
   ctx.shadowBlur = 10 * u;
   ctx.beginPath();
   ctx.moveTo(-7 * u, 0);

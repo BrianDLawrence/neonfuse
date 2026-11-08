@@ -275,8 +275,11 @@ export async function openActivity(page: Page, options: ActivityOptions): Promis
       return;
     }
     tickets += 1;
+    // Like the real route, an optional { mode } body picks the party lobby; no body is the duel.
+    const body = route.request().postData();
+    const mode = body && (JSON.parse(body) as { mode?: string }).mode === "party" ? "party" as const : undefined;
     await route.fulfill({
-      json: { ticket: signJoinTicket({ playerId: user.playerId, name: user.displayName, roomId: instanceId }, E2E_MULTIPLAYER_SECRET, Date.now()) }
+      json: { ticket: signJoinTicket({ playerId: user.playerId, name: user.displayName, roomId: instanceId, mode }, E2E_MULTIPLAYER_SECRET, Date.now()) }
     });
   });
   // A pass-through proxy to the real test server, so a test can sever one socket.
@@ -356,6 +359,66 @@ export async function joinFromAnotherDevice(instanceId: string, user: FakeDiscor
   return { joined: await joined, closed };
 }
 
+/**
+ * A Party Brawl fighter played straight from the test over the realtime protocol, so
+ * a third or fourth person costs a socket instead of another Phaser game.
+ */
+export type PartySocket = {
+  latest: () => RoomSnapshot | undefined;
+  waitFor: (predicate: (state: RoomSnapshot) => boolean, timeoutMs?: number) => Promise<RoomSnapshot>;
+  ready: (ready?: boolean) => void;
+  /** Plants a bomb where the fighter stands, in the round that is live now. */
+  bomb: () => void;
+  leave: () => Promise<void>;
+};
+
+const openPartySockets = new Set<WebSocket>();
+
+export async function partySocket(instanceId: string, user: FakeDiscordUser): Promise<PartySocket> {
+  const socket = new WebSocket(E2E_MULTIPLAYER_URL);
+  openPartySockets.add(socket);
+  let latest: RoomSnapshot | undefined;
+  let sequence = 0;
+  const waiters = new Set<{ predicate: (state: RoomSnapshot) => boolean; resolve: (state: RoomSnapshot) => void }>();
+  socket.on("message", (raw) => {
+    const message = JSON.parse(raw.toString()) as ServerMessage;
+    if (message.type !== "state") return;
+    latest = message;
+    for (const waiter of waiters) {
+      if (waiter.predicate(message)) { waiters.delete(waiter); waiter.resolve(message); }
+    }
+  });
+  await new Promise<void>((resolve, reject) => { socket.once("open", () => resolve()); socket.once("error", reject); });
+  const send = (message: object) => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); };
+  const client: PartySocket = {
+    latest: () => latest,
+    waitFor: (predicate, timeoutMs = 20_000) => {
+      if (latest && predicate(latest)) return Promise.resolve(latest);
+      return new Promise((resolve, reject) => {
+        const waiter = { predicate, resolve: (state: RoomSnapshot) => { clearTimeout(timer); resolve(state); } };
+        const timer = setTimeout(() => { waiters.delete(waiter); reject(new Error(`${user.displayName} timed out waiting for the party state`)); }, timeoutMs);
+        waiters.add(waiter);
+      });
+    },
+    ready: (ready = true) => send({ type: "ready", ready }),
+    bomb: () => {
+      if (latest) send({ type: "input", roundId: latest.roundId, sequence: sequence++, command: { type: "bomb" } });
+    },
+    leave: async () => {
+      const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+      send({ type: "leave" });
+      await closed;
+      openPartySockets.delete(socket);
+    }
+  };
+  send({
+    type: "join",
+    ticket: signJoinTicket({ playerId: user.playerId, name: user.displayName, roomId: instanceId, mode: "party" }, E2E_MULTIPLAYER_SECRET, Date.now())
+  });
+  await client.waitFor(() => true);
+  return client;
+}
+
 const openClients = new Set<ActivityClient>();
 
 /**
@@ -366,6 +429,8 @@ const openClients = new Set<ActivityClient>();
 export async function closeActivities() {
   const clients = [...openClients];
   openClients.clear();
+  for (const socket of openPartySockets) socket.close(1000, "Test finished");
+  openPartySockets.clear();
   await Promise.all(clients.map(async (client) => {
     await client.closeSockets();
     await client.page.goto("about:blank").catch(() => undefined);

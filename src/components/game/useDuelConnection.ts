@@ -6,7 +6,7 @@ import type { ClientMessage, RoomSnapshot, ServerMessage } from "@/game/multipla
 import { fetchWithActivityRenewal, type ActivityAuth } from "@/lib/activity-session-renewal";
 import { authenticatedHeaders } from "@/lib/authenticated-headers";
 
-export function useDuelConnection(activityAuth: ActivityAuth | undefined) {
+export function useDuelConnection(activityAuth: ActivityAuth | undefined, mode: "duel" | "party" = "duel") {
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [status, setStatus] = useState<"connecting" | "connected" | "reconnecting" | "error">("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +39,9 @@ export function useDuelConnection(activityAuth: ActivityAuth | undefined) {
         // A 401 means the bearer session lapsed: renew once and retry before
         // treating it as fatal.
         const response = await fetchWithActivityRenewal(activityAuthRef.current, (token) =>
-          fetch("/api/multiplayer/ticket", { method: "POST", headers: authenticatedHeaders(token), signal: abort.signal }));
+          fetch("/api/multiplayer/ticket", mode === "party"
+            ? { method: "POST", headers: authenticatedHeaders(token, { "Content-Type": "application/json" }), body: JSON.stringify({ mode }), signal: abort.signal }
+            : { method: "POST", headers: authenticatedHeaders(token), signal: abort.signal }));
         if (cancelled) return;
         const payload = await response.json() as { ticket?: string; error?: string };
         if (!response.ok || !payload.ticket) {
@@ -101,7 +103,7 @@ export function useDuelConnection(activityAuth: ActivityAuth | undefined) {
       socket?.close();
       socketRef.current = null;
     };
-  }, [attempt]);
+  }, [attempt, mode]);
 
   const input = useCallback((command: DuelCommand) => {
     const current = snapshotRef.current;

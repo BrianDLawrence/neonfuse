@@ -5,6 +5,7 @@ import { playExplosionEffect } from "../presentation/explosionEffect";
 import { FusebotView, rowDepth } from "../presentation/fusebotView";
 import { getDangerTiles } from "../simulation/danger";
 import type { DuelCommand } from "../simulation/duel";
+import { PARTY_SEAT_PROFILES } from "../simulation/partyBots";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, createInitialArena, type Direction, type GridPoint } from "../simulation/arena";
 import { computeArenaBoardFit } from "../simulation/layout";
 
@@ -102,7 +103,9 @@ export class DuelScene extends Phaser.Scene {
       sprite.setData("tile", `${tile.x},${tile.y}`);
       sprite.setAlpha(alive ? 1 : 0.25);
     };
-    snapshot?.duel?.players.forEach((player, index) => this.renderFighter(index, player.tile, player.alive, index === snapshot.seat));
+    const fighters = snapshot?.mode === "party" ? snapshot.fighters : null;
+    snapshot?.duel?.players.forEach((player, index) =>
+      this.renderFighter(index, player.tile, player.alive, index === snapshot.seat, fighters?.[index]?.kind === "bot"));
     const liveBombs = new Set<number>();
     snapshot?.duel?.bombs.forEach((bomb) => {
       liveBombs.add(bomb.id);
@@ -142,13 +145,16 @@ export class DuelScene extends Phaser.Scene {
     if (bombPressed) this.view.input({ type: "bomb" });
   }
   private queueBomb(event: KeyboardEvent) { if (!event.repeat) this.bombQueued = true; }
-  private renderFighter(seat: number, tile: GridPoint, alive: boolean, isLocal: boolean) {
+  private renderFighter(seat: number, tile: GridPoint, alive: boolean, isLocal: boolean, isBot: boolean) {
     const world = this.world(tile);
     const tileKey = `${tile.x},${tile.y}`;
     let fighter = this.fighters.get(seat);
     if (!fighter) {
-      // Seat 0 wears Spark's colors and seat 1 wears Fuse Rush's; your own fighter gets the YOU marker.
-      const view = new FusebotView(this, seat === 0 ? "spark" : "fuse-rush", world.x, world.y, { marker: isLocal ? "YOU" : undefined, row: tile.y });
+      // Seat 0 wears Spark's colors and seat 1 wears Fuse Rush's; Party Brawl seats 2 and 3 wear
+      // their bots' looks. A bot always wears its own profile and the BOT marker; yours gets YOU.
+      const character = seat === 0 && !isBot ? "spark" : PARTY_SEAT_PROFILES[seat];
+      const marker = isLocal ? "YOU" : isBot ? "BOT" : undefined;
+      const view = new FusebotView(this, character, world.x, world.y, { marker, row: tile.y });
       fighter = { view, tile: tileKey };
       this.fighters.set(seat, fighter);
     } else if (fighter.tile !== tileKey) {

@@ -10,7 +10,8 @@ import {
 const baseURL = `http://localhost:${APP_PORT}`;
 // Point at a preinstalled Chromium when the bundled browser is not downloaded.
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined;
-const DUEL_SPEC = /activity-duel\.spec\.ts/;
+// Duel and Party Brawl specs each drive two software-rendered Phaser games.
+const DUEL_SPEC = /activity-(duel|party-brawl)\.spec\.ts/;
 
 export default defineConfig({
   testDir: "./e2e",
