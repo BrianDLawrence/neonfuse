@@ -1,7 +1,12 @@
 import type { Db, Filter } from "mongodb";
 import { deriveCampaignProgress, type CampaignRoundRecord } from "@/game/simulation/campaign";
 import { discordPlayerId } from "@/lib/discord-identity";
-import { summarizePlayerCareer, type DuelCareerRecord, type LocalCareerRecord } from "@/lib/player-career";
+import {
+  PARTY_SERIES_COLLECTION,
+  summarizePlayerCareer,
+  type DuelCareerRecord,
+  type LocalCareerRecord
+} from "@/lib/player-career";
 import type { DiscordPartyRoster } from "@/lib/player-profile-types";
 import {
   PLAYER_TITLES,
@@ -28,7 +33,10 @@ export type PartyProfileRecord = {
 export type PartyLocalRecord = LocalCareerRecord & { accountId: string };
 /** A stored campaign win, as loaded for the party roster. */
 export type PartyCampaignRecord = CampaignRoundRecord & { accountId: string };
+/** A `duel_results` row; Party Brawl rounds are in it too and are told apart by `mode`. */
 export type PartyDuelRecord = DuelCareerRecord & { players: string[] };
+/** A finished Party Brawl series, as loaded for the roster's XP. */
+export type PartySeriesRecord = { winner: { kind: "human"; playerId: string } | { kind: "bot" } | null };
 
 type PartyRosterInput = {
   discordUserIds: string[];
@@ -37,6 +45,7 @@ type PartyRosterInput = {
   profiles: PartyProfileRecord[];
   localMatches: PartyLocalRecord[];
   duelsOldestFirst: PartyDuelRecord[];
+  partySeries?: PartySeriesRecord[];
   /** Campaign wins, oldest first; only used to keep earned act titles equippable. */
   campaignWinsOldestFirst?: PartyCampaignRecord[];
 };
@@ -63,6 +72,7 @@ export function buildDiscordPartyRoster({
   profiles,
   localMatches,
   duelsOldestFirst,
+  partySeries = [],
   campaignWinsOldestFirst = []
 }: PartyRosterInput): DiscordPartyRoster {
   const connectedIds = connectedDiscordIds(discordUserIds, currentDiscordUserId);
@@ -92,7 +102,8 @@ export function buildDiscordPartyRoster({
       (match) => accountOwner.get(match.accountId) === playerId
     );
     const memberDuels = duelsOldestFirst.filter((duel) => duel.players.includes(playerId));
-    const career = summarizePlayerCareer(memberLocalMatches, memberDuels, playerId);
+    const seriesWins = partySeries.filter((series) => series.winner?.kind === "human" && series.winner.playerId === playerId).length;
+    const career = summarizePlayerCareer(memberLocalMatches, memberDuels, playerId, seriesWins);
     const campaign = deriveCampaignProgress(
       campaignWinsOldestFirst.filter((round) => accountOwner.get(round.accountId) === playerId)
     );
@@ -159,7 +170,7 @@ export async function loadDiscordPartyRoster(
       ...sessions.flatMap((session) => session.legacyPlayerId ? [session.legacyPlayerId] : [])
     ])
   );
-  const [profiles, localMatches, campaignWins, duels] = await Promise.all([
+  const [profiles, localMatches, campaignWins, duels, partySeries] = await Promise.all([
     db
       .collection<PartyProfileRecord>("player_profiles")
       .find(
@@ -186,9 +197,16 @@ export async function loadDiscordPartyRoster(
       .collection<PartyDuelRecord>("duel_results")
       .find(
         { players: { $in: playerIds } } as Filter<PartyDuelRecord>,
-        { projection: { players: 1, winnerId: 1 } }
+        { projection: { players: 1, winnerId: 1, mode: 1, outcome: 1 } }
       )
       .sort({ createdAt: 1 })
+      .toArray(),
+    db
+      .collection<PartySeriesRecord & { players: string[] }>(PARTY_SERIES_COLLECTION)
+      .find(
+        { players: { $in: playerIds } } as Filter<PartySeriesRecord & { players: string[] }>,
+        { projection: { winner: 1 } }
+      )
       .toArray()
   ]);
 
@@ -199,6 +217,7 @@ export async function loadDiscordPartyRoster(
     profiles,
     localMatches,
     duelsOldestFirst: duels,
+    partySeries,
     campaignWinsOldestFirst: campaignWins.map((match) => ({
       accountId: match.accountId,
       stageId: String(match.stageId ?? ""),

@@ -1,6 +1,6 @@
 import type { Db } from "mongodb";
 import { describe, expect, it, vi } from "vitest";
-import { loadDailyProgress, loadPlayerCareer, summarizePlayerCareer } from "./player-career";
+import { loadDailyProgress, loadPlayerCareer, loadPlayerHistory, summarizePlayerCareer } from "./player-career";
 
 const player = { id: "discord-player", displayName: "Fuse Pilot", source: "web" as const };
 
@@ -11,9 +11,10 @@ function fakeDb(rows: Record<string, unknown[]>) {
     collection: (name: string) => ({
       find: (...args: unknown[]) => {
         find(...args);
-        const cursor = { sort: () => cursor, toArray: async () => rows[name] ?? [] };
+        const cursor = { sort: () => cursor, limit: () => cursor, toArray: async () => rows[name] ?? [] };
         return cursor;
-      }
+      },
+      countDocuments: async () => (rows[name] ?? []).length
     })
   };
 
@@ -59,13 +60,71 @@ describe("summarizePlayerCareer", () => {
     expect(summarizePlayerCareer([], [], "new-player")).toEqual({
       local: { played: 0, wins: 0, losses: 0, draws: 0 },
       duel: { played: 0, wins: 0, losses: 0, draws: 0 },
+      party: { played: 0, wins: 0, losses: 0, draws: 0 },
+      partySeriesWins: 0,
       bestScore: 0,
       bestWinStreak: 0
     });
   });
+
+  it("keeps Party Brawl rounds out of duel records and streaks", () => {
+    const career = summarizePlayerCareer(
+      [],
+      [
+        { winnerId: "player-a" },
+        { winnerId: null, mode: "party", outcome: "bot" },
+        { winnerId: "player-a", mode: "party", outcome: "human" },
+        { winnerId: null, mode: "party", outcome: "draw" },
+        { winnerId: "player-a" }
+      ],
+      "player-a",
+      1
+    );
+
+    expect(career.duel).toEqual({ played: 2, wins: 2, losses: 0, draws: 0 });
+    expect(career.bestWinStreak).toBe(2);
+    expect(career.party).toEqual({ played: 3, wins: 1, losses: 1, draws: 1 });
+    expect(career.partySeriesWins).toBe(1);
+  });
 });
 
 describe("career loaders", () => {
+  it("reads party rounds and series wins without counting them as duels", async () => {
+    const { db } = fakeDb({
+      matches: [],
+      duel_results: [
+        { winnerId: null, mode: "party", outcome: "bot" },
+        { winnerId: player.id, mode: "party", outcome: "human" }
+      ],
+      party_series: [{ winner: { kind: "human", playerId: player.id } }]
+    });
+
+    const career = await loadPlayerCareer(db, player);
+
+    expect(career.duel.played).toBe(0);
+    expect(career.party).toEqual({ played: 2, wins: 1, losses: 1, draws: 0 });
+    expect(career.partySeriesWins).toBe(1);
+  });
+
+  it("lists party rounds in history without naming a single opponent", async () => {
+    const playedAt = new Date("2026-11-08T12:00:00.000Z");
+    const { db } = fakeDb({
+      matches: [],
+      duel_results: [{
+        roundId: "round-1", mode: "party", outcome: "bot", winnerId: null, players: [player.id, "rival"],
+        reason: "blast", durationMs: 60_000, createdAt: playedAt
+      }],
+      player_profiles: []
+    });
+
+    const { matches } = await loadPlayerHistory(db, player, 10);
+
+    expect(matches).toEqual([{
+      id: "party-round-1", kind: "party", result: "loss", opponentName: "3 rivals",
+      durationMs: 60_000, score: null, reason: "blast", playedAt: playedAt.toISOString()
+    }]);
+  });
+
   it("counts Daily Fuse rounds as local matches", async () => {
     const { db, find } = fakeDb({ matches: [], duel_results: [] });
 

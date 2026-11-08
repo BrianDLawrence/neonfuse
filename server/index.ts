@@ -1,6 +1,7 @@
 import { MongoClient, type Collection, type Document } from "mongodb";
 import { createRealtimeServer } from "./realtime";
-import type { DuelResult } from "./rooms";
+import type { PartyResult } from "./rooms";
+import { partyRoundDocument, partySeriesDocument } from "./results";
 import {
   reportOperationalError,
   reportOperationalWarning
@@ -21,6 +22,7 @@ async function main() {
   const mongoUri = process.env.MONGODB_URI;
   let mongo: MongoClient | undefined;
   let results: Collection<Document> | undefined;
+  let partySeries: Collection<Document> | undefined;
   let persistence: "connected" | "not-configured" | "unavailable" = mongoUri
     ? "unavailable"
     : "not-configured";
@@ -29,6 +31,8 @@ async function main() {
     await mongo.connect();
     results = mongo.db(process.env.MONGODB_DB ?? "neon-fuse").collection("duel_results");
     await results.createIndex({ roundId: 1 }, { unique: true });
+    partySeries = mongo.db(process.env.MONGODB_DB ?? "neon-fuse").collection("party_series");
+    await partySeries.createIndex({ seriesId: 1 }, { unique: true });
     persistence = "connected";
   } else {
     reportOperationalWarning({
@@ -37,16 +41,19 @@ async function main() {
       summary: "MONGODB_URI is not set; multiplayer results will not be persisted"
     });
   }
-  const pending = new Map<string, DuelResult>();
+  // Every write is an idempotent insert keyed by a unique ID, so retries never duplicate a result.
+  type PendingWrite = { collection: "duel_results" | "party_series"; filter: Document; document: Document };
+  const pending = new Map<string, PendingWrite>();
   let writing = false;
   let lastPersistenceAlert = 0;
   async function flush() {
-    if (writing || !results) return;
+    if (writing || !results || !partySeries) return;
     writing = true;
     try {
-      for (const result of pending.values()) {
-        await results.updateOne({ roundId: result.roundId }, { $setOnInsert: { ...result, createdAt: new Date() } }, { upsert: true });
-        pending.delete(result.roundId);
+      for (const [key, write] of pending) {
+        const collection = write.collection === "party_series" ? partySeries : results;
+        await collection.updateOne(write.filter, { $setOnInsert: { ...write.document, createdAt: new Date() } }, { upsert: true });
+        pending.delete(key);
       }
       persistence = "connected";
     } catch (error) {
@@ -76,7 +83,26 @@ async function main() {
     dependencyHealth: () => ({ persistence, pendingResults: pending.size }),
     onResult: (result) => {
       if (!results) return;
-      pending.set(result.roundId, result);
+      pending.set(result.roundId, { collection: "duel_results", filter: { roundId: result.roundId }, document: result });
+      void flush();
+    },
+    onPartyResult: (result: PartyResult) => {
+      if (!results) return;
+      const document = result.kind === "round" ? partyRoundDocument(result) : partySeriesDocument(result);
+      if (!document) {
+        reportOperationalWarning({
+          service: "realtime",
+          event: "result.party.rejected",
+          summary: "A Party Brawl result failed validation and was not stored",
+          fields: { kind: result.kind }
+        });
+        return;
+      }
+      if (result.kind === "round") {
+        pending.set(result.roundId, { collection: "duel_results", filter: { roundId: result.roundId }, document });
+      } else {
+        pending.set(`series:${result.seriesId}`, { collection: "party_series", filter: { seriesId: result.seriesId }, document });
+      }
       void flush();
     }
   });

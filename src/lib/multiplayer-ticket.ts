@@ -3,7 +3,9 @@ import { z } from "zod";
 
 const ticketSchema = z.object({
   playerId: z.string().min(1).max(100), name: z.string().min(1).max(100),
-  roomId: z.string().min(1).max(256), expiresAt: z.number().int(), nonce: z.string().uuid()
+  roomId: z.string().min(1).max(256), expiresAt: z.number().int(), nonce: z.string().uuid(),
+  // Absent on duel tickets, so a duel ticket is exactly what it was before Party Brawl.
+  mode: z.literal("party").optional()
 }).strict();
 export type JoinTicket = z.infer<typeof ticketSchema>;
 
@@ -11,8 +13,9 @@ function signature(payload: string, secret: string) {
   if (secret.length < 32) throw new Error("MULTIPLAYER_SECRET must contain at least 32 characters");
   return createHmac("sha256", secret).update(payload).digest();
 }
-export function signJoinTicket(identity: Pick<JoinTicket, "playerId" | "name" | "roomId">, secret: string, now: number) {
-  const payload = Buffer.from(JSON.stringify({ ...identity, expiresAt: now + 30000, nonce: randomUUID() })).toString("base64url");
+export function signJoinTicket(identity: Pick<JoinTicket, "playerId" | "name" | "roomId" | "mode">, secret: string, now: number) {
+  const { mode, ...rest } = identity;
+  const payload = Buffer.from(JSON.stringify({ ...rest, ...(mode ? { mode } : {}), expiresAt: now + 30000, nonce: randomUUID() })).toString("base64url");
   return `${payload}.${signature(payload, secret).toString("base64url")}`;
 }
 export function verifyJoinTicket(ticket: string, secret: string, now: number): JoinTicket | null {

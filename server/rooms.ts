@@ -1,7 +1,8 @@
 import { advanceDuel, commandDuel, createDuel, eliminateSeats, type DuelState, type Seat } from "../src/game/simulation/duel";
-import { createPartyBot, partyRoundSeed, stepPartyBots, type PartyBot } from "../src/game/simulation/partyBots";
+import { createPartyBot, PARTY_SEAT_PROFILES, partyRoundSeed, stepPartyBots, type PartyBot } from "../src/game/simulation/partyBots";
+import { createSeries, recordSeriesRound, seatSeriesOccupant, SERIES_TARGET_WINS, type SeriesState } from "../src/game/simulation/series";
 import type { BotProfileId } from "../src/game/simulation/bots";
-import type { ClientMessage, RoomSnapshot } from "../src/game/multiplayer/protocol";
+import type { ClientMessage, PartySnapshot, RoomSnapshot } from "../src/game/multiplayer/protocol";
 import type { JoinTicket } from "../src/lib/multiplayer-ticket";
 
 export const RECONNECT_MS = 15000;
@@ -24,16 +25,33 @@ export type Room = {
   startedAt: number;
   emptyAt: number | null;
   party: PartyRound | null;
+  /** Party-only: the best-of-three in progress or just finished. */
+  series: { id: string; state: SeriesState } | null;
 };
 export type DuelResult = { roundId: string; roomId: string; players: string[]; winnerId: string | null; reason: string; durationMs: number };
 export type PartyRoundResult = {
+  kind: "round";
   roundId: string;
   roomId: string;
+  seriesId: string;
+  seriesRound: number;
   seats: RoundSeat[];
   winnerSeat: Seat | null;
   reason: string;
   durationMs: number;
 };
+export type PartySeriesResult = {
+  kind: "series";
+  seriesId: string;
+  roomId: string;
+  /** The final round's fighters, who hold the seats when the series ends. */
+  seats: RoundSeat[];
+  wins: number[];
+  rounds: number;
+  winnerSeat: Seat | null;
+  reason: "won" | "cap";
+};
+export type PartyResult = PartyRoundResult | PartySeriesResult;
 
 /** A duel room is keyed by its Activity instance; that instance's party lobby is a separate room. */
 export function roomKey(instanceId: string, mode: RoomMode) {
@@ -48,7 +66,7 @@ export class Rooms {
     private readonly newId: () => string,
     private readonly completed: (result: DuelResult) => void,
     private readonly maxRooms = 500,
-    private readonly partyCompleted: (result: PartyRoundResult) => void = () => undefined
+    private readonly partyCompleted: (result: PartyResult) => void = () => undefined
   ) {
     if (!Number.isInteger(maxRooms) || maxRooms < 1) {
       throw new Error("maxRooms must be a positive integer");
@@ -62,7 +80,7 @@ export class Rooms {
     if (!room) {
       if (this.rooms.size >= this.maxRooms) throw new Error("The arena is busy. Try again shortly.");
       const seats = mode === "party" ? PARTY_SEATS : 2;
-      room = { id, mode, roundId: this.newId(), members: Array.from({ length: seats }, () => null), duel: null, startedAt: 0, emptyAt: null, party: null };
+      room = { id, mode, roundId: this.newId(), members: Array.from({ length: seats }, () => null), duel: null, startedAt: 0, emptyAt: null, party: null, series: null };
       this.rooms.set(room.id, room);
     }
     this.tickRoom(room, now);
@@ -132,6 +150,14 @@ export class Rooms {
     room.roundId = this.newId();
     room.members.forEach((other) => { if (other) { other.sequence = -1; other.ready = false; } });
     if (room.mode !== "party") return;
+    // A finished series makes this a rematch; otherwise newcomers and departures take their seats now.
+    if (!room.series || room.series.state.outcome) {
+      room.series = { id: this.newId(), state: createSeries(room.members.map((_, seat) => occupantKey(room, seat as Seat))) };
+    } else {
+      for (const seat of room.members.keys()) {
+        room.series.state = seatSeriesOccupant(room.series.state, seat as Seat, occupantKey(room, seat as Seat));
+      }
+    }
     const startsAt = room.duel.startsAt;
     const seats = room.members.map<RoundSeat>((member, index) => member
       ? { kind: "human", playerId: member.id, name: member.name }
@@ -177,7 +203,9 @@ export class Rooms {
     const forfeits = expired.flatMap((gone, seat) => gone && isHuman(seat) ? [seat as Seat] : []);
     if (forfeits.length) duel = eliminateSeats(duel, forfeits);
     if (!room.members.some((member, seat) => member && !expired[seat])) {
+      // Nobody is left to finish the series, so it ends unrecorded; its rounds stay.
       room.duel = { ...duel, winner: "draw", reason: "abandoned" };
+      room.series = null;
       return;
     }
     if (duel.winner === null) {
@@ -191,13 +219,25 @@ export class Rooms {
       duel = { ...duel, winner: "draw" };
     }
     room.duel = duel;
-    if (duel.winner === null) return;
-    this.partyCompleted({ roundId: room.roundId, roomId: room.id, seats: party.seats,
-      winnerSeat: duel.winner === "draw" ? null : duel.winner,
+    if (duel.winner === null || !room.series) return;
+    const series = recordSeriesRound(room.series.state, duel.winner);
+    room.series.state = series;
+    this.partyCompleted({ kind: "round", roundId: room.roundId, roomId: room.id, seriesId: room.series.id, seriesRound: series.rounds,
+      seats: party.seats, winnerSeat: duel.winner === "draw" ? null : duel.winner,
       reason: duel.reason!, durationMs: Math.max(0, duel.time - duel.startsAt) });
+    if (series.outcome) {
+      this.partyCompleted({ kind: "series", seriesId: room.series.id, roomId: room.id, seats: party.seats,
+        wins: series.seats.map((seat) => seat?.wins ?? 0), rounds: series.rounds,
+        winnerSeat: series.outcome.winnerSeat, reason: series.outcome.reason });
+    }
   }
 
   snapshot(room: Room, seat: Seat, now: number): RoomSnapshot {
+    const base = this.duelSnapshot(room, seat, now);
+    return room.mode === "party" ? { ...base, ...partyView(room) } : base;
+  }
+
+  private duelSnapshot(room: Room, seat: Seat, now: number): RoomSnapshot {
     const disconnected = room.members.find((member) => member && !member.connection);
     return { type: "state", serverId: this.serverId, roundId: room.roundId, seat,
       phase: !room.duel ? "waiting" : room.duel.winner !== null ? "finished" : room.duel.time < room.duel.startsAt ? "countdown" : "playing",
@@ -205,4 +245,33 @@ export class Rooms {
       duel: room.duel,
       reconnectSeconds: disconnected?.disconnectedAt != null ? Math.max(0, Math.ceil((RECONNECT_MS - now + disconnected.disconnectedAt) / 1000)) : null };
   }
+}
+
+/** Series wins follow whoever holds a seat: a person by account, an empty seat by its bot. */
+function occupantKey(room: Room, seat: Seat) {
+  const member = room.members[seat];
+  return member ? `human:${member.id}` : `bot:${seat}`;
+}
+
+function partyView(room: Room): Omit<PartySnapshot, keyof RoomSnapshot> & { mode: "party" } {
+  const series = room.series?.state ?? null;
+  return {
+    mode: "party",
+    seats: room.members.map((member, seat) => member
+      ? { kind: "human", name: member.name, connected: !!member.connection, ready: member.ready }
+      : { kind: "bot", profileId: PARTY_SEAT_PROFILES[seat] }),
+    fighters: room.party?.seats.map((fighter) => fighter.kind === "human"
+      ? { kind: "human", name: fighter.name }
+      : { kind: "bot", profileId: fighter.profileId }) ?? null,
+    series: series && {
+      rounds: series.rounds,
+      target: SERIES_TARGET_WINS,
+      // Until the next round seats a newcomer, show the record they will start with.
+      wins: room.members.map((_, seat) => {
+        const entry = series.seats[seat];
+        return entry && (series.outcome || entry.occupant === occupantKey(room, seat as Seat)) ? entry.wins : 0;
+      }),
+      outcome: series.outcome
+    }
+  };
 }

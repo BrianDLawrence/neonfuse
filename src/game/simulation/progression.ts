@@ -48,6 +48,9 @@ export type PlayerProgression = {
 export type ProgressionCareerStats = {
   local: { played: number; wins: number; losses: number; draws: number };
   duel: { played: number; wins: number; losses: number; draws: number };
+  /** Optional so stored stats from before Party Brawl still derive the same progression. */
+  party?: { played: number; wins: number; losses: number; draws: number };
+  partySeriesWins?: number;
   bestScore: number;
   bestWinStreak: number;
 };
@@ -162,7 +165,7 @@ function earnedAchievements(
   stats: ProgressionCareerStats,
   campaign: CampaignProgress
 ): AchievementId[] {
-  const totalPlayed = stats.local.played + stats.duel.played;
+  const totalPlayed = stats.local.played + stats.duel.played + (stats.party?.played ?? 0);
 
   return ACHIEVEMENT_IDS.filter((id) => {
     switch (id) {
@@ -189,8 +192,9 @@ function earnedAchievements(
 function calculateXp(stats: ProgressionCareerStats): number {
   const localXp = stats.local.played * 20 + stats.local.wins * 30 + stats.local.draws * 10;
   const duelXp = stats.duel.played * 50 + stats.duel.wins * 100 + stats.duel.draws * 30;
+  const partyXp = (stats.party?.played ?? 0) * 30 + (stats.party?.wins ?? 0) * 60 + (stats.partySeriesWins ?? 0) * 100;
 
-  return Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, localXp + duelXp));
+  return Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, localXp + duelXp + partyXp));
 }
 
 /**

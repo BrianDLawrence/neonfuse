@@ -51,6 +51,8 @@ Alert on these event names:
 - `health.database.failed`
 - `server.startup.failed`
 - `result.persistence.failed`
+- `result.party.rejected` (a Party Brawl result failed its schema and was not
+  stored; it points to a server bug, never to client input)
 
 Treat `server.startup.failed` and sustained `result.persistence.failed` events as
 release-blocking. A `persistence.disabled` warning is expected only in local or
@@ -62,9 +64,16 @@ The launch configuration is deliberately bounded to one process:
 
 - `MAX_REALTIME_CONNECTIONS=200`
 - `MAX_REALTIME_ROOMS=100`
-- two seats per room
+- two seats per duel room; four seats per Party Brawl room, of which bots
+  fill the empty ones without using a connection
 - 40 client messages per second per connection
 - 8 KiB maximum WebSocket payload
+
+One Activity instance can hold both a duel room and a party room. A full party
+of four people uses four connections, so 200 connections hold 50 full parties
+against 100 duels; the connection ceiling, not the room ceiling, binds first
+when parties are busy. Each bot decides about twice a second on the existing
+50 ms room tick, so bots add CPU but no sockets or timers.
 
 These are safety ceilings, not a load-tested service-level guarantee. Excess
 WebSocket upgrades receive `503 Service Unavailable` with `Retry-After: 5`.

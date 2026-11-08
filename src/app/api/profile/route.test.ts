@@ -55,6 +55,8 @@ beforeEach(() => {
   vi.mocked(loadPlayerCareer).mockResolvedValue({
     local: { played: 1, wins: 1, losses: 0, draws: 0 },
     duel: { played: 0, wins: 0, losses: 0, draws: 0 },
+    party: { played: 0, wins: 0, losses: 0, draws: 0 },
+    partySeriesWins: 0,
     bestScore: 4500,
     bestWinStreak: 0
   });

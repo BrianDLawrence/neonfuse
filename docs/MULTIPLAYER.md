@@ -30,6 +30,41 @@ The existing scene still orchestrates local rounds. Moving those modes onto the
 new state machine is a separate migration, so their established timing and bot
 behavior do not change as part of multiplayer.
 
+## Party Brawl
+
+Party Brawl is a second lobby in the same Activity instance, kept apart from the
+duel: its room key is `<instanceId>#party`, and the ticket route signs
+`mode: "party"` into the ticket when the client posts `{ "mode": "party" }`.
+Duel tickets, rooms, snapshots and results are unchanged.
+
+- Four fighters always. People take the lowest free seat; at each round start
+  the server fills every empty seat with a bot (`src/game/simulation/partyBots.ts`).
+  A seat's bot is fixed: Circuit Shade, Fuse Rush, Volt Warden, Glitch Bloom.
+- Bots reuse the local bot brain but act only through `commandDuel`, so they
+  have the same move cooldown, bomb cap and 1.4 s fuse as people. Decisions are
+  seeded from the round ID and run on duel time, never `Math.random`.
+- A round needs two people seated and ready; a round against bots alone never
+  starts, so it is never stored.
+- A forfeit (leaving, or reconnect grace running out) knocks out only that
+  fighter. The round runs on, bots included, until one fighter is left or time
+  runs out. If no person is left in the room the round is abandoned and not
+  stored.
+- Best of three (`src/game/simulation/series.ts`): first to two round wins,
+  capped at five rounds, after which the leader wins and a tie is a draw. Every
+  seated person votes for the next round. Between rounds a newcomer may take a
+  bot's seat or a free one; round wins belong to whoever holds the seat, so a
+  newcomer starts at zero and a person who leaves loses their wins.
+- Results: each round is a `duel_results` document with `mode: "party"`,
+  `players` (people only), `seats`, `outcome` (`human`, `bot` or `draw`) and
+  `winnerId` (a person, or null). Each finished series is one `party_series`
+  document, unique by `seriesId`. Both are built by the server and checked
+  against `src/lib/schemas/party-result.ts` before writing. Career, history and
+  roster readers keep party rounds out of duel records, so a bot win never reads
+  as a duel draw; Party Brawl has its own profile tally and XP.
+
+Deploy the realtime server before the Next.js app: an older realtime server
+rejects tickets that carry `mode`, which only affects Party Brawl.
+
 ## Configuration
 
 Use Node 22.13+ (or a supported newer LTS). Install dependencies with `npm ci`.

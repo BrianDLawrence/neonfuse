@@ -158,7 +158,14 @@ test.describe("Discord Activity", () => {
       identity: { displayName: PILOT.displayName, avatarUrl: null, source: "discord-activity", refreshedAt: joined },
       preferences: DEFAULT_PROFILE_PREFERENCES,
       progression: synced,
-      stats: { local: EMPTY_PROFILE_MATCH_STATS, duel: { played: 1, wins: 1, losses: 0, draws: 0 }, bestScore: 0, bestWinStreak: 1 },
+      stats: {
+        local: EMPTY_PROFILE_MATCH_STATS,
+        duel: { played: 1, wins: 1, losses: 0, draws: 0 },
+        party: EMPTY_PROFILE_MATCH_STATS,
+        partySeriesWins: 0,
+        bestScore: 0,
+        bestWinStreak: 1
+      },
       createdAt: joined,
       updatedAt: joined,
       lastSeenAt: joined

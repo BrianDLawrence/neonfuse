@@ -18,7 +18,9 @@ export function ensureGameIndexes(db: Db) {
       db.collection("high-scores").createIndex({ score: -1 }),
       db.collection("high-scores").createIndex({ mode: 1, score: -1 }),
       db.collection("player_profiles").createIndex({ playerId: 1 }, { unique: true }),
-      db.collection("duel_results").createIndex({ players: 1, createdAt: -1 })
+      db.collection("duel_results").createIndex({ players: 1, createdAt: -1 }),
+      db.collection("party_series").createIndex({ players: 1 }),
+      db.collection("party_series").createIndex({ "winner.playerId": 1 })
     ]).then(() => undefined);
   }
 

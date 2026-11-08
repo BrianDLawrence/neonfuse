@@ -41,6 +41,7 @@ export async function deletePlayerData(
     deleteFrom(db, "high-scores", { accountId: { $in: playerIds } }),
     deleteFrom(db, "visitors", { accountId: { $in: playerIds } }),
     deleteFrom(db, "duel_results", { players: { $in: playerIds } }),
+    deleteFrom(db, "party_series", { players: { $in: playerIds } }),
     deleteFrom(db, "activity_sessions", { $or: activitySessionFilters })
   ]);
 
