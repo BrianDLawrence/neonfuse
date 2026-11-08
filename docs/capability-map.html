@@ -684,7 +684,7 @@
         <div class="status-summary" aria-label="Capability totals">
           <div class="implemented-count">
             <span>Implemented</span>
-            <strong>32</strong>
+            <strong>33</strong>
           </div>
           <div class="planned-count">
             <span>Planned</span>
@@ -930,6 +930,10 @@
                     <strong>Realtime multiplayer</strong>
                     <span>Two seats, ready flow, reconnect grace, and rematch.</span>
                   </button>
+                  <button class="capability-node" type="button" aria-pressed="false" data-capability="party-brawl" data-status="implemented">
+                    <strong>Party Brawl</strong>
+                    <span>Four-seat Activity lobby, server bots, best-of-three series.</span>
+                  </button>
                 </div>
               </section>
 
@@ -1002,7 +1006,7 @@
               <h3>Review findings to address</h3>
               <ol class="review-list">
                 <li><span class="review-index">01</span><span><strong>Implement shared room routing before replica two.</strong> The launch service is explicitly capped at one process; horizontal scale still requires sticky/shared ownership and shared nonce replay storage.</span></li>
-                <li><span class="review-index">02</span><span><strong>Extend browser regression coverage.</strong> Playwright now covers the sign-in gate, local and skirmish rounds, Campaign (act locks, gauntlet, Megagrid), the Versus picker and Overclocked unlock, the game menu, Profile, High Scores, Tracks, Bot Lab, and phone touch controls on desktop and phone. The Discord Activity is covered through a fake Discord host: sign-in, party roster and invites, the duel lobby, full rounds, forfeit, reconnect, seat takeover, countdown cancel and Profile sync, with the realtime server on its own test port. Still to automate: result persistence against a real database and multi-process routing.</span></li>
+                <li><span class="review-index">02</span><span><strong>Extend browser regression coverage.</strong> Playwright now covers the sign-in gate, local and skirmish rounds, Campaign (act locks, gauntlet, Megagrid), the Versus picker and Overclocked unlock, the game menu, Profile, High Scores, Tracks, Bot Lab, and phone touch controls on desktop and phone. The Discord Activity is covered through a fake Discord host: sign-in, party roster and invites, the duel lobby, full rounds, forfeit, reconnect, seat takeover, countdown cancel, Profile sync and Party Brawl, with the realtime server on its own test port. Still to automate: result persistence against a real database and multi-process routing.</span></li>
                 <li><span class="review-index">03</span><span><strong>Separate competitive rewards.</strong> Keep local achievements, campaign stars and clear times cosmetic until local match facts have an authoritative source. The shipped Act-clear achievements follow this rule.</span></li>
                 <li><span class="review-index">04</span><span><strong>Decompose orchestration.</strong> <code>ArenaScene</code> (about 1,100 lines) and <code>GameShell</code> (about 1,400) now carry campaign, Versus and Megagrid logic. Keep extracting focused React dialogs/hooks and Phaser round systems as features grow.</span></li>
                 <li><span class="review-index">05</span><span><strong>Teach bots about fuses.</strong> Bots flee any bomb and do not model fuse timing, so stage data keeps <code>botFuseMs</code> at 1500 or more even though the bound allows 1200. Fuse-aware bots would unlock harder tuning.</span></li>
@@ -1013,7 +1017,7 @@
       </main>
 
       <footer class="capability-footer">
-        <p>Reviewed against repository code · 7 November 2026 · main @ 9765377</p>
+        <p>Reviewed against repository code · 8 November 2026 · main @ ff4df2b</p>
         <p>Solid = implemented · Dashed = planned</p>
       </footer>
     </div>
@@ -1023,7 +1027,7 @@
         "match-modes": {
           status: "implemented",
           title: "Four play modes",
-          summary: "Neon Fuse offers a staged Campaign, Versus against any bot, watch-only Bot Skirmish, and a server-authoritative Discord friend duel. On phones the Friend entry moves into the game menu, and Daily Fuse opens from the menu beside them.",
+          summary: "Neon Fuse offers a staged Campaign, Versus against any bot, watch-only Bot Skirmish, and a server-authoritative Discord friend duel, with the four-seat Party Brawl opening from the Discord party dialog and menu. On phones the Friend entry moves into the game menu, and Daily Fuse opens from the menu beside them.",
           owner: "React mode row and menu + local Phaser arena + authoritative duel runtime",
           code: ["src/game/modes.ts", "src/components/game/GameShell.tsx", "src/components/game/DuelGame.tsx", "server/rooms.ts"],
           boundary: "Campaign, Versus and Skirmish run client-side; friend duels accept commands while the server owns state and results."
@@ -1279,10 +1283,18 @@
         authoritative: {
           status: "implemented",
           title: "Authoritative results",
-          summary: "The duel server advances the simulation, resolves winners and forfeits, and writes each completed result once using its unique round ID.",
+          summary: "The duel server advances the simulation, resolves winners and forfeits, and writes each completed result once using its unique round ID. Party Brawl rounds and finished series are written the same way, built by the server and validated before storage.",
           owner: "Dedicated Node realtime service + pure duel simulation",
           code: ["server/rooms.ts", "server/index.ts", "src/game/simulation/duel.ts"],
-          boundary: "Authority applies to friend duels; local arena scores remain client-reported and explicitly unranked."
+          boundary: "Authority applies to friend duels and Party Brawl; local arena scores remain client-reported and explicitly unranked."
+        },
+        "party-brawl": {
+          status: "implemented",
+          title: "Party Brawl",
+          summary: "A second Activity lobby with four fighters, up to best-of-three rounds, and a server-driven bot in every empty seat. Two people must be seated and ready to start a round. A leaver or a lapsed reconnect knocks out only that fighter, and between rounds a newcomer can take a bot's seat. Lobby, round and series screens show each seat's series fuse.",
+          owner: "Pure four-seat duel, series and bot rules + dedicated realtime room mode + React party screens",
+          code: ["src/game/simulation/series.ts", "src/game/simulation/partyBots.ts", "server/rooms.ts", "src/components/game/PartyBrawl.tsx"],
+          boundary: "Bots act only through the same commands as people, seeded from the round ID. Only people are stored as players, bot-only rounds are never saved, and duel readers skip party rows so a bot win never reads as a duel draw."
         },
         multiplayer: {
           status: "implemented",
