@@ -50,6 +50,8 @@ type HistoryStatus = "loading" | "ready" | "loading-more" | "error";
 const EMPTY_CAREER: PlayerCareerStats = {
   local: { ...EMPTY_PROFILE_MATCH_STATS },
   duel: { ...EMPTY_PROFILE_MATCH_STATS },
+  party: { ...EMPTY_PROFILE_MATCH_STATS },
+  partySeriesWins: 0,
   bestScore: 0,
   bestWinStreak: 0
 };

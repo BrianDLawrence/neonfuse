@@ -126,4 +126,27 @@ describe("realtime transport", () => {
     expect(await replayClosed).toBe(4001);
     first.close();
   });
+  it("opens a separate party lobby for the same instance and fills it with bots", async () => {
+    const url = await start();
+    const join = (socket: WebSocket, playerId: string, mode?: "party") =>
+      socket.send(JSON.stringify({ type: "join", ticket: signJoinTicket({ playerId, name: playerId, roomId: "instance", mode }, secret, Date.now()) }));
+    const duel = await connect(url);
+    join(duel, "a");
+    expect((await nextState(duel)).players).toHaveLength(2);
+    const a = await connect(url); const b = await connect(url);
+    join(a, "a", "party");
+    const lobby = await nextState(a);
+    expect(lobby).toMatchObject({ mode: "party", seat: 0 });
+    expect(lobby.mode === "party" && lobby.seats.map((seat) => seat.kind)).toEqual(["human", "bot", "bot", "bot"]);
+    join(b, "b", "party");
+    await nextState(b);
+    a.send(JSON.stringify({ type: "ready", ready: true }));
+    b.send(JSON.stringify({ type: "ready", ready: true }));
+    const [one, two] = await Promise.all([nextState(a, (s) => s.phase === "countdown"), nextState(b, (s) => s.phase === "countdown")]);
+    expect(one.roundId).toBe(two.roundId);
+    expect(one.duel?.players).toHaveLength(4);
+    expect(one.mode === "party" && one.fighters?.map((fighter) => fighter.kind)).toEqual(["human", "human", "bot", "bot"]);
+    expect(server!.rooms.rooms.size).toBe(2);
+    duel.close(); a.close(); b.close();
+  });
 });

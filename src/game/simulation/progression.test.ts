@@ -39,6 +39,18 @@ function clearActs(acts: CampaignActId[], skip: string[] = []): CampaignProgress
 const CAMPAIGN_ACHIEVEMENTS = ["ladder-climber", "overclocked", "megagrid"] as const;
 
 describe("calculatePlayerProgression", () => {
+  it("awards Party Brawl XP for rounds, round wins and series wins without duel badges", () => {
+    const party = calculatePlayerProgression({
+      ...EMPTY_CAREER,
+      party: { played: 3, wins: 2, losses: 1, draws: 0 },
+      partySeriesWins: 1
+    });
+
+    expect(party.xp).toBe(3 * 30 + 2 * 60 + 100);
+    expect(party.badges).toEqual(["first-spark"]);
+    expect(calculatePlayerProgression(EMPTY_CAREER).xp).toBe(0);
+  });
+
   it("starts a new player at level one with the default title", () => {
     expect(calculatePlayerProgression(EMPTY_CAREER)).toEqual({
       xp: 0,

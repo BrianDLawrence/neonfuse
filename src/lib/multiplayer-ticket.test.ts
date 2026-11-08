@@ -11,4 +11,10 @@ describe("multiplayer tickets", () => {
     expect(verifyJoinTicket("changed" + token, secret, 1)).toBeNull();
     expect(verifyJoinTicket("invalid", secret, 1)).toBeNull();
   });
+  it("signs the party mode into the ticket and leaves duel tickets without one", () => {
+    const duel = verifyJoinTicket(signJoinTicket({ playerId: "a", name: "Alice", roomId: "party" }, secret, 0), secret, 1);
+    expect(duel).not.toHaveProperty("mode");
+    const party = verifyJoinTicket(signJoinTicket({ playerId: "a", name: "Alice", roomId: "party", mode: "party" }, secret, 0), secret, 1);
+    expect(party?.mode).toBe("party");
+  });
 });

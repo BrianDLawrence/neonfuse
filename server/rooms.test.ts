@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Rooms, type DuelResult, type PartyRoundResult, type Room } from "./rooms";
+import { Rooms, type DuelResult, type PartyResult, type Room } from "./rooms";
 import type { Seat } from "../src/game/simulation/duel";
 import type { JoinTicket } from "../src/lib/multiplayer-ticket";
 
@@ -93,7 +93,7 @@ describe("two-player rooms", () => {
 describe("party rooms", () => {
   function party() {
     let id = 0;
-    const results: PartyRoundResult[] = [];
+    const results: PartyResult[] = [];
     const duels: DuelResult[] = [];
     const rooms = new Rooms("server", () => `round-${++id}`, (result) => duels.push(result), 500, (result) => results.push(result));
     const ticket = (playerId: string): JoinTicket => ({ playerId, name: playerId, roomId: "instance", expiresAt: 30000, nonce: "unused" });
@@ -179,7 +179,7 @@ describe("party rooms", () => {
     for (let now = 4400; room.duel?.winner === null; now += 50) rooms.tick(now);
     rooms.tick(200_000);
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ roundId: room.roundId, roomId: "instance#party" });
+    expect(results[0]).toMatchObject({ kind: "round", roundId: room.roundId, roomId: "instance#party", seriesRound: 1 });
     expect(results[0].seats.filter((seat) => seat.kind === "human")).toHaveLength(2);
     expect(results[0].winnerSeat === null || results[0].winnerSeat >= 2).toBe(true);
   });
@@ -220,5 +220,78 @@ describe("party rooms", () => {
     rooms.message(room, 0, { type: "leave" }, 3200);
     expect(room.duel).toMatchObject({ winner: "draw", reason: "forfeit" });
     expect(results.at(-1)).toMatchObject({ winnerSeat: null, reason: "forfeit" });
+  });
+
+  /** Plays a round in which only `survivor` is left standing; the next tick resolves it. */
+  function winRound(rooms: Rooms, room: Room, survivor: Seat, now: number) {
+    rooms.tick(now + 3000);
+    room.duel = { ...room.duel!, players: room.duel!.players.map((player, seat) => ({ ...player, alive: seat === survivor })) };
+    rooms.tick(now + 3050);
+  }
+
+  it("needs fresh votes between rounds and finishes a best-of-three", () => {
+    const { join, readyAll, rooms, results } = party();
+    const { room } = join("a");
+    join("b");
+    readyAll(room);
+    winRound(rooms, room, 0, 0);
+    expect(rooms.snapshot(room, 0, 4400)).toMatchObject({ mode: "party", phase: "finished",
+      series: { rounds: 1, target: 2, wins: [1, 0, 0, 0], outcome: null } });
+    rooms.message(room, 0, { type: "ready", ready: true }, 5000);
+    expect(rooms.snapshot(room, 0, 5000).phase).toBe("finished");
+    rooms.message(room, 1, { type: "ready", ready: true }, 5000);
+    expect(rooms.snapshot(room, 0, 5000).phase).toBe("countdown");
+    winRound(rooms, room, 0, 5000);
+    const rounds = results.filter((result) => result.kind === "round");
+    const series = results.filter((result) => result.kind === "series");
+    expect(rounds.map((round) => round.seriesRound)).toEqual([1, 2]);
+    expect(new Set(rounds.map((round) => round.seriesId)).size).toBe(1);
+    expect(series).toEqual([expect.objectContaining({ seriesId: rounds[0].seriesId, wins: [2, 0, 0, 0], rounds: 2, winnerSeat: 0, reason: "won" })]);
+    readyAll(room, 10_000);
+    winRound(rooms, room, 1, 10_000);
+    const rematch = results.filter((result) => result.kind === "round").at(-1);
+    expect(rematch).toMatchObject({ seriesRound: 1 });
+    expect(rematch?.kind === "round" && rematch.seriesId).not.toBe(rounds[0].seriesId);
+  });
+
+  it("seats a newcomer in a bot's seat between rounds with a fresh record", () => {
+    const { join, readyAll, rooms, results } = party();
+    const { room } = join("a");
+    join("b");
+    readyAll(room);
+    winRound(rooms, room, 3, 0);
+    expect(results.at(-1)).toMatchObject({ kind: "round", winnerSeat: 3 });
+    expect(rooms.snapshot(room, 0, 3050)).toMatchObject({ series: { wins: [0, 0, 0, 1] } });
+    const newcomer = join("c", 4000);
+    expect(newcomer.seat).toBe(2);
+    expect(rooms.snapshot(room, 0, 4000)).toMatchObject({ seats: [{ kind: "human" }, { kind: "human" }, { kind: "human", name: "c" }, { kind: "bot", profileId: "glitch-bloom" }] });
+    rooms.message(room, 1, { type: "leave" }, 4000);
+    expect(rooms.snapshot(room, 0, 4000)).toMatchObject({ seats: [{ kind: "human" }, { kind: "bot", profileId: "fuse-rush" }, { kind: "human" }, { kind: "bot" }] });
+    readyAll(room, 4100);
+    expect(room.party?.seats.map((seat) => seat.kind)).toEqual(["human", "bot", "human", "bot"]);
+    expect(room.series?.state.seats.map((seat) => seat?.occupant)).toEqual(["human:a", "bot:1", "human:c", "bot:3"]);
+    expect(room.series?.state.seats[3]?.wins).toBe(1);
+  });
+
+  it("drops an abandoned series so the next round starts a new one", () => {
+    const { join, readyAll, rooms } = party();
+    const { room } = join("a");
+    join("b");
+    readyAll(room);
+    const first = room.series?.id;
+    rooms.tick(3000);
+    rooms.message(room, 0, { type: "leave" }, 3100);
+    rooms.message(room, 1, { type: "leave" }, 3100);
+    expect(room.series).toBeNull();
+    join("a", 4000);
+    join("b", 4000);
+    readyAll(room, 4000);
+    expect(room.series?.id).not.toBe(first);
+  });
+
+  it("keeps the duel snapshot free of party fields", () => {
+    const { rooms, ticket } = party();
+    const duel = rooms.join(ticket("a"), "duel-a", 0);
+    expect(rooms.snapshot(duel.room, 0, 0)).not.toHaveProperty("mode");
   });
 });

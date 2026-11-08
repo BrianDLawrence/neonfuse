@@ -4,6 +4,27 @@ import { getActStages } from "@/game/simulation/campaign";
 import { buildDiscordPartyRoster } from "@/lib/discord-party";
 
 describe("buildDiscordPartyRoster", () => {
+  it("never counts Party Brawl rounds as duels and adds their XP to the level", () => {
+    const aliceId = discordPlayerId("discord-a");
+    const input = {
+      discordUserIds: ["discord-a"],
+      currentDiscordUserId: "discord-a",
+      sessionsNewestFirst: [{ discordUserId: "discord-a", playerId: aliceId, displayName: "Alice" }],
+      profiles: [{ playerId: aliceId }],
+      localMatches: []
+    };
+    const party = Array.from({ length: 6 }, () => ({ players: [aliceId, "rival"], winnerId: aliceId, mode: "party" as const, outcome: "human" as const }));
+    const roster = buildDiscordPartyRoster({
+      ...input,
+      duelsOldestFirst: [...party, { players: [aliceId, "rival"], winnerId: null, mode: "party", outcome: "bot" }],
+      partySeries: [{ winner: { kind: "human", playerId: aliceId } }, { winner: { kind: "bot" } }]
+    });
+
+    expect(roster.members[0].duel).toEqual({ played: 0, wins: 0, losses: 0, draws: 0 });
+    // 7 rounds x 30 + 6 wins x 60 + 1 series x 100 = 670 XP, level 2.
+    expect(roster.members[0].level).toBe(2);
+  });
+
   it("builds safe public cards from connected Activity members", () => {
     const aliceId = discordPlayerId("discord-a");
     const bobId = discordPlayerId("discord-b");

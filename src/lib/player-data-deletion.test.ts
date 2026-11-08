@@ -22,13 +22,14 @@ describe("deletePlayerData", () => {
       source: "discord-activity"
     });
 
-    expect(result.deletedDocuments).toBe(10);
+    expect(result.deletedDocuments).toBe(11);
     expect(calls.map(({ collection }) => collection)).toEqual([
       "player_profiles",
       "matches",
       "high-scores",
       "visitors",
       "duel_results",
+      "party_series",
       "activity_sessions",
       "account",
       "session",
@@ -37,6 +38,9 @@ describe("deletePlayerData", () => {
     ]);
     expect(calls.find(({ collection }) => collection === "matches")?.filter).toEqual({
       accountId: { $in: ["stable-player", "legacy-player", "auth-user"] }
+    });
+    expect(calls.find(({ collection }) => collection === "party_series")?.filter).toEqual({
+      players: { $in: ["stable-player", "legacy-player", "auth-user"] }
     });
     expect(calls.find(({ collection }) => collection === "activity_sessions")?.filter).toEqual({
       $or: [

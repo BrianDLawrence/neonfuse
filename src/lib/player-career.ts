@@ -19,9 +19,22 @@ export type LocalCareerRecord = {
   score: number;
 };
 
+/**
+ * A row of `duel_results`. Party Brawl rounds share the collection (and its unique
+ * round ID, deletion and roster queries) but carry `mode: "party"`; they are never
+ * counted as duels, so a bot win (no winner ID) can never read as a duel draw.
+ */
 export type DuelCareerRecord = {
   winnerId: string | null;
+  mode?: "party";
+  outcome?: "human" | "bot" | "draw";
 };
+
+export const PARTY_SERIES_COLLECTION = "party_series";
+
+function isPartyRound(record: DuelCareerRecord) {
+  return record.mode === "party";
+}
 
 type LocalMatchDocument = LocalCareerRecord & {
   accountId: string;
@@ -73,12 +86,23 @@ function duelResult(winnerId: string | null, playerId: string): "win" | "loss" |
   return winnerId === playerId ? "win" : "loss";
 }
 
+function partyResult(record: DuelCareerRecord, playerId: string): "win" | "loss" | "draw" {
+  if (record.outcome === "draw") return "draw";
+  return record.winnerId === playerId ? "win" : "loss";
+}
+
 export function summarizePlayerCareer(
   localMatches: LocalCareerRecord[],
-  duelsOldestFirst: DuelCareerRecord[],
-  playerId: string
+  resultsOldestFirst: DuelCareerRecord[],
+  playerId: string,
+  partySeriesWins = 0
 ): PlayerCareerStats {
-  const duelResults = duelsOldestFirst.map((duel) => duelResult(duel.winnerId, playerId));
+  const duelResults = resultsOldestFirst
+    .filter((record) => !isPartyRound(record))
+    .map((duel) => duelResult(duel.winnerId, playerId));
+  const partyResults = resultsOldestFirst
+    .filter(isPartyRound)
+    .map((round) => partyResult(round, playerId));
   let streak = 0;
   let bestWinStreak = 0;
 
@@ -90,6 +114,8 @@ export function summarizePlayerCareer(
   return {
     local: tally(localMatches.map((match) => localResult(match.winner))),
     duel: tally(duelResults),
+    party: tally(partyResults),
+    partySeriesWins,
     bestScore: localMatches.reduce((best, match) => Math.max(best, match.score), 0),
     bestWinStreak
   };
@@ -100,7 +126,7 @@ function accountFilter(player: PlayerIdentity): string | { $in: string[] } {
 }
 
 export async function loadPlayerCareer(db: Db, player: PlayerIdentity): Promise<PlayerCareerStats> {
-  const [localMatches, duels] = await Promise.all([
+  const [localMatches, duels, partySeriesWins] = await Promise.all([
     db
       .collection<LocalMatchDocument>("matches")
       .find(
@@ -112,13 +138,16 @@ export async function loadPlayerCareer(db: Db, player: PlayerIdentity): Promise<
       .collection<DuelResultDocument>("duel_results")
       .find(
         { players: player.id } as Filter<DuelResultDocument>,
-        { projection: { winnerId: 1 } }
+        { projection: { winnerId: 1, mode: 1, outcome: 1 } }
       )
       .sort({ createdAt: 1 })
-      .toArray()
+      .toArray(),
+    db
+      .collection(PARTY_SERIES_COLLECTION)
+      .countDocuments({ "winner.kind": "human", "winner.playerId": player.id })
   ]);
 
-  return summarizePlayerCareer(localMatches, duels, player.id);
+  return summarizePlayerCareer(localMatches, duels, player.id, partySeriesWins);
 }
 
 function localOpponentName(match: Pick<LocalMatchDocument, "mode" | "stageId" | "dateKey">): string {
@@ -208,7 +237,7 @@ export async function loadPlayerHistory(
       .toArray()
   ]);
   const opponentIds = Array.from(
-    new Set(duels.flatMap((duel) => duel.players.filter((id) => id && id !== player.id)))
+    new Set(duels.filter((duel) => !isPartyRound(duel)).flatMap((duel) => duel.players.filter((id) => id && id !== player.id)))
   );
   const opponentProfiles = opponentIds.length
     ? await db
@@ -234,6 +263,18 @@ export async function loadPlayerHistory(
       playedAt: match.createdAt.toISOString()
     })),
     ...duels.map<PlayerCareerMatch>((duel) => {
+      if (isPartyRound(duel)) {
+        return {
+          id: `party-${duel.roundId}`,
+          kind: "party",
+          result: partyResult(duel, player.id),
+          opponentName: "3 rivals",
+          durationMs: duel.durationMs,
+          score: null,
+          reason: duel.reason,
+          playedAt: duel.createdAt.toISOString()
+        };
+      }
       const opponentId = duel.players.find((id) => id && id !== player.id);
 
       return {

@@ -4,13 +4,14 @@ import { WebSocket, WebSocketServer } from "ws";
 import { clientMessageSchema, type ServerMessage } from "../src/game/multiplayer/protocol";
 import { verifyJoinTicket } from "../src/lib/multiplayer-ticket";
 import type { Seat } from "../src/game/simulation/duel";
-import { Rooms, type Room, type DuelResult } from "./rooms";
+import { Rooms, type Room, type DuelResult, type PartyResult } from "./rooms";
 
 export type PersistenceState = "connected" | "not-configured" | "unavailable";
 
 type RealtimeServerOptions = {
   secret: string;
   onResult: (result: DuelResult) => void;
+  onPartyResult?: (result: PartyResult) => void;
   maxConnections?: number;
   maxRooms?: number;
   dependencyHealth?: () => {
@@ -29,6 +30,7 @@ function positiveInteger(value: number, name: string) {
 export function createRealtimeServer({
   secret,
   onResult,
+  onPartyResult = () => undefined,
   maxConnections = 1000,
   maxRooms = 500,
   dependencyHealth = () => ({ persistence: "not-configured", pendingResults: 0 })
@@ -40,7 +42,7 @@ export function createRealtimeServer({
   let draining = false;
   let closePromise: Promise<void> | undefined;
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
-  const rooms = new Rooms(randomUUID(), randomUUID, onResult, maxRooms);
+  const rooms = new Rooms(randomUUID(), randomUUID, onResult, maxRooms, onPartyResult);
   const usedTickets = new Map<string, number>();
   type Connection = { id: string; room?: Room; seat?: Seat; alive: boolean; messages: number; window: number };
   const connections = new Map<WebSocket, Connection>();
@@ -121,7 +123,7 @@ export function createRealtimeServer({
           const ticket = verifyJoinTicket(message.ticket, secret, now);
           if (!ticket || usedTickets.has(ticket.nonce)) { socket.close(4001, "Invalid or expired ticket"); return; }
           usedTickets.set(ticket.nonce, ticket.expiresAt);
-          const joined = rooms.join(ticket, connection.id, now);
+          const joined = rooms.join(ticket, connection.id, now, ticket.mode ?? "duel");
           connection.room = joined.room;
           connection.seat = joined.seat;
           clearTimeout(authTimeout);

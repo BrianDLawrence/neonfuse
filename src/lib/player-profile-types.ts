@@ -19,13 +19,16 @@ export type ProfileMatchStats = {
 export type PlayerCareerStats = {
   local: ProfileMatchStats;
   duel: ProfileMatchStats;
+  /** Party Brawl rounds, from verified server results; kept apart from duels. */
+  party: ProfileMatchStats;
+  partySeriesWins: number;
   bestScore: number;
   bestWinStreak: number;
 };
 
 export type PlayerCareerMatch = {
   id: string;
-  kind: "local" | "duel";
+  kind: "local" | "duel" | "party";
   result: "win" | "loss" | "draw";
   opponentName: string;
   durationMs: number;

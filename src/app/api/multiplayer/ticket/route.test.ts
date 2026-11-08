@@ -1,39 +1,60 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("@/lib/activity-session", () => ({ findActivitySession: vi.fn() }));
+vi.mock("@/lib/discord-activity-instance", () => ({ verifyDiscordActivityInstance: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
+
 import { findActivitySession } from "@/lib/activity-session";
+import { verifyDiscordActivityInstance } from "@/lib/discord-activity-instance";
+import { verifyJoinTicket } from "@/lib/multiplayer-ticket";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { POST } from "./route";
-import { verifyJoinTicket } from "@/lib/multiplayer-ticket";
 
-const secret = "test-secret-with-at-least-32-characters";
-const request = () => new Request("http://localhost/api/multiplayer/ticket", { method: "POST", headers: { authorization: "Bearer session" } });
-beforeEach(() => {
-  vi.stubEnv("MULTIPLAYER_SECRET", secret); vi.stubEnv("DISCORD_BOT_TOKEN", "test-bot-token"); vi.stubEnv("DISCORD_CLIENT_ID", "app");
-  vi.mocked(enforceRateLimit).mockResolvedValue(null);
-  vi.mocked(findActivitySession).mockResolvedValue({ playerId: "a", discordUserId: "discord-a", displayName: "Alice", instanceId: "party" });
-});
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.resetAllMocks(); });
+const secret = "ticket-route-secret-with-at-least-32-chars";
 
-describe("Discord party admission", () => {
-  it("issues room-bound tickets only after verifying Discord membership", async () => {
-    const fetch = vi.fn().mockResolvedValue(Response.json({ application_id: "app", instance_id: "party", users: ["discord-a"] }));
-    vi.stubGlobal("fetch", fetch);
-    const response = await POST(request());
+function requestTicket(body?: string) {
+  return POST(new Request("http://localhost/api/multiplayer/ticket", {
+    method: "POST",
+    headers: { authorization: "Bearer session-token", ...(body ? { "content-type": "application/json" } : {}) },
+    body
+  }));
+}
+
+async function ticketFrom(response: Response) {
+  const payload = await response.json() as { ticket: string };
+  return verifyJoinTicket(payload.ticket, secret, Date.now());
+}
+
+describe("POST /api/multiplayer/ticket", () => {
+  beforeEach(() => {
+    vi.stubEnv("MULTIPLAYER_SECRET", secret);
+    vi.mocked(enforceRateLimit).mockResolvedValue(null);
+    vi.mocked(findActivitySession).mockResolvedValue({
+      playerId: "player-1", displayName: "Alice", instanceId: "instance-1"
+    } as Awaited<ReturnType<typeof findActivitySession>>);
+    vi.mocked(verifyDiscordActivityInstance).mockResolvedValue({ ok: true } as Awaited<ReturnType<typeof verifyDiscordActivityInstance>>);
+  });
+  afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
+
+  it("issues a duel ticket when the body is empty, as older clients send", async () => {
+    const response = await requestTicket();
     expect(response.status).toBe(200);
-    const { ticket } = await response.json();
-    expect(verifyJoinTicket(ticket, secret, Date.now())).toMatchObject({ playerId: "a", roomId: "party" });
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/app/activity-instances/party"), expect.anything());
+    const ticket = await ticketFrom(response);
+    expect(ticket).toMatchObject({ playerId: "player-1", roomId: "instance-1" });
+    expect(ticket).not.toHaveProperty("mode");
   });
-  it("rejects a forged instance claim even with a valid user session", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ application_id: "app", instance_id: "party", users: ["someone-else"] })));
-    expect((await POST(request())).status).toBe(403);
+
+  it("signs the party lobby into the ticket", async () => {
+    const ticket = await ticketFrom(await requestTicket(JSON.stringify({ mode: "party" })));
+    expect(ticket?.mode).toBe("party");
   });
-  it("rejects missing and expired sessions without querying Discord", async () => {
-    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
-    expect((await POST(new Request("http://localhost", { method: "POST" }))).status).toBe(401);
-    vi.mocked(findActivitySession).mockResolvedValue(null);
-    expect((await POST(request())).status).toBe(401);
-    expect(fetch).not.toHaveBeenCalled();
+
+  it("rejects an invalid body before touching the session", async () => {
+    for (const body of ["{", JSON.stringify({ mode: "ranked" }), JSON.stringify({ mode: "party", roomId: "other" })]) {
+      const response = await requestTicket(body);
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ ok: false });
+    }
+    expect(findActivitySession).not.toHaveBeenCalled();
   });
 });
