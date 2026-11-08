@@ -103,6 +103,11 @@ function createCharacterTextures(scene: Phaser.Scene) {
       drawPlayerMarker(ctx, FUSEBOT_SIZE, label);
     });
   });
+  // Party Brawl bots: the muted text colour, so a bot never reads as the local player.
+  paint(scene, "marker-bot", 48, 28, (ctx) => {
+    ctx.translate(24, 18);
+    drawPlayerMarker(ctx, FUSEBOT_SIZE, "BOT", "#94a3b8");
+  });
 }
 
 /**

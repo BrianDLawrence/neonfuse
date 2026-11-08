@@ -12,6 +12,7 @@ type DiscordPartyScreenProps = {
   onClose: () => void;
   onInviteFriends: () => Promise<void>;
   onStartDuel: () => void;
+  onStartParty: () => void;
 };
 
 type PartyStatus = "loading" | "ready" | "error";
@@ -21,7 +22,8 @@ export function DiscordPartyScreen({
   participantCount,
   onClose,
   onInviteFriends,
-  onStartDuel
+  onStartDuel,
+  onStartParty
 }: Readonly<DiscordPartyScreenProps>) {
   const [roster, setRoster] = useState<DiscordPartyRoster | null>(null);
   const [status, setStatus] = useState<PartyStatus>("loading");
@@ -155,6 +157,14 @@ export function DiscordPartyScreen({
               type="button"
             >
               Open Duel Lobby
+            </button>
+            <button
+              className="command-button"
+              disabled={connectedCount < 2}
+              onClick={onStartParty}
+              type="button"
+            >
+              Start Party Brawl
             </button>
           </div>
         </div>

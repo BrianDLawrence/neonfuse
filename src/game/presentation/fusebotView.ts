@@ -19,7 +19,7 @@ export function rowDepth(row: number, layer: "block" | "actor") {
 
 type FusebotViewOptions = {
   /** Shows the floating marker and the brighter ground ring. */
-  marker?: "P1" | "YOU";
+  marker?: "P1" | "YOU" | "BOT";
   row: number;
 };
 

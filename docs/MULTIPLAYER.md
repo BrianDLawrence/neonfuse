@@ -37,6 +37,12 @@ duel: its room key is `<instanceId>#party`, and the ticket route signs
 `mode: "party"` into the ticket when the client posts `{ "mode": "party" }`.
 Duel tickets, rooms, snapshots and results are unchanged.
 
+Players open it from **Start Party Brawl** in the Discord Party dialog or
+**Party Brawl** in the menu. The lobby shows four seats (bots in any empty one),
+each seat's series fuse, and **Ready**, **Next round** or **Rematch**. A fighter
+who is out watches the rest of the round. `DuelGame` renders both modes; the
+party screens live in `src/components/game/PartyBrawl.tsx`.
+
 - Four fighters always. People take the lowest free seat; at each round start
   the server fills every empty seat with a bot (`src/game/simulation/partyBots.ts`).
   A seat's bot is fixed: Circuit Shade, Fuse Rush, Volt Warden, Glitch Bloom.

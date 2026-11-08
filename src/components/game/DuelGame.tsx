@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/game/simulation/arena";
 import type { ActivityAuth } from "@/lib/activity-session-renewal";
+import { PartyLobby, PartyScoreboard } from "./PartyBrawl";
 import { useDuelConnection } from "./useDuelConnection";
 
 const DIRECTIONS = [{ dir: "up", glyph: "▲" }, { dir: "left", glyph: "◀" }, { dir: "right", glyph: "▶" }, { dir: "down", glyph: "▼" }] as const;
 
-export function DuelGame({ activityAuth, onLeave }: { activityAuth?: ActivityAuth; onLeave: () => void }) {
-  const connection = useDuelConnection(activityAuth);
+type DuelGameProps = { activityAuth?: ActivityAuth; mode?: "duel" | "party"; onLeave: () => void };
+
+export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps) {
+  const connection = useDuelConnection(activityAuth, mode);
   const { snapshot, snapshotRef, input, status, error, notice } = connection;
   const host = useRef<HTMLDivElement>(null);
   const direction = useRef<Direction | null>(null);
@@ -17,6 +20,9 @@ export function DuelGame({ activityAuth, onLeave }: { activityAuth?: ActivityAut
   const player = snapshot?.players[snapshot.seat];
   const loadout = snapshot?.duel?.players[snapshot.seat].loadout;
   const canPlay = status === "connected" && phase === "playing";
+  const party = snapshot?.mode === "party" ? snapshot : null;
+  const isParty = mode === "party";
+  const knockedOut = Boolean(party && phase === "playing" && party.duel && !party.duel.players[party.seat]?.alive);
   const liveRef = useRef(canPlay);
   useEffect(() => { liveRef.current = canPlay; if (!canPlay) direction.current = null; }, [canPlay]);
 
@@ -62,21 +68,32 @@ export function DuelGame({ activityAuth, onLeave }: { activityAuth?: ActivityAut
 
   return (
     <main className="duel-shell">
-      <div className="duel-canvas" ref={host} tabIndex={-1} aria-label="Two-player arena. Arrow keys or WASD to move, Space to plant a bomb." />
+      <div className="duel-canvas" ref={host} tabIndex={-1} aria-label={`${isParty ? "Four-fighter" : "Two-player"} arena. Arrow keys or WASD to move, Space to plant a bomb.`} />
       <header className="duel-header">
-        <div><h1>Neon Fuse</h1><p>Friend match · Two players</p></div>
+        <div><h1>Neon Fuse</h1><p>{isParty ? "Party Brawl · Four fighters" : "Friend match · Two players"}</p></div>
         <div className="duel-header-actions">
           <span className="hud-chip" aria-live="polite"><span>Round</span><strong>{status !== "connected" ? status : phase === "playing" ? "Live" : phase}</strong></span>
           <button className="command-button secondary" onClick={onLeave} type="button">Leave</button>
         </div>
       </header>
-      {snapshot ? <div className="duel-scoreboard" aria-label="Player slots">
+      {/* The party lobby already lists every seat, so its scoreboard shows only around a round. */}
+      {party ? (phase === "countdown" || phase === "playing" ? <PartyScoreboard snapshot={party} /> : null) : snapshot && !isParty ? <div className="duel-scoreboard" aria-label="Player slots">
         {snapshot.players.map((member, index) => <span className="duel-player-label" data-seat={index} key={index}>
           <strong>{member?.name ?? "Open slot"}{snapshot.seat === index ? " (you)" : ""}</strong>
           <small>{member ? member.connected ? "Connected" : "Reconnecting…" : "Waiting for opponent"}</small>
         </span>)}
       </div> : null}
-      {(phase === "waiting" || phase === "finished" || status === "error") ? (
+      {isParty && (phase === "waiting" || phase === "finished" || status === "error") ? (
+        <PartyLobby
+          canReady={loaded && status === "connected"}
+          notice={error ?? notice ?? (status !== "connected" ? "Connecting to your party…" : !loaded ? "Loading the arena…" : "Rounds last up to three minutes.")}
+          onLeave={onLeave}
+          onReady={connection.ready}
+          onRetry={connection.retry}
+          snapshot={party}
+          status={status}
+        />
+      ) : (phase === "waiting" || phase === "finished" || status === "error") ? (
         <section className="duel-lobby" aria-labelledby="duel-title">
           <p className="auth-kicker">Discord Party</p>
           <h2 id="duel-title">{heading}</h2>
@@ -102,7 +119,8 @@ export function DuelGame({ activityAuth, onLeave }: { activityAuth?: ActivityAut
         </section>
       ) : null}
       {phase === "countdown" && status === "connected" ? <div className="duel-countdown" role="status">{countdown}<span>Get ready!</span></div> : null}
-      {status === "reconnecting" && phase === "playing" ? <p className="duel-connection-banner" role="status">Reconnecting… The round continues.</p> : snapshot?.reconnectSeconds != null && phase === "playing" ? <p className="duel-connection-banner" role="status">Opponent reconnecting · {snapshot.reconnectSeconds}s remaining</p> : null}
+      {status === "reconnecting" && phase === "playing" ? <p className="duel-connection-banner" role="status">Reconnecting… The round continues.</p> :
+        knockedOut && snapshot?.reconnectSeconds == null ? <p className="duel-connection-banner brawl-out-banner" role="status">You&apos;re out. Watching the rest of the round.</p> : snapshot?.reconnectSeconds != null && phase === "playing" ? <p className="duel-connection-banner" role="status">{isParty ? "A player is reconnecting" : "Opponent reconnecting"} · {snapshot.reconnectSeconds}s remaining</p> : null}
       <footer className="duel-controls">
         <p className="duel-help">WASD / Arrows: Move · Space: Bomb{loadout ? ` · Bombs ${loadout.bombs} / Blast ${loadout.blast} / Speed ${loadout.speed}` : ""}</p>
         {phase === "playing" ? <div className="duel-touch-row">

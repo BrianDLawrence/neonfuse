@@ -222,7 +222,8 @@ export function GameShell({
   onInviteFriends?: () => Promise<void>;
   onSignOut: () => Promise<void>;
 }>) {
-  const [isDuelOpen, setIsDuelOpen] = useState(false);
+  // A friend match replaces the shell: the two-seat duel or the four-fighter Party Brawl.
+  const [friendMatch, setFriendMatch] = useState<"duel" | "party" | null>(null);
   const [roundStatus, setRoundStatus] = useState("Warmup");
   const [bombs, setBombs] = useState(1);
   const [blast, setBlast] = useState(2);
@@ -959,7 +960,7 @@ export function GameShell({
       : "Ready";
   const playerOnBoard = hasHumanPlayer(modeCommand.mode);
 
-  if (isDuelOpen) return <DuelGame activityAuth={activityAuth} onLeave={() => setIsDuelOpen(false)} />;
+  if (friendMatch) return <DuelGame activityAuth={activityAuth} key={friendMatch} mode={friendMatch} onLeave={() => setFriendMatch(null)} />;
 
   return (
     <main className="app-frame" data-touch-controls={touchControlsEnabled ? "true" : "false"}>
@@ -1099,7 +1100,7 @@ export function GameShell({
             <button
               aria-pressed={false}
               className="command-button secondary command-button-friend"
-              onClick={() => setIsDuelOpen(true)}
+              onClick={() => setFriendMatch("duel")}
               type="button"
             >
               <span className="label-full">Play with a friend</span>
@@ -1161,7 +1162,8 @@ export function GameShell({
               items={[
                 { label: "Daily Fuse", onSelect: handleOpenDaily, status: dailyMenuStatus },
                 { label: "Profile", onSelect: () => setIsProfileOpen(true) },
-                { label: "Play with a friend", onSelect: () => setIsDuelOpen(true) },
+                { label: "Play with a friend", onSelect: () => setFriendMatch("duel") },
+                { label: "Party Brawl", onSelect: () => setFriendMatch("party") },
                 ...(connectionLabel && activityAuth && onInviteFriends
                   ? [{ label: "Discord party", onSelect: () => setIsPartyOpen(true) }]
                   : []),
@@ -1242,7 +1244,11 @@ export function GameShell({
             onInviteFriends={onInviteFriends}
             onStartDuel={() => {
               setIsPartyOpen(false);
-              setIsDuelOpen(true);
+              setFriendMatch("duel");
+            }}
+            onStartParty={() => {
+              setIsPartyOpen(false);
+              setFriendMatch("party");
             }}
             participantCount={activityParticipantCount ?? 1}
           />

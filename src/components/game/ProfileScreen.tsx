@@ -127,6 +127,9 @@ export function ProfileScreen({
   onEquippedTitleChange
 }: Readonly<ProfileScreenProps>) {
   const [career, setCareer] = useState<PlayerCareerStats>(profile?.stats ?? EMPTY_CAREER);
+  // Stats saved before Party Brawl have no party tally.
+  const party = career.party ?? EMPTY_PROFILE_MATCH_STATS;
+  const partySeriesWins = career.partySeriesWins ?? 0;
   const [progression, setProgression] = useState<PlayerProgression>(
     profile?.progression ?? calculatePlayerProgression(EMPTY_CAREER)
   );
@@ -287,6 +290,11 @@ export function ProfileScreen({
                   <span>Verified duels</span>
                   <strong>{career.duel.wins}-{career.duel.losses}-{career.duel.draws}</strong>
                   <small>{career.duel.played} played</small>
+                </div>
+                <div className="profile-record" data-kind="party">
+                  <span>Party Brawl</span>
+                  <strong>{party.wins}-{party.losses}-{party.draws}</strong>
+                  <small>{party.played} rounds · {partySeriesWins} series won</small>
                 </div>
                 <div className="profile-record" data-kind="local">
                   <span>Local arena</span>
@@ -463,7 +471,7 @@ export function ProfileScreen({
                   {history.map((match) => (
                     <article className="profile-history-row" data-result={match.result} key={match.id}>
                       <span className="profile-match-kind" data-kind={match.kind}>
-                        {match.kind === "duel" ? "Verified duel" : "Local unranked"}
+                        {match.kind === "duel" ? "Verified duel" : match.kind === "party" ? "Party Brawl" : "Local unranked"}
                       </span>
                       <span className="profile-match-opponent">
                         <strong>{match.result}</strong>
