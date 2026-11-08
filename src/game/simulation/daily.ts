@@ -6,6 +6,7 @@ import {
   type StageBotSpec,
   type StageModifiers
 } from "./campaign";
+import { hashString } from "./seed";
 
 // Daily Fuse: one seeded challenge per UTC day; see docs/SINGLE_PLAYER.md. Every
 // function here takes the date key as input, so nothing reads the clock.
@@ -177,18 +178,6 @@ export function isDailyKeyInWindow(dateKey: string, nowMs: number): boolean {
   );
 }
 
-// FNV-1a over the key, so each date gets a stable 32-bit seed.
-function hashDateKey(dateKey: string): number {
-  let hash = 0x811c9dc5;
-
-  for (let index = 0; index < dateKey.length; index += 1) {
-    hash ^= dateKey.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  return hash >>> 0;
-}
-
 // mulberry32: a small seeded stream of draws in [0, 1).
 function createDraws(seed: number): () => number {
   let state = seed;
@@ -231,7 +220,7 @@ export function getDailyChallenge(dateKey: string | null | undefined): DailyChal
     return null;
   }
 
-  const seed = hashDateKey(dateKey);
+  const seed = hashString(dateKey);
   const draw = createDraws(seed);
   const day = dayNumber(dateKey);
   const modifier = DAILY_MODIFIERS[((day % DAILY_MODIFIERS.length) + DAILY_MODIFIERS.length) % DAILY_MODIFIERS.length];

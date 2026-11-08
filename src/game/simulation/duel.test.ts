@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceDuel, commandDuel, createDuel } from "./duel";
+import { advanceDuel, commandDuel, createDuel, eliminateSeats } from "./duel";
 
 describe("authoritative duel", () => {
   it("rejects movement before countdown, into walls, and faster than the cooldown", () => {
@@ -52,5 +52,58 @@ describe("authoritative duel", () => {
     expect(next.explosions).toHaveLength(2);
     expect(next.explosions[0].clearedBlocks).toContainEqual({ x: 3, y: 1 });
     expect(next.arena[1][3]).toBe("floor");
+  });
+});
+
+describe("party duel seats", () => {
+  it("keeps the two-seat duel identical to the original spawn layout", () => {
+    expect(createDuel()).toEqual(createDuel(2));
+    expect(createDuel(2).players.map((player) => player.tile)).toEqual([{ x: 1, y: 1 }, { x: 11, y: 9 }]);
+  });
+
+  it("spawns three and four fighters in the cleared corners", () => {
+    expect(createDuel(3).players.map((player) => player.tile)).toEqual([{ x: 1, y: 1 }, { x: 11, y: 9 }, { x: 11, y: 1 }]);
+    const four = createDuel(4);
+    expect(four.players.map((player) => player.tile)).toEqual([{ x: 1, y: 1 }, { x: 11, y: 9 }, { x: 11, y: 1 }, { x: 1, y: 9 }]);
+    for (const player of four.players) expect(four.arena[player.tile.y][player.tile.x]).toBe("floor");
+  });
+
+  it("keeps a three-fighter round going until one fighter is left standing", () => {
+    let state = advanceDuel(createDuel(3), 3000);
+    state = commandDuel(state, 0, { type: "bomb" });
+    state = advanceDuel(state, 4400);
+    expect(state.players.map((player) => player.alive)).toEqual([false, true, true]);
+    expect(state.winner).toBeNull();
+    state = commandDuel(state, 1, { type: "bomb" });
+    state = advanceDuel(state, 5800);
+    expect(state.winner).toBe(2);
+    expect(state.reason).toBe("blast");
+  });
+
+  it("draws when the last fighters fall on the same tick", () => {
+    let state = advanceDuel(createDuel(3), 3000);
+    for (const seat of [0, 1, 2] as const) state = commandDuel(state, seat, { type: "bomb" });
+    const finished = advanceDuel(state, 4400);
+    expect(finished.winner).toBe("draw");
+  });
+
+  it("blocks moves into any living fighter's tile with four seats", () => {
+    const state = advanceDuel(createDuel(4), 3000);
+    state.players[3].tile = { x: 2, y: 1 };
+    expect(commandDuel(state, 0, { type: "move", direction: "right" })).toEqual(state);
+    state.players[3].alive = false;
+    expect(commandDuel(state, 0, { type: "move", direction: "right" }).players[0].tile).toEqual({ x: 2, y: 1 });
+  });
+
+  it("eliminates forfeiting seats and lets the round continue while two remain", () => {
+    const live = advanceDuel(createDuel(4), 3000);
+    const one = eliminateSeats(live, [1]);
+    expect(one.players[1].alive).toBe(false);
+    expect(one.winner).toBeNull();
+    expect(live.players[1].alive).toBe(true);
+    const done = eliminateSeats(one, [0, 3]);
+    expect(done).toMatchObject({ winner: 2, reason: "forfeit" });
+    expect(eliminateSeats(done, [2])).toBe(done);
+    expect(eliminateSeats(live, [0, 1, 2, 3])).toMatchObject({ winner: "draw", reason: "forfeit" });
   });
 });
