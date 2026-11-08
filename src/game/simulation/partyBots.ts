@@ -1,6 +1,6 @@
 import type { GridPoint } from "./arena";
-import { BOT_PROFILES, chooseBotTurn, type BotProfileId } from "./bots";
-import { manhattanDistance } from "./danger";
+import { BOT_PROFILES, chooseBotTurn, type BotProfileId, type BotTurnContext, type BotTurnIntent } from "./bots";
+import { isDangerTile, manhattanDistance } from "./danger";
 import { commandDuel, type DuelCommand, type DuelState, type Seat } from "./duel";
 import { hashString } from "./seed";
 
@@ -64,7 +64,7 @@ export function choosePartyBotCommands(state: DuelState, bot: PartyBot, seed: nu
   const actor = state.players[bot.seat];
   const target = nearestOpponent(state, bot.seat);
   if (!actor?.alive || target === null) return [];
-  const intent = chooseBotTurn({
+  const context: BotTurnContext = {
     arena: state.arena,
     actor: { id: "bot-a", tile: actor.tile, alive: true, loadout: actor.loadout, profile: BOT_PROFILES[bot.profileId], turn: bot.turn },
     opponentTile: state.players[target].tile,
@@ -76,7 +76,8 @@ export function choosePartyBotCommands(state: DuelState, bot: PartyBot, seed: nu
     ],
     powerups: state.powerups,
     decisionSeed: seed
-  });
+  };
+  const intent = choosePressingTurn(context) ?? chooseBotTurn(context);
   if (intent.type === "wait") return [];
   if (intent.type === "move") {
     const move = stepToward(actor.tile, intent.tile);
@@ -84,6 +85,23 @@ export function choosePartyBotCommands(state: DuelState, bot: PartyBot, seed: nu
   }
   const escape = intent.moveTo ? stepToward(actor.tile, intent.moveTo) : null;
   return escape ? [{ type: "bomb" }, escape] : [{ type: "bomb" }];
+}
+
+/**
+ * Party-only pressure. The local brain holds still while any bomb is live, which with
+ * four fighters is most of the round, so bot-only rounds ran out the clock. When the bot
+ * is out of every blast, it plans as if the board were clear and keeps that plan only if
+ * it stays safe against the live bombs: a move must not enter a blast, and a bomb needs an
+ * escape that also clears them. Otherwise (or when it is in danger) the local brain decides.
+ */
+export function choosePressingTurn(context: BotTurnContext): BotTurnIntent | null {
+  const { arena, actor, bombs } = context;
+  if (bombs.length === 0 || isDangerTile(arena, bombs, actor.tile)) return null;
+  const plan = chooseBotTurn({ ...context, bombs: [] });
+  if (plan.type === "move") return isDangerTile(arena, bombs, plan.tile) ? null : plan;
+  if (plan.type === "wait") return null;
+  const escape = chooseBotTurn({ ...context, bombs: [...bombs, { tile: actor.tile, range: actor.loadout.blast }] });
+  return escape.type === "move" ? { type: "plant-bomb", moveTo: escape.tile } : null;
 }
 
 /** Lets every living bot whose turn is due act at the state's current time, in seat order. */

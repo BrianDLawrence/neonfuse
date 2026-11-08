@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { BOT_PROFILES, chooseBotTurn } from "./bots";
+import { isDangerTile } from "./danger";
 import { advanceDuel, createDuel, type DuelState, type Seat } from "./duel";
 import {
   choosePartyBotCommands,
+  choosePressingTurn,
   createPartyBot,
   nearestOpponent,
   partyBotDelay,
@@ -92,5 +95,66 @@ describe("party bots", () => {
     expect(first.state.winner).not.toBeNull();
     expect(first.state.time).toBeLessThanOrEqual(183_000);
     expect(second).toEqual(first);
+  });
+
+  it("keeps pressing while a rival's bomb ticks across the arena, where a local bot would wait", () => {
+    const state = advanceDuel(createDuel(4), 3280);
+    const far = state.players[3].tile;
+    state.bombs.push({ id: 9, owner: 3, tile: { ...far }, range: 2, explodesAt: 4680 });
+    const context = {
+      arena: state.arena,
+      actor: { id: "bot-a" as const, tile: state.players[0].tile, alive: true, loadout: state.players[0].loadout, profile: BOT_PROFILES["fuse-rush"], turn: 0 },
+      opponentTile: state.players[1].tile,
+      bombs: [{ tile: far, range: 2 }],
+      activeBombCount: 0,
+      blockedTiles: [far, state.players[1].tile, state.players[2].tile, state.players[3].tile],
+      decisionSeed: 11
+    };
+    expect(chooseBotTurn(context)).toEqual({ type: "wait" });
+    const pressing = choosePressingTurn(context);
+    expect(pressing?.type).not.toBe("wait");
+    expect(choosePartyBotCommands(state, createPartyBot(0, 0), 11).length).toBeGreaterThan(0);
+  });
+
+  it("leaves escaping to the local brain and never presses into a live blast", () => {
+    const state = advanceDuel(createDuel(4), 3280);
+    const actor = state.players[0];
+    const context = {
+      arena: state.arena,
+      actor: { id: "bot-a" as const, tile: actor.tile, alive: true, loadout: actor.loadout, profile: BOT_PROFILES["fuse-rush"], turn: 0 },
+      opponentTile: state.players[3].tile,
+      bombs: [{ tile: { x: actor.tile.x + 1, y: actor.tile.y }, range: 2 }],
+      activeBombCount: 0,
+      decisionSeed: 5
+    };
+    expect(choosePressingTurn(context)).toBeNull();
+    expect(choosePressingTurn({ ...context, bombs: [] })).toBeNull();
+    // Two short blasts cover both first steps out of the corner, but not the corner itself.
+    const bombs = [{ tile: { x: actor.tile.x + 2, y: actor.tile.y }, range: 1 }, { tile: { x: actor.tile.x, y: actor.tile.y + 2 }, range: 1 }];
+    expect(isDangerTile(state.arena, bombs, actor.tile)).toBe(false);
+    let refused = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const wanted = chooseBotTurn({ ...context, bombs: [], decisionSeed: seed });
+      const intent = choosePressingTurn({ ...context, bombs, decisionSeed: seed });
+      if (wanted.type === "move" && isDangerTile(state.arena, bombs, wanted.tile)) {
+        refused += 1;
+        expect(intent).toBeNull();
+      }
+      if (intent?.type === "move") expect(isDangerTile(state.arena, bombs, intent.tile)).toBe(false);
+    }
+    expect(refused).toBeGreaterThan(0);
+  });
+
+  it("ends most bot-only rounds with a winner well before the timer", () => {
+    const roundIds = Array.from({ length: 20 }, (_, index) => `party-finish-${index}`);
+    const outcomes = roundIds.map((roundId) => {
+      const { state } = playRound(roundId);
+      return { winner: state.winner, reason: state.reason, time: state.time };
+    });
+    const decided = outcomes.filter((outcome) => typeof outcome.winner === "number");
+    expect(decided.length).toBeGreaterThanOrEqual(15);
+    expect(decided.every((outcome) => outcome.reason === "blast" && outcome.time < 183_000)).toBe(true);
+    expect(outcomes.filter((outcome) => outcome.reason === "timeout").length).toBeLessThanOrEqual(2);
+    expect(roundIds.map((roundId) => playRound(roundId).state.winner)).toEqual(outcomes.map((outcome) => outcome.winner));
   });
 });
