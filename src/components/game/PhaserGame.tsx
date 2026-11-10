@@ -27,6 +27,7 @@ export type TouchControlsApi = {
   setMusicTrack: (track: MusicTrack | null) => void;
   previewMusicTrack: (track: MusicTrack | null) => void;
   tapBomb: () => void;
+  tapDetonate: () => void;
   requestReset: () => void;
 };
 
@@ -188,6 +189,7 @@ export function PhaserGame({
           }
         },
         tapBomb: () => game.events.emit("touch-bomb"),
+        tapDetonate: () => game.events.emit("touch-detonate"),
         requestReset: () => game.events.emit("touch-reset")
       });
     }

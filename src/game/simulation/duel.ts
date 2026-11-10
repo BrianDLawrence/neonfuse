@@ -1,12 +1,13 @@
 import { createInitialArena, directionToDelta, getSpawnPoints, isWalkable, type ArenaGrid, type Direction, type GridPoint } from "./arena";
 import { resolveBlast, tileListIncludes } from "./blast";
 import { stepSlides, tryKick, type BombSlide } from "./kick";
+import { chooseDetonation, plantFuseMs } from "./remote";
 import { resolveShieldHit } from "./shield";
 import { applyPowerup, choosePowerupDrop, createInitialLoadout, DEFAULT_POWERUP_DROP_RATES, type ActorLoadout, type PickupType, type SpecialDropRates } from "./powerups";
 
 export type Seat = 0 | 1 | 2 | 3;
 export type SeatCount = 2 | 3 | 4;
-export type DuelCommand = { type: "move"; direction: Direction } | { type: "bomb" };
+export type DuelCommand = { type: "move"; direction: Direction } | { type: "bomb" } | { type: "detonate" };
 /**
  * Per-room rules the server picks when a round starts. A state without rules plays the
  * classic game, which is what the two-seat duel did before perks existed.
@@ -35,6 +36,9 @@ export type DuelState = {
     explodesAt: number;
     /** Set while a kicked bomb is sliding. */
     slide?: BombSlide;
+    /** A bomb planted while its owner held Remote: a long fuse its owner can cut short. */
+    remote?: boolean;
+    plantedAt?: number;
   }[];
   explosions: { id: number; tiles: GridPoint[]; clearedBlocks: GridPoint[]; expiresAt: number }[];
   powerups: { tile: GridPoint; type: PickupType }[];
@@ -87,10 +91,18 @@ export function commandDuel(state: DuelState, seat: Seat, command: DuelCommand):
   if (command.type === "bomb") {
     if (state.bombs.filter((bomb) => bomb.owner === seat).length >= player.loadout.bombs ||
       state.bombs.some((bomb) => tileListIncludes([bomb.tile], player.tile))) return state;
+    const remote = (player.loadout.remote ?? 0) >= 1;
     return { ...state, nextBombId: state.nextBombId + 1, bombs: [...state.bombs, {
       id: state.nextBombId, owner: seat, tile: { ...player.tile }, range: player.loadout.blast,
-      explodesAt: state.time + 1400
+      explodesAt: state.time + plantFuseMs(remote, 1400),
+      ...(remote ? { remote: true, plantedAt: state.time } : {})
     }] };
+  }
+  if (command.type === "detonate") {
+    // The owner's oldest armed remote bomb goes off on the next advance; chains follow as usual.
+    const id = chooseDetonation(state.bombs, seat, state.time);
+    if (id === null) return state;
+    return { ...state, bombs: state.bombs.map((bomb) => bomb.id === id ? { ...bomb, explodesAt: state.time } : bomb) };
   }
   if (state.time < player.nextMoveAt) return state;
   const delta = directionToDelta(command.direction);

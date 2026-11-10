@@ -376,5 +376,7 @@ test.describe("touch layout", () => {
     await expect(touch.getByRole("button", { name: "Reset round" })).toBeVisible();
     // The Perks chip stays out of the crowded phone HUD until a perk is held.
     await expect(page.locator(".hud-chip-perks")).toBeHidden();
+    // Detonate appears only while the player holds Remote.
+    await expect(touch.getByRole("button", { name: "Detonate remote bomb" })).toHaveCount(0);
   });
 });

@@ -40,6 +40,19 @@ describe("two-player rooms", () => {
     expect(rooms.snapshot(a.room, 1, 3000).phase).toBe("playing");
   });
 
+  it("routes a detonate input to the fighter's remote bomb", () => {
+    const { rooms, a, ready } = setup(); ready(); rooms.tick(3000);
+    a.room.duel!.players[0].loadout.remote = 1;
+    const input = (sequence: number, command: { type: "bomb" } | { type: "detonate" }) =>
+      ({ type: "input", roundId: a.room.roundId, sequence, command }) as const;
+    rooms.message(a.room, 0, input(1, { type: "bomb" }), 3000);
+    expect(a.room.duel?.bombs[0]).toMatchObject({ remote: true, explodesAt: 7000 });
+    rooms.message(a.room, 0, input(2, { type: "detonate" }), 3400);
+    rooms.tick(3450);
+    expect(a.room.duel?.bombs).toHaveLength(0);
+    expect(a.room.duel?.explosions).toHaveLength(1);
+  });
+
   it("plays the two-seat duel without shield, kick or remote", () => {
     const { rooms, a, ready } = setup(); ready(); rooms.tick(3000);
     const specials = a.room.duel?.rules?.specials ?? {};

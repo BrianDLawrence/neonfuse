@@ -860,12 +860,9 @@ export function GameShell({
     touchApiRef.current?.previewMusicTrack(null);
   }, []);
   const handleBlastZonesToggle = useCallback(() => {
-    setShowBlastZones((current) => {
-      writeShowBlastZones(!current);
-      return !current;
-    });
-  }, []);
-
+    writeShowBlastZones(!showBlastZones);
+    setShowBlastZones(!showBlastZones);
+  }, [showBlastZones]);
   const handleMusicToggle = useCallback(() => {
     setMusicEnabled((currentEnabled) => {
       const nextEnabled = !currentEnabled;
@@ -931,6 +928,9 @@ export function GameShell({
   }, []);
   const handleTouchBomb = useCallback(() => {
     touchApiRef.current?.tapBomb();
+  }, []);
+  const handleTouchDetonate = useCallback(() => {
+    touchApiRef.current?.tapDetonate();
   }, []);
   const handleTouchReset = useCallback(() => {
     touchApiRef.current?.requestReset();
@@ -1485,6 +1485,7 @@ export function GameShell({
             <>
               <span className="key-chip">Arrow Keys / WASD: Move</span>
               <span className="key-chip">Space: Bomb</span>
+              {perks.includes("remote") ? <span className="key-chip">E / Shift: Detonate</span> : null}
             </>
           ) : (
             <span className="key-chip">Bot Skirmish: Watch only</span>
@@ -1500,7 +1501,7 @@ export function GameShell({
                 ? "Last bot standing"
                 : `Blast ${opponentProfile.name}${versusOverclocked ? " (Overclocked)" : ""}`}
           </span>
-          <span className="key-chip">{showBlastZones ? "Pulsing tiles: about to blow" : "Vision shows blast zones"}</span>
+          <span className="key-chip">{showBlastZones || !playerOnBoard ? "Pulsing tiles: about to blow" : "Vision shows blast zones"}</span>
         </div>
 
         <aside className="touch-controls" aria-label="Touch controls">
@@ -1533,6 +1534,16 @@ export function GameShell({
                 type="button"
               >
                 <span aria-hidden="true">Bomb</span>
+              </button>
+            ) : null}
+            {playerOnBoard && perks.includes("remote") ? (
+              <button
+                aria-label="Detonate remote bomb"
+                className="touch-button touch-button-detonate"
+                onPointerDown={handleTouchDetonate}
+                type="button"
+              >
+                <span aria-hidden="true">Detonate</span>
               </button>
             ) : null}
             <button

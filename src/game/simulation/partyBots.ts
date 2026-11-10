@@ -3,10 +3,14 @@ import { BOT_PROFILES, chooseBotTurn, type BotProfileId, type BotTurnContext, ty
 import { isDangerTile, manhattanDistance } from "./danger";
 import { commandDuel, type DuelCommand, type DuelState, type Seat } from "./duel";
 import { slideAwareThreats } from "./kick";
+import { chooseBotDetonation } from "./remote";
 import { hashString } from "./seed";
 
 /** Each party seat has a fixed Fusebot; a bot filling that seat plays this profile. */
 export const PARTY_SEAT_PROFILES: readonly BotProfileId[] = ["circuit-shade", "fuse-rush", "volt-warden", "glitch-bloom"];
+
+/** A party bot holds a remote bomb no longer than a normal fuse before setting it off. */
+export const PARTY_BOT_REMOTE_HOLD_MS = 1400;
 
 /** Bots wait a beat after the countdown, like local bots do. */
 export const PARTY_BOT_START_DELAY_MS = 280;
@@ -79,14 +83,20 @@ export function choosePartyBotCommands(state: DuelState, bot: PartyBot, seed: nu
     powerups: state.powerups,
     decisionSeed: seed
   };
+  // A bot holding Remote sets off its bomb once it is clear and a rival is caught, or once
+  // the bomb has been held for the normal fuse, so remote bombs keep the usual pace.
+  const rivals = state.players.filter((player, index) => index !== bot.seat && player.alive).map((player) => player.tile);
+  const detonate: DuelCommand[] = chooseBotDetonation({
+    arena: state.arena, owner: bot.seat, actorTile: actor.tile, rivals, bombs: state.bombs, time: state.time, holdMs: PARTY_BOT_REMOTE_HOLD_MS
+  }) === null ? [] : [{ type: "detonate" }];
   const intent = choosePressingTurn(context) ?? chooseBotTurn(context);
-  if (intent.type === "wait") return [];
+  if (intent.type === "wait") return detonate;
   if (intent.type === "move") {
     const move = stepToward(actor.tile, intent.tile);
-    return move ? [move] : [];
+    return move ? [...detonate, move] : detonate;
   }
   const escape = intent.moveTo ? stepToward(actor.tile, intent.moveTo) : null;
-  return escape ? [{ type: "bomb" }, escape] : [{ type: "bomb" }];
+  return [...detonate, { type: "bomb" }, ...(escape ? [escape] : [])];
 }
 
 /**
