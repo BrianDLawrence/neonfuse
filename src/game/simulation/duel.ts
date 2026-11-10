@@ -1,10 +1,18 @@
 import { createInitialArena, directionToDelta, getSpawnPoints, isWalkable, type ArenaGrid, type Direction, type GridPoint } from "./arena";
 import { resolveBlast, tileListIncludes } from "./blast";
-import { applyPowerup, choosePowerupDrop, createInitialLoadout, type ActorLoadout, type PowerupType } from "./powerups";
+import { applyPowerup, choosePowerupDrop, createInitialLoadout, DEFAULT_POWERUP_DROP_RATES, type ActorLoadout, type PickupType, type SpecialDropRates } from "./powerups";
 
 export type Seat = 0 | 1 | 2 | 3;
 export type SeatCount = 2 | 3 | 4;
 export type DuelCommand = { type: "move"; direction: Direction } | { type: "bomb" };
+/**
+ * Per-room rules the server picks when a round starts. A state without rules plays the
+ * classic game, which is what the two-seat duel did before perks existed.
+ */
+export type DuelRules = {
+  /** Perks that can drop from broken blocks; null drops none. */
+  specials: SpecialDropRates | null;
+};
 export type DuelState = {
   time: number;
   startsAt: number;
@@ -12,16 +20,19 @@ export type DuelState = {
   players: { tile: GridPoint; alive: boolean; loadout: ActorLoadout; nextMoveAt: number }[];
   bombs: { id: number; owner: Seat; tile: GridPoint; range: number; explodesAt: number }[];
   explosions: { id: number; tiles: GridPoint[]; clearedBlocks: GridPoint[]; expiresAt: number }[];
-  powerups: { tile: GridPoint; type: PowerupType }[];
+  powerups: { tile: GridPoint; type: PickupType }[];
   nextBombId: number;
   winner: Seat | "draw" | null;
   reason: "blast" | "forfeit" | "timeout" | "abandoned" | null;
+  /** Absent on a classic round and in snapshots from servers that predate perks. */
+  rules?: DuelRules;
 };
 
 /** Two seats is the friend duel; three or four take the remaining corners in `getSpawnPoints` order. */
-export function createDuel(seats: SeatCount = 2): DuelState {
+export function createDuel(seats: SeatCount = 2, rules?: DuelRules): DuelState {
   const arena = createInitialArena();
   return {
+    ...(rules ? { rules } : {}),
     time: 0, startsAt: 3000, arena,
     players: getSpawnPoints(arena).slice(0, seats).map((tile) => ({
       tile, alive: true, loadout: createInitialLoadout(), nextMoveAt: 0
@@ -99,7 +110,7 @@ export function advanceDuel(state: DuelState, time: number): DuelState {
     });
     queue.push(...next.bombs.filter((candidate) => tileListIncludes(blast.tiles, candidate.tile)));
     for (const tile of blast.clearedBlocks) {
-      const type = choosePowerupDrop(tile);
+      const type = choosePowerupDrop(tile, DEFAULT_POWERUP_DROP_RATES, next.rules?.specials ?? null);
       if (type) next.powerups.push({ tile, type });
     }
   }

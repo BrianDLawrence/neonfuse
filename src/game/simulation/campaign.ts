@@ -7,10 +7,12 @@ import {
 } from "./bots";
 import {
   MAX_LOADOUT,
+  clampSpecialDropRates,
   createInitialLoadout,
   type ActorLoadout,
   type PlayerLoadout,
-  type PowerupDropRates
+  type PowerupDropRates,
+  type SpecialDropRates
 } from "./powerups";
 
 // Acts 1 (Circuit Ladder), 2 (Overclock) and 3 (Megagrid); see
@@ -58,6 +60,8 @@ export type StageModifiers = {
   botMoveScale?: number;
   /** Replaces the drop rates for this stage, each 1–10. */
   powerupDropRates?: PowerupDropRates;
+  /** Switches perks on for this stage, each 0–10; perks are off when absent. */
+  specialDropRates?: SpecialDropRates;
 };
 
 export type CampaignStage = {
@@ -336,6 +340,8 @@ export type ResolvedModifiers = {
   botFuseMs: number;
   botMoveScale: number;
   powerupDropRates: PowerupDropRates | null;
+  /** Null when the stage drops no perks. */
+  specialDropRates: SpecialDropRates | null;
 };
 
 /** The stage's rule modifiers with defaults filled in and every value clamped to its bounds. */
@@ -344,7 +350,9 @@ export function resolveStageModifiers(stage: CampaignStage): ResolvedModifiers {
 }
 
 /** Fills in defaults and clamps any modifier set (stage or Versus) to its bounds. */
-export function clampModifiers({ botFuseMs, botMoveScale, powerupDropRates }: StageModifiers): ResolvedModifiers {
+export function clampModifiers({ botFuseMs, botMoveScale, powerupDropRates, specialDropRates }: StageModifiers): ResolvedModifiers {
+  const specials = specialDropRates ? clampSpecialDropRates(specialDropRates) : null;
+
   return {
     botFuseMs: Math.round(clamp(botFuseMs ?? DEFAULT_BOT_FUSE_MS, BOT_FUSE_BOUNDS.min, BOT_FUSE_BOUNDS.max)),
     botMoveScale: clamp(botMoveScale ?? 1, BOT_MOVE_SCALE_BOUNDS.min, BOT_MOVE_SCALE_BOUNDS.max),
@@ -354,7 +362,8 @@ export function clampModifiers({ botFuseMs, botMoveScale, powerupDropRates }: St
           blast: clamp(Math.round(powerupDropRates.blast), 1, 10),
           speed: clamp(Math.round(powerupDropRates.speed), 1, 10)
         }
-      : null
+      : null,
+    specialDropRates: specials && Object.keys(specials).length > 0 ? specials : null
   };
 }
 

@@ -153,6 +153,7 @@ export type CampaignStage = {
     botFuseMs?: number;           // bounded 1200–2400
     botMoveScale?: number;        // bounded 0.7–1.3, multiplies move delay
     powerupDropRates?: PowerupDropRates;
+    specialDropRates?: SpecialDropRates; // perks (shield, vision, kick, remote), each 0–10, off when absent
   };
   objective: "knockout";
   roundsToWin: number;

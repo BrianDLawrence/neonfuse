@@ -57,8 +57,8 @@ import {
   choosePowerupDrop,
   createInitialLoadout,
   type ActorLoadout,
-  type PowerupDropRates,
-  type PowerupType
+  type PickupType,
+  type PowerupDropRates
 } from "../simulation/powerups";
 import { resolveRoundWinner } from "../simulation/round";
 import { resolveVersusOpponent } from "../simulation/versus";
@@ -100,7 +100,7 @@ type CombatActor = {
 
 type ActivePowerup = {
   tile: GridPoint;
-  type: PowerupType;
+  type: PickupType;
   sprite: Phaser.GameObjects.Image;
 };
 
@@ -1059,7 +1059,7 @@ export class ArenaScene extends Phaser.Scene {
     return this.roundSeed + bot.turn * 101 + (bot.id === "bot-b" ? 9_973 : 0);
   }
 
-  private getPowerupTexture(powerup: PowerupType) {
+  private getPowerupTexture(powerup: PickupType) {
     return `powerup-${powerup}`;
   }
 

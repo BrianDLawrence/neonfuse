@@ -236,7 +236,7 @@ describe("resolveStageBot", () => {
       startingLoadout: { bombs: 99, blast: 0, speed: 2 }
     });
 
-    expect(loadout).toEqual({ bombs: MAX_LOADOUT.bombs, blast: createInitialLoadout().blast, speed: 2 });
+    expect(loadout).toEqual({ ...createInitialLoadout(), bombs: MAX_LOADOUT.bombs, speed: 2 });
   });
 
   it("never mutates the shared base profile", () => {
@@ -260,21 +260,32 @@ describe("resolveStageModifiers", () => {
     expect(resolveStageModifiers(base)).toEqual({
       botFuseMs: DEFAULT_BOT_FUSE_MS,
       botMoveScale: 1,
-      powerupDropRates: null
+      powerupDropRates: null,
+      specialDropRates: null
     });
   });
 
   it("clamps out-of-range values to their bounds", () => {
     const wild = {
       ...base,
-      modifiers: { botFuseMs: 100, botMoveScale: 9, powerupDropRates: { bomb: 0, blast: 4.6, speed: 40 } }
+      modifiers: {
+        botFuseMs: 100,
+        botMoveScale: 9,
+        powerupDropRates: { bomb: 0, blast: 4.6, speed: 40 },
+        specialDropRates: { shield: 12, vision: 2.4, kick: -1 }
+      }
     };
 
     expect(resolveStageModifiers(wild)).toEqual({
       botFuseMs: 1200,
       botMoveScale: 1.3,
-      powerupDropRates: { bomb: 1, blast: 5, speed: 10 }
+      powerupDropRates: { bomb: 1, blast: 5, speed: 10 },
+      specialDropRates: { shield: 10, vision: 2 }
     });
+  });
+
+  it("treats a stage whose perks are all off as dropping none", () => {
+    expect(resolveStageModifiers({ ...base, modifiers: { specialDropRates: { kick: 0 } } }).specialDropRates).toBeNull();
   });
 });
 

@@ -6,7 +6,7 @@ import {
   manhattanDistance,
   type BombThreat
 } from "./danger";
-import type { ActorLoadout, PowerupType } from "./powerups";
+import type { ActorLoadout, PickupType } from "./powerups";
 import { MAX_LOADOUT } from "./powerups";
 
 export type BotId = "bot-a" | "bot-b";
@@ -44,7 +44,7 @@ export type BotActorState = {
 
 export type BotPowerupTarget = {
   tile: GridPoint;
-  type: PowerupType;
+  type: PickupType;
 };
 
 export type BotTurnIntent =
@@ -497,7 +497,17 @@ function hasAdjacentSoftBlock(arena: ArenaGrid, tile: GridPoint) {
   return getAdjacentTiles(tile).some((neighbor) => arena[neighbor.y]?.[neighbor.x] === "soft");
 }
 
-function getPowerupNeed(loadout: ActorLoadout, powerup: PowerupType) {
+/** 1 when the pickup would help this bot, 0 when it is capped or a perk bots cannot use. */
+export function getPowerupNeed(loadout: ActorLoadout, powerup: PickupType) {
+  // Bots already read every blast zone, and never walk into a bomb to kick it.
+  if (powerup === "vision" || powerup === "kick") {
+    return 0;
+  }
+
+  if (powerup === "shield" || powerup === "remote") {
+    return (loadout[powerup] ?? 0) >= MAX_LOADOUT[powerup] ? 0 : 1;
+  }
+
   if (powerup === "bomb") {
     return loadout.bombs >= MAX_LOADOUT.bombs ? 0 : 1;
   }
