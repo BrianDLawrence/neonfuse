@@ -107,3 +107,34 @@ describe("party duel seats", () => {
     expect(eliminateSeats(live, [0, 1, 2, 3])).toMatchObject({ winner: "draw", reason: "forfeit" });
   });
 });
+
+describe("duel rules", () => {
+  /** Breaks every soft block at once and reports what dropped. */
+  function dropsWith(state: ReturnType<typeof createDuel>) {
+    const live = advanceDuel(state, 3000);
+    live.bombs = live.arena.flatMap((row, y) => row.flatMap((cell, x) =>
+      cell === "soft" ? [{ id: 100 + y * 20 + x, owner: 0 as const, tile: { x: x - 1, y }, range: 1, explodesAt: 3000 }] : []));
+    return advanceDuel(live, 3050).powerups.map((powerup) => powerup.type);
+  }
+
+  it("plays the classic game when a round has no rules", () => {
+    expect(createDuel(4)).not.toHaveProperty("rules");
+    expect(dropsWith(createDuel(4)).every((type) => ["bomb", "blast", "speed"].includes(type))).toBe(true);
+  });
+
+  it("drops the perks a room switches on, and no others", () => {
+    const visionOnly = dropsWith(createDuel(4, { specials: { vision: 3 } }));
+    expect(visionOnly).toContain("vision");
+    expect(visionOnly.some((type) => type === "shield" || type === "kick" || type === "remote")).toBe(false);
+    const classic = dropsWith(createDuel(4)).filter((type) => ["bomb", "blast", "speed"].includes(type));
+    expect(visionOnly.filter((type) => ["bomb", "blast", "speed"].includes(type))).toEqual(classic);
+  });
+
+  it("lets a fighter pick up a perk once", () => {
+    const state = advanceDuel(createDuel(2, { specials: { shield: 3 } }), 3000);
+    state.powerups.push({ tile: { x: 2, y: 1 }, type: "shield" });
+    const picked = commandDuel(state, 0, { type: "move", direction: "right" });
+    expect(picked.players[0].loadout.shield).toBe(1);
+    expect(picked.powerups).toHaveLength(0);
+  });
+});

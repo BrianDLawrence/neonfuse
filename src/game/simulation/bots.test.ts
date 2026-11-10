@@ -7,6 +7,7 @@ import {
   BOT_PROFILES,
   DEFAULT_BOT_SELECTION,
   chooseBotTurn,
+  getPowerupNeed,
   type BotActorState,
   type BotProfileId
 } from "./bots";
@@ -251,5 +252,17 @@ describe("bots on large boards", () => {
 
     expect(run.alive).toBe(true);
     expect(run.endDistance).toBeLessThan(run.startDistance / 2);
+  });
+});
+
+describe("getPowerupNeed", () => {
+  it("wants a shield or remote it lacks and ignores perks bots cannot use", () => {
+    const loadout = createInitialLoadout();
+    expect(getPowerupNeed(loadout, "shield")).toBe(1);
+    expect(getPowerupNeed(loadout, "remote")).toBe(1);
+    expect(getPowerupNeed({ ...loadout, shield: 1 }, "shield")).toBe(0);
+    expect(getPowerupNeed(loadout, "vision")).toBe(0);
+    expect(getPowerupNeed(loadout, "kick")).toBe(0);
+    expect(getPowerupNeed(loadout, "bomb")).toBe(1);
   });
 });

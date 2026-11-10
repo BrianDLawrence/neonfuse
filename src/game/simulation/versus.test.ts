@@ -35,7 +35,7 @@ describe("resolveVersusOpponent", () => {
 
     expect(opponent.profile).toEqual(BOT_PROFILES["circuit-shade"]);
     expect(opponent.loadout).toEqual(createInitialLoadout());
-    expect(opponent.modifiers).toEqual({ botFuseMs: DEFAULT_BOT_FUSE_MS, botMoveScale: 1, powerupDropRates: null });
+    expect(opponent.modifiers).toEqual({ botFuseMs: DEFAULT_BOT_FUSE_MS, botMoveScale: 1, powerupDropRates: null, specialDropRates: null });
   });
 
   it("tunes the Overclocked variant within the stage bounds", () => {
