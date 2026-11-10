@@ -39,6 +39,7 @@ type PhaserGameProps = {
   };
   botSelection: BotSelection;
   versusOverclocked?: boolean;
+  showBlastZones?: boolean;
   powerupDropRates: PowerupDropRates;
   touchControlsEnabled?: boolean;
   onRoundStatusChange?: (status: string) => void;
@@ -53,6 +54,7 @@ export function PhaserGame({
   modeCommand,
   botSelection,
   versusOverclocked = false,
+  showBlastZones = false,
   powerupDropRates,
   touchControlsEnabled = false,
   onRoundStatusChange,
@@ -76,11 +78,13 @@ export function PhaserGame({
   const powerupDropRatesRef = useRef(powerupDropRates);
   const botSelectionRef = useRef(botSelection);
   const versusOverclockedRef = useRef(versusOverclocked);
+  const showBlastZonesRef = useRef(showBlastZones);
   const touchControlsEnabledRef = useRef(touchControlsEnabled);
 
   useEffect(() => {
     botSelectionRef.current = botSelection;
     versusOverclockedRef.current = versusOverclocked;
+    showBlastZonesRef.current = showBlastZones;
     powerupDropRatesRef.current = powerupDropRates;
     touchControlsEnabledRef.current = touchControlsEnabled;
     roundStatusChangeRef.current = onRoundStatusChange;
@@ -98,6 +102,7 @@ export function PhaserGame({
     onRegisterTouchControls,
     onRoundStatusChange,
     powerupDropRates,
+    showBlastZones,
     touchControlsEnabled,
     versusOverclocked
   ]);
@@ -139,7 +144,8 @@ export function PhaserGame({
           getBotSelection: () => botSelectionRef.current,
           getCampaignStage: () => campaignStageRef.current,
           getDailyDateKey: () => dailyDateKeyRef.current,
-          getVersusOverclock: () => versusOverclockedRef.current
+          getVersusOverclock: () => versusOverclockedRef.current,
+          getShowBlastZones: () => showBlastZonesRef.current
         }
       });
       gameRef.current = game;

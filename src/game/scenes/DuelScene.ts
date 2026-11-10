@@ -3,11 +3,11 @@ import type { RoomSnapshot } from "../multiplayer/protocol";
 import { BombView, DangerOverlay, drawArenaBlocks, drawArenaFloor } from "../presentation/arenaViews";
 import { playExplosionEffect } from "../presentation/explosionEffect";
 import { FusebotView, rowDepth, type ShieldVisual } from "../presentation/fusebotView";
-import { getDangerTiles } from "../simulation/danger";
 import type { DuelCommand } from "../simulation/duel";
 import { PARTY_SEAT_PROFILES } from "../simulation/partyBots";
 import { hasPerk } from "../simulation/powerups";
 import { isShieldGuarding } from "../simulation/shield";
+import { visibleDangerTiles } from "../simulation/vision";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, createInitialArena, type Direction, type GridPoint } from "../simulation/arena";
 import { computeArenaBoardFit } from "../simulation/layout";
 
@@ -16,6 +16,8 @@ export type DuelView = {
   direction: () => Direction | null;
   input: (command: DuelCommand) => void;
   touchControlsVisible: () => boolean;
+  /** The "Show blast zones" setting. */
+  showBlastZones: () => boolean;
   loaded: () => void;
 };
 
@@ -28,6 +30,7 @@ export class DuelScene extends Phaser.Scene {
   private bombs = new Map<number, BombView>();
   private danger?: DangerOverlay;
   private dangerKey = "";
+  private hadVision = false;
   private seenExplosions = new Set<number>();
   private arenaKey = "";
   private roundId = "";
@@ -121,11 +124,19 @@ export class DuelScene extends Phaser.Scene {
     });
     for (const [id, bomb] of this.bombs) if (!liveBombs.has(id)) { bomb.destroy(); this.bombs.delete(id); }
     const threats = snapshot?.duel?.bombs.map((bomb) => ({ tile: bomb.tile, range: bomb.range })) ?? [];
-    const dangerKey = `${arenaKey}|${JSON.stringify(threats)}`;
+    // Blast zones need Vision. A fighter who is out watches with them shown, and a server
+    // that predates perks sends no rules, so its rounds keep the classic overlay.
+    const me = snapshot?.duel?.players[snapshot.seat];
+    const viewer = snapshot?.duel?.rules && me?.alive ? me.loadout : null;
+    const tiles = visibleDangerTiles({ arena, bombs: threats, viewer, alwaysShow: this.view.showBlastZones() });
+    const dangerKey = `${arenaKey}|${JSON.stringify(tiles)}`;
+    const hasVision = viewer?.vision === 1;
     if (dangerKey !== this.dangerKey) {
       this.dangerKey = dangerKey;
-      this.danger?.update(getDangerTiles(arena, threats), (tile) => this.world(tile));
+      this.danger?.update(tiles, (tile) => this.world(tile));
+      if (hasVision && !this.hadVision) this.danger?.reveal();
     }
+    this.hadVision = hasVision;
     snapshot?.duel?.powerups.forEach((powerup) => render(`pickup-${powerup.tile.x}-${powerup.tile.y}`, powerup.tile, `powerup-${powerup.type}`, rowDepth(powerup.tile.y, "actor") - 0.6));
     for (const [key, sprite] of this.sprites) if (!wanted.has(key)) { sprite.destroy(); this.sprites.delete(key); }
     const explosions = snapshot?.duel?.explosions ?? [];

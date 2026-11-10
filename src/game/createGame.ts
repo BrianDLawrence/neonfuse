@@ -54,6 +54,8 @@ export type GameEvents = {
   getDailyDateKey?: () => string | null;
   /** Read when a Versus round starts: fight slot A's bot as its Overclocked variant. */
   getVersusOverclock?: () => boolean;
+  /** The "Show blast zones" setting: draw every blast zone even without the Vision perk. */
+  getShowBlastZones?: () => boolean;
 };
 
 type CreateGameOptions = {

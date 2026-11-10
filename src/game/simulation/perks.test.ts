@@ -15,6 +15,17 @@ describe("perk drop rates by mode", () => {
     }
   });
 
+  it("drops Vision in every mode, since blast zones are hidden without it", () => {
+    for (const mode of Object.keys(MODE_PERK_DROP_RATES) as PerkMode[]) {
+      expect(perkDropRatesFor(mode)?.vision).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps campaign and Daily Fuse to Vision alone, so stage balance holds", () => {
+    expect(perkDropRatesFor("campaign")).toEqual({ vision: 3 });
+    expect(perkDropRatesFor("daily")).toEqual({ vision: 3 });
+  });
+
   it("keeps every rate within 0-10", () => {
     for (const rates of Object.values(MODE_PERK_DROP_RATES)) {
       for (const rate of Object.values(rates ?? {})) {

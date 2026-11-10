@@ -109,6 +109,21 @@ test.describe("game shell", () => {
     await expect(perks).toContainText("None");
   });
 
+  test("blast zones need Vision unless the player turns them on in the menu", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the control strip is hidden on phones");
+    await openShell(page);
+
+    const hint = page.locator(".control-strip");
+    await expect(hint).toContainText("Vision shows blast zones");
+    await openMenuItem(page, "Show blast zones");
+    await expect(hint).toContainText("Pulsing tiles: about to blow");
+    await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.locator(".shell-menu-item", { hasText: "Show blast zones" })).toHaveAttribute("aria-pressed", "true");
+    // The setting is kept on this device.
+    await page.reload();
+    await expect(page.locator(".control-strip")).toContainText("Pulsing tiles: about to blow");
+  });
+
   test("Bot Skirmish swaps the player loadout for bot readouts", async ({ page }) => {
     await openShell(page);
 

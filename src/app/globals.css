@@ -465,6 +465,25 @@ h5,
   background: var(--background);
 }
 
+.stat-icon-vision {
+  width: 16px;
+  height: 10px;
+  margin-block: 3px;
+  border: 2px solid var(--perk-vision);
+  border-radius: 50% / 60%;
+}
+
+.stat-icon-vision::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--perk-vision);
+}
+
 /* Perk icons in the HUD sit at full strength: holding one is the news. */
 .hud-chip-perks .stat-icon,
 .bot-hud-chip .stat-icon {

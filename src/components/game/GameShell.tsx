@@ -55,7 +55,9 @@ import {
   CAMPAIGN_PROGRESS_STORAGE_KEY,
   DAILY_PROGRESS_STORAGE_KEY,
   MUSIC_TRACK_STORAGE_KEY,
-  VISITOR_STORAGE_KEY
+  VISITOR_STORAGE_KEY,
+  readShowBlastZones,
+  writeShowBlastZones
 } from "@/lib/client-storage";
 import type { HighScoreEntry } from "@/lib/leaderboard";
 import {
@@ -258,6 +260,7 @@ export function GameShell({
   const [isVersusOpen, setIsVersusOpen] = useState(false);
   // Session-only: the stored preference stays the plain slot A bot.
   const [versusOverclocked, setVersusOverclocked] = useState(false);
+  const [showBlastZones, setShowBlastZones] = useState(false);
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress>(EMPTY_CAMPAIGN_PROGRESS);
   const [campaignResult, setCampaignResult] = useState<CampaignRoundResult | null>(null);
   const [isDailyOpen, setIsDailyOpen] = useState(false);
@@ -324,6 +327,8 @@ export function GameShell({
     dailyProgressRef.current = storedDaily;
     setDailyProgress(storedDaily);
     setTodayKey(readTodayKey());
+
+    setShowBlastZones(readShowBlastZones());
 
     const stored = readStoredMusicTrack();
 
@@ -854,6 +859,13 @@ export function GameShell({
   const handleStopPreviewTrack = useCallback(() => {
     touchApiRef.current?.previewMusicTrack(null);
   }, []);
+  const handleBlastZonesToggle = useCallback(() => {
+    setShowBlastZones((current) => {
+      writeShowBlastZones(!current);
+      return !current;
+    });
+  }, []);
+
   const handleMusicToggle = useCallback(() => {
     setMusicEnabled((currentEnabled) => {
       const nextEnabled = !currentEnabled;
@@ -966,6 +978,7 @@ export function GameShell({
         <PhaserGame
           botSelection={botSelection}
           versusOverclocked={versusOverclocked}
+          showBlastZones={showBlastZones}
           modeCommand={modeCommand}
           powerupDropRates={powerupDropRates}
           touchControlsEnabled={touchControlsEnabled}
@@ -1168,6 +1181,7 @@ export function GameShell({
                   ? [{ label: "Discord party", onSelect: () => setIsPartyOpen(true) }]
                   : []),
                 { label: "Music", onSelect: handleMusicToggle, pressed: musicEnabled },
+                { label: "Show blast zones", onSelect: handleBlastZonesToggle, pressed: showBlastZones },
                 { label: "Tracks", onSelect: () => setIsMusicOpen(true) },
                 { label: "High Scores", onSelect: () => setIsHighScoresOpen(true) },
                 { label: "Bots", onSelect: () => setIsBotLabOpen(true) },
@@ -1486,7 +1500,7 @@ export function GameShell({
                 ? "Last bot standing"
                 : `Blast ${opponentProfile.name}${versusOverclocked ? " (Overclocked)" : ""}`}
           </span>
-          <span className="key-chip">Pulsing tiles: about to blow</span>
+          <span className="key-chip">{showBlastZones ? "Pulsing tiles: about to blow" : "Vision shows blast zones"}</span>
         </div>
 
         <aside className="touch-controls" aria-label="Touch controls">
