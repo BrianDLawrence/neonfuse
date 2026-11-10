@@ -36,19 +36,21 @@ function playRound(roundId: string) {
   // Counted with plain checks and asserted once: an expect per tick dominated the run time.
   let overCap = 0;
   let shieldsBroken = 0;
+  const remoteBombIds = new Set<number>();
   for (let time = 0; state.winner === null && time <= 190_000; time += 50) {
     const shieldsBefore = state.players.map((player) => player.loadout.shield);
     state = advanceDuel(state, time);
     state.players.forEach((player, seat) => {
       if (shieldsBefore[seat] === 1 && player.loadout.shield === 0) shieldsBroken += 1;
     });
+    for (const bomb of state.bombs) if (bomb.remote) remoteBombIds.add(bomb.id);
     ({ state, bots } = stepPartyBots(state, bots, seed));
     state.players.forEach((player, seat) => {
       if (state.bombs.filter((bomb) => bomb.owner === seat).length > player.loadout.bombs) overCap += 1;
     });
   }
   expect(overCap).toBe(0);
-  return { state, bots, shieldsBroken };
+  return { state, bots, shieldsBroken, remoteBombs: remoteBombIds.size };
 }
 
 describe("party bots", () => {
@@ -161,16 +163,32 @@ describe("party bots", () => {
     expect(refused).toBeGreaterThan(0);
   });
 
+  it("sets off its remote bomb once a rival is caught and the bot is clear", () => {
+    const state = advanceDuel(createDuel(4, { specials: { remote: 2 } }), 3500);
+    state.players[0].loadout.remote = 1;
+    state.players[0].tile = { x: 11, y: 1 };
+    state.players[2].tile = { x: 11, y: 9 };
+    state.players[1].tile = { x: 1, y: 2 };
+    state.bombs = [{ id: 1, owner: 0, tile: { x: 1, y: 1 }, range: 1, explodesAt: 7000, remote: true, plantedAt: 3000 }];
+    expect(choosePartyBotCommands(state, createPartyBot(0, 3000), 5)[0]).toEqual({ type: "detonate" });
+    state.players[1].tile = { x: 5, y: 1 };
+    expect(choosePartyBotCommands(state, createPartyBot(0, 3000), 5)).not.toContainEqual({ type: "detonate" });
+  });
+
   it("ends most bot-only rounds with a winner well before the timer", () => {
     const roundIds = Array.from({ length: 20 }, (_, index) => `party-finish-${index}`);
     let shieldsBroken = 0;
+    let remoteBombs = 0;
     const outcomes = roundIds.map((roundId) => {
       const round = playRound(roundId);
       shieldsBroken += round.shieldsBroken;
+      remoteBombs += round.remoteBombs;
       return { winner: round.state.winner, reason: round.state.reason, time: round.state.time };
     });
     // Bots pick up shields, and blasts break them, in real rounds.
     expect(shieldsBroken).toBeGreaterThan(0);
+    // ...and plant remote bombs, which still let rounds finish.
+    expect(remoteBombs).toBeGreaterThan(0);
     const decided = outcomes.filter((outcome) => typeof outcome.winner === "number");
     expect(decided.length).toBeGreaterThanOrEqual(15);
     expect(decided.every((outcome) => outcome.reason === "blast" && outcome.time < 183_000)).toBe(true);

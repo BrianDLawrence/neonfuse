@@ -17,7 +17,9 @@
   --perk-shield: #e0f2fe;
   --perk-vision: #c084fc;
   --perk-kick: #f472b6;
-  --perk-remote: var(--danger);
+  /* Teal, so a remote bomb's steady light and the Detonate button never read as
+     the amber fuse or the pink-red Bomb button. */
+  --perk-remote: #2dd4bf;
   /* See-through surface for controls that sit on top of the arena (touch pad). */
   --panel-glass: rgba(8, 10, 18, 0.5);
   --font-display: var(--font-chakra), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -508,6 +510,35 @@ h5,
   width: 6px;
   height: 7px;
   background: repeating-linear-gradient(to bottom, var(--perk-kick) 0 1.5px, transparent 1.5px 3px);
+}
+
+.stat-icon-remote {
+  width: 14px;
+}
+
+/* The antenna mast and its light. */
+.stat-icon-remote::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  width: 2px;
+  height: 11px;
+  background: var(--perk-remote);
+}
+
+.stat-icon-remote::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--perk-remote);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-45deg);
 }
 
 /* Perk icons in the HUD sit at full strength: holding one is the news. */
@@ -2517,6 +2548,22 @@ h5,
     inset 0 0 24px rgba(244, 63, 94, 0.18);
 }
 
+.touch-button-detonate {
+  border-color: rgba(45, 212, 191, 0.6);
+  color: var(--perk-remote);
+  background: rgba(45, 212, 191, 0.14);
+  box-shadow:
+    0 0 26px rgba(45, 212, 191, 0.2),
+    inset 0 0 18px rgba(45, 212, 191, 0.08);
+}
+
+.touch-button-detonate:active {
+  background: rgba(45, 212, 191, 0.28);
+  box-shadow:
+    0 0 36px rgba(45, 212, 191, 0.45),
+    inset 0 0 24px rgba(45, 212, 191, 0.16);
+}
+
 .touch-button-reset {
   min-height: clamp(44px, 12vw, 60px);
   color: var(--muted);
@@ -4026,6 +4073,9 @@ h5,
 .duel-pad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 4px; touch-action: none; }
 .duel-pad .touch-pad-button { border-radius: 8px; }
 .duel-touch-row .touch-button { min-width: 76px; min-height: 76px; border-radius: 8px; }
+.duel-touch-actions { display: flex; flex-direction: column; gap: 10px; }
+/* Shorter than Bomb so the pair stays inside the touch band the board fit reserves. */
+.duel-touch-actions .touch-button-detonate { min-height: 52px; font-size: 11px; }
 @media (hover: none) and (pointer: coarse) {
   .duel-touch-row { display: flex; }
 }

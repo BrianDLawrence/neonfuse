@@ -149,6 +149,15 @@ export class BombView {
     this.scene.tweens.add({ targets: streak, alpha: 0, scale: 0.2, duration: 220, onComplete: () => streak.destroy() });
   }
 
+  /** A remote bomb: a steady antenna light instead of a flickering fuse. */
+  setRemote() {
+    const color = Phaser.Display.Color.HexStringToColor(PERK_COLORS.remote).color;
+    this.tweens[1]?.remove();
+    this.fuse.setTint(color).setScale(0.22).setAlpha(1);
+    this.tweens[1] = this.scene.tweens.add({ targets: this.fuse, alpha: { from: 1, to: 0.45 }, yoyo: true, repeat: -1, duration: 520 });
+    this.light.setTint(color);
+  }
+
   /** The last stretch of the fuse: pulse faster so the danger is felt. */
   setUrgent() {
     this.tweens.forEach((tween) => tween.setTimeScale(2.4));

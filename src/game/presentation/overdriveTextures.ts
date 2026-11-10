@@ -76,7 +76,7 @@ export const PERK_COLORS = {
   shield: "#e0f2fe",
   vision: "#c084fc",
   kick: "#f472b6",
-  remote: "#fb7185"
+  remote: "#2dd4bf"
 } as const;
 
 export function createOverdriveTextures(scene: Phaser.Scene) {
@@ -408,6 +408,20 @@ function createPerkTextures(scene: Phaser.Scene, chip: (color: string, glyph: (c
       ctx.beginPath();
       ctx.moveTo(from, y);
       ctx.lineTo(16.5, y);
+      ctx.stroke();
+    }
+  }));
+
+  // Remote: an antenna mast with signal arcs.
+  paint(scene, "powerup-remote", 40, 40, chip(PERK_COLORS.remote, (ctx) => {
+    ctx.fillRect(19, 18, 2.5, 12);
+    ctx.beginPath();
+    ctx.arc(20.25, 17, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    for (const radius of [5.5, 9]) {
+      ctx.beginPath();
+      ctx.arc(20.25, 17, radius, -Math.PI * 0.82, -Math.PI * 0.18);
       ctx.stroke();
     }
   }));

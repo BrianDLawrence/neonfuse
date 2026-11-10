@@ -9,7 +9,10 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("input"), roundId: z.string().max(80), sequence: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
     command: z.discriminatedUnion("type", [
       z.object({ type: z.literal("move"), direction: z.enum(["up", "down", "left", "right"]) }).strict(),
-      z.object({ type: z.literal("bomb") }).strict()
+      z.object({ type: z.literal("bomb") }).strict(),
+      // Remote detonate. Clients send it only while their fighter holds Remote, which a
+      // server that predates perks never grants, so an older server never sees it.
+      z.object({ type: z.literal("detonate") }).strict()
     ]) }).strict(),
   z.object({ type: z.literal("leave") }).strict()
 ]);

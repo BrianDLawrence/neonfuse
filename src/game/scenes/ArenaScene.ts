@@ -65,6 +65,7 @@ import {
 } from "../simulation/powerups";
 import { perkDropRatesFor } from "../simulation/perks";
 import { KICK_STEP_MS, slideAwareThreats, slideOnce, tryKick, type BombSlide } from "../simulation/kick";
+import { chooseBotDetonation, chooseDetonation, plantFuseMs } from "../simulation/remote";
 import { resolveShieldHit } from "../simulation/shield";
 import { canSeeBlastZones, visibleDangerTiles } from "../simulation/vision";
 import { resolveRoundWinner } from "../simulation/round";
@@ -92,6 +93,9 @@ type ActiveBomb = {
   timer: Phaser.Time.TimerEvent;
   urgentTimer: Phaser.Time.TimerEvent;
   urgent: boolean;
+  /** Planted while its owner held Remote: a long fuse its owner can cut short. */
+  remote: boolean;
+  plantedAt: number;
   /** Set while a kicked bomb slides, with the timer that steps it. */
   slide?: BombSlide;
   slideTimer?: Phaser.Time.TimerEvent;
@@ -126,6 +130,7 @@ export class ArenaScene extends Phaser.Scene {
   private touchInput?: TouchInputState;
   private touchBombQueued = false;
   private keyboardBombQueued = false;
+  private detonateQueued = false;
   private lastTouchStepAt = Number.NEGATIVE_INFINITY;
   private actors = new Map<ActorId, CombatActor>();
   private botMoveEvent?: Phaser.Time.TimerEvent;
@@ -184,17 +189,23 @@ export class ArenaScene extends Phaser.Scene {
 
     this.game.events.on("mode-change", this.handleModeChange, this);
     this.game.events.on("touch-bomb", this.handleTouchBomb, this);
+    this.game.events.on("touch-detonate", this.queueDetonate, this);
     this.game.events.on("touch-reset", this.resetRound, this);
     this.input.keyboard?.on("keydown", this.unlockAudio, this);
     this.input.keyboard?.on("keydown-SPACE", this.handleBombKey, this);
+    this.input.keyboard?.on("keydown-E", this.handleDetonateKey, this);
+    this.input.keyboard?.on("keydown-SHIFT", this.handleDetonateKey, this);
     this.input.on("pointerdown", this.unlockAudio, this);
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off("mode-change", this.handleModeChange, this);
       this.game.events.off("touch-bomb", this.handleTouchBomb, this);
+      this.game.events.off("touch-detonate", this.queueDetonate, this);
       this.game.events.off("touch-reset", this.resetRound, this);
       this.input.keyboard?.off("keydown", this.unlockAudio, this);
       this.input.keyboard?.off("keydown-SPACE", this.handleBombKey, this);
+      this.input.keyboard?.off("keydown-E", this.handleDetonateKey, this);
+      this.input.keyboard?.off("keydown-SHIFT", this.handleDetonateKey, this);
       this.input.off("pointerdown", this.unlockAudio, this);
       this.scale.off("resize", this.handleResize, this);
       this.indicators?.destroy();
@@ -221,6 +232,8 @@ export class ArenaScene extends Phaser.Scene {
     // Taken every frame, so a press while the round is not live is dropped, not replayed later.
     const bombPressed = this.keyboardBombQueued;
     this.keyboardBombQueued = false;
+    const detonatePressed = this.detonateQueued;
+    this.detonateQueued = false;
 
     if (Phaser.Input.Keyboard.JustDown(this.wasd.R)) {
       this.resetRound();
@@ -246,6 +259,30 @@ export class ArenaScene extends Phaser.Scene {
 
     if (bombPressed || this.consumeTouchBomb()) {
       this.plantPlayerBomb(player);
+    }
+
+    if (detonatePressed) {
+      this.detonateRemote(player);
+    }
+  }
+
+  private queueDetonate() {
+    this.detonateQueued = true;
+  }
+
+  private handleDetonateKey(event: KeyboardEvent) {
+    if (!event.repeat) {
+      this.detonateQueued = true;
+    }
+  }
+
+  /** Sets off the actor's oldest armed remote bomb, if it has one. */
+  private detonateRemote(actor: CombatActor) {
+    const id = chooseDetonation(this.activeBombs, actor.id, this.time.now);
+    const bomb = this.activeBombs.find((candidate) => candidate.id === id);
+
+    if (bomb) {
+      this.detonateBomb(bomb);
     }
   }
 
@@ -432,15 +469,20 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    this.plantBombAt(player.id, { ...player.tile }, player.loadout.blast, PLAYER_FUSE_MS);
+    const remote = player.loadout.remote >= 1;
+    this.plantBombAt(player.id, { ...player.tile }, player.loadout.blast, plantFuseMs(remote, PLAYER_FUSE_MS), remote);
     player.view.plant();
     this.emitAudio("weapon.charge.start");
     this.shellEvents?.onRoundStatusChange?.("Fuse");
   }
 
-  private plantBombAt(owner: ActorId, tile: GridPoint, range: number, fuseMs: number) {
+  private plantBombAt(owner: ActorId, tile: GridPoint, range: number, fuseMs: number, remote = false) {
     const world = this.tileToWorld(tile);
     const view = new BombView(this, world.x, world.y, tile.y, owner === "player");
+
+    if (remote) {
+      view.setRemote();
+    }
 
     const bomb: ActiveBomb = {
       id: this.nextBombId++,
@@ -453,7 +495,9 @@ export class ArenaScene extends Phaser.Scene {
         bomb.urgent = true;
         view.setUrgent();
       }),
-      urgent: false
+      urgent: false,
+      remote,
+      plantedAt: this.time.now
     };
 
     this.activeBombs.push(bomb);
@@ -789,7 +833,12 @@ export class ArenaScene extends Phaser.Scene {
     actor.guardUntil = guardUntil;
     this.refreshShieldVisual(actor);
     this.emitAudio("player.shield.break");
-    this.time.delayedCall(Math.max(0, guardUntil - this.time.now), () => this.refreshShieldVisual(actor));
+    // A reset may have replaced this actor (and destroyed its view) before the grace ends.
+    this.time.delayedCall(Math.max(0, guardUntil - this.time.now), () => {
+      if (this.actors.get(actor.id) === actor) {
+        this.refreshShieldVisual(actor);
+      }
+    });
 
     if (actor.kind === "player") {
       this.shellEvents?.onRoundStatusChange?.("Shield broke");
@@ -890,12 +939,39 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
+  /** A bot sets off its remote bomb once it is clear and a rival is caught, or after its usual fuse. */
+  private tryBotDetonation(bot: CombatActor) {
+    if (bot.loadout.remote < 1 && !this.activeBombs.some((bomb) => bomb.owner === bot.id && bomb.remote)) {
+      return;
+    }
+
+    const rivals = Array.from(this.actors.values())
+      .filter((actor) => actor.id !== bot.id && actor.alive)
+      .map((actor) => actor.tile);
+    const id = chooseBotDetonation({
+      arena: this.arena,
+      owner: bot.id,
+      actorTile: bot.tile,
+      rivals,
+      bombs: this.activeBombs,
+      time: this.time.now,
+      holdMs: this.botFuseMs
+    });
+    const bomb = this.activeBombs.find((candidate) => candidate.id === id);
+
+    if (bomb) {
+      this.detonateBomb(bomb);
+    }
+  }
+
   private moveBots() {
     if (this.roundOver || !this.roundActive) {
       return;
     }
 
     this.getLiveBots().forEach((bot) => {
+      this.tryBotDetonation(bot);
+
       if (this.time.now < bot.nextMoveAt) {
         return;
       }
@@ -930,7 +1006,8 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     if (intent.type === "plant-bomb") {
-      this.plantBombAt(bot.id, { ...bot.tile }, bot.loadout.blast, this.botFuseMs);
+      const remote = bot.loadout.remote >= 1;
+      this.plantBombAt(bot.id, { ...bot.tile }, bot.loadout.blast, plantFuseMs(remote, this.botFuseMs), remote);
       this.shellEvents?.onRoundStatusChange?.("Danger");
 
       if (intent.moveTo && this.canActorMoveTo(bot, intent.moveTo)) {

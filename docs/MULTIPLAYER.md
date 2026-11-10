@@ -76,10 +76,15 @@ rejects tickets that carry `mode`, which only affects Party Brawl.
 Each round's `DuelState` carries `rules` from `roundRules(mode)` in
 `server/rooms.ts`, which reads the per-mode table in
 `src/game/simulation/perks.ts`. The friend duel drops only Vision; Party Brawl
-also drops Shield and Kick. Shield and Kick are part of the authoritative
+also drops Shield, Kick and Remote. All three are part of the authoritative
 simulation: `advanceDuel` applies `resolveShieldHit` to each tick's hits, a
 move into a bomb with Kick starts a slide in `commandDuel` (no new command),
 and `advanceDuel` steps slides on the server clock before resolving blasts.
+Remote adds one input, `{ "type": "detonate" }`, which sets off the sender's
+oldest armed remote bomb on the next advance. It carries no target or timing,
+and clients send it only while their fighter holds Remote, which an older
+server never grants (it would close the socket on an unknown command). Party
+bots send it through `commandDuel` like people do.
 Vision is presentation only, so the server just carries the loadout field.
 
 Blast zones are hidden unless your fighter holds Vision. A snapshot with no

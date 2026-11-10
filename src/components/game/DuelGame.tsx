@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/game/simulation/arena";
-import { heldPerks } from "@/game/simulation/powerups";
+import { hasPerk, heldPerks } from "@/game/simulation/powerups";
 import { readShowBlastZones } from "@/lib/client-storage";
 import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { PartyLobby, PartyScoreboard } from "./PartyBrawl";
@@ -23,6 +23,7 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
   const player = snapshot?.players[snapshot.seat];
   const loadout = snapshot?.duel?.players[snapshot.seat].loadout;
   // Rounds with perks list them; a classic duel's help line reads as it always did.
+  const holdsRemote = hasPerk(loadout, "remote");
   const perkText = snapshot?.duel?.rules
     ? ` · Perks ${heldPerks(loadout).map((perk) => PERK_LABELS[perk]).join(", ") || "none"}`
     : "";
@@ -78,7 +79,7 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
 
   return (
     <main className="duel-shell">
-      <div className="duel-canvas" ref={host} tabIndex={-1} aria-label={`${isParty ? "Four-fighter" : "Two-player"} arena. Arrow keys or WASD to move, Space to plant a bomb.`} />
+      <div className="duel-canvas" ref={host} tabIndex={-1} aria-label={`${isParty ? "Four-fighter" : "Two-player"} arena. Arrow keys or WASD to move, Space to plant a bomb.${holdsRemote ? " E or Shift sets off your remote bomb." : ""}`} />
       <header className="duel-header">
         <div><h1>Neon Fuse</h1><p>{isParty ? "Party Brawl · Four fighters" : "Friend match · Two players"}</p></div>
         <div className="duel-header-actions">
@@ -132,7 +133,7 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
       {status === "reconnecting" && phase === "playing" ? <p className="duel-connection-banner" role="status">Reconnecting… The round continues.</p> :
         knockedOut && snapshot?.reconnectSeconds == null ? <p className="duel-connection-banner brawl-out-banner" role="status">You&apos;re out. Watching the rest of the round.</p> : snapshot?.reconnectSeconds != null && phase === "playing" ? <p className="duel-connection-banner" role="status">{isParty ? "A player is reconnecting" : "Opponent reconnecting"} · {snapshot.reconnectSeconds}s remaining</p> : null}
       <footer className="duel-controls">
-        <p className="duel-help">WASD / Arrows: Move · Space: Bomb{loadout ? ` · Bombs ${loadout.bombs} / Blast ${loadout.blast} / Speed ${loadout.speed}${perkText}` : ""}</p>
+        <p className="duel-help">WASD / Arrows: Move · Space: Bomb{loadout ? ` · Bombs ${loadout.bombs} / Blast ${loadout.blast} / Speed ${loadout.speed}${perkText}` : ""}{holdsRemote ? " · E / Shift: Detonate" : ""}</p>
         {phase === "playing" ? <div className="duel-touch-row">
           <div className="duel-pad" role="group" aria-label="Move">
             {DIRECTIONS.map(({ dir, glyph }) => <button className="touch-pad-button" data-dir={dir} aria-label={`Move ${dir}`} disabled={!canPlay} key={dir} type="button"
@@ -142,7 +143,10 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
               <span aria-hidden="true">{glyph}</span>
             </button>)}
           </div>
-          <button className="touch-button touch-button-bomb" disabled={!canPlay} onClick={() => { input({ type: "bomb" }); host.current?.focus(); }} type="button">Bomb</button>
+          <div className="duel-touch-actions">
+            <button className="touch-button touch-button-bomb" disabled={!canPlay} onClick={() => { input({ type: "bomb" }); host.current?.focus(); }} type="button">Bomb</button>
+            {holdsRemote ? <button aria-label="Detonate remote bomb" className="touch-button touch-button-detonate" disabled={!canPlay} onClick={() => { input({ type: "detonate" }); host.current?.focus(); }} type="button">Detonate</button> : null}
+          </div>
         </div> : null}
       </footer>
     </main>

@@ -212,3 +212,44 @@ describe("kick in the duel", () => {
     expect(exploded.explosions[0].tiles[0]).toEqual({ x: 3, y: 3 });
   });
 });
+
+describe("remote detonate in the duel", () => {
+  function withRemote() {
+    const state = advanceDuel(createDuel(2, { specials: { remote: 2 } }), 3000);
+    state.players[0].loadout.remote = 1;
+    return state;
+  }
+
+  it("gives bombs planted with Remote the long fuse", () => {
+    const planted = commandDuel(withRemote(), 0, { type: "bomb" });
+    expect(planted.bombs[0]).toMatchObject({ remote: true, plantedAt: 3000, explodesAt: 7000 });
+    const plain = commandDuel(advanceDuel(createDuel(), 3000), 0, { type: "bomb" });
+    expect(plain.bombs[0]).not.toHaveProperty("remote");
+  });
+
+  it("sets off the oldest armed remote bomb on the next advance", () => {
+    let state = commandDuel(withRemote(), 0, { type: "bomb" });
+    state = advanceDuel(state, 3200);
+    expect(commandDuel(state, 0, { type: "detonate" })).toBe(state);
+    state = advanceDuel(state, 3300);
+    state = commandDuel(state, 0, { type: "detonate" });
+    expect(state.bombs[0].explodesAt).toBe(3300);
+    const exploded = advanceDuel(state, 3350);
+    expect(exploded.bombs).toHaveLength(0);
+    expect(exploded.explosions[0].id).toBe(1);
+  });
+
+  it("ignores a detonate from a fighter who is out or has no remote bomb", () => {
+    const state = advanceDuel(commandDuel(withRemote(), 0, { type: "bomb" }), 3500);
+    expect(commandDuel(state, 1, { type: "detonate" })).toBe(state);
+    state.players[0].alive = false;
+    expect(commandDuel(state, 0, { type: "detonate" })).toBe(state);
+  });
+
+  it("lets a remote bomb go off by itself when its fuse runs out", () => {
+    const state = commandDuel(withRemote(), 0, { type: "bomb" });
+    state.players[0].tile = { x: 9, y: 9 };
+    expect(advanceDuel(state, 6999).bombs).toHaveLength(1);
+    expect(advanceDuel(state, 7000).bombs).toHaveLength(0);
+  });
+});

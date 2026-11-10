@@ -39,6 +39,7 @@ export class DuelScene extends Phaser.Scene {
   private keys?: Record<string, Phaser.Input.Keyboard.Key>;
   private lastStep = -Infinity;
   private bombQueued = false;
+  private detonateQueued = false;
   constructor(private readonly view: DuelView) { super("ArenaScene"); }
 
   create() {
@@ -48,9 +49,13 @@ export class DuelScene extends Phaser.Scene {
     this.keys = this.input.keyboard?.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE", false) as Record<string, Phaser.Input.Keyboard.Key>;
     // A keyup drained in the same frame clears JustDown, so queue the bomb from the keydown itself.
     this.input.keyboard?.on("keydown-SPACE", this.queueBomb, this);
+    this.input.keyboard?.on("keydown-E", this.queueDetonate, this);
+    this.input.keyboard?.on("keydown-SHIFT", this.queueDetonate, this);
     this.scale.on("resize", this.fit, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off("keydown-SPACE", this.queueBomb, this);
+      this.input.keyboard?.off("keydown-E", this.queueDetonate, this);
+      this.input.keyboard?.off("keydown-SHIFT", this.queueDetonate, this);
       this.scale.off("resize", this.fit, this);
     });
     this.fit();
@@ -123,7 +128,9 @@ export class DuelScene extends Phaser.Scene {
       const tileKey = `${bomb.tile.x},${bomb.tile.y}`;
       const view = this.bombs.get(bomb.id);
       if (!view) {
-        this.bombs.set(bomb.id, new BombView(this, world.x, world.y, bomb.tile.y, bomb.owner === snapshot.seat));
+        const created = new BombView(this, world.x, world.y, bomb.tile.y, bomb.owner === snapshot.seat);
+        if (bomb.remote) created.setRemote();
+        this.bombs.set(bomb.id, created);
       } else if (this.bombTiles.get(bomb.id) !== tileKey) {
         // A kicked bomb moved since the last snapshot.
         view.slideTo(world.x, world.y, bomb.tile.y, 90);
@@ -156,6 +163,8 @@ export class DuelScene extends Phaser.Scene {
     }
     const bombPressed = this.bombQueued;
     this.bombQueued = false;
+    const detonatePressed = this.detonateQueued;
+    this.detonateQueued = false;
     if (snapshot?.phase !== "playing" || !this.keys) return;
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(focused.tagName)) return;
@@ -168,8 +177,11 @@ export class DuelScene extends Phaser.Scene {
       this.view.input({ type: "move", direction }); this.lastStep = time;
     }
     if (bombPressed) this.view.input({ type: "bomb" });
+    // Only a fighter holding Remote sends detonate, so a server that predates perks never sees it.
+    if (detonatePressed && hasPerk(snapshot.duel?.players[snapshot.seat].loadout, "remote")) this.view.input({ type: "detonate" });
   }
   private queueBomb(event: KeyboardEvent) { if (!event.repeat) this.bombQueued = true; }
+  private queueDetonate(event: KeyboardEvent) { if (!event.repeat) this.detonateQueued = true; }
   private renderFighter(seat: number, tile: GridPoint, alive: boolean, isLocal: boolean, isBot: boolean, shield: ShieldVisual) {
     const world = this.world(tile);
     const tileKey = `${tile.x},${tile.y}`;

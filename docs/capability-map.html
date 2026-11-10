@@ -807,8 +807,8 @@
                     </span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="powerups" data-status="implemented">
-                    <strong>Powerups + admin</strong>
-                    <span>Bomb, blast, speed, caps, and tunable drop rates.</span>
+                    <strong>Powerups + perks</strong>
+                    <span>Bomb, blast, speed, plus Shield, Vision, Kick and Remote perks.</span>
                   </button>
                   <button class="capability-node" type="button" aria-pressed="false" data-capability="touch" data-status="implemented">
                     <strong>Responsive controls</strong>
@@ -1074,11 +1074,11 @@
         },
         powerups: {
           status: "implemented",
-          title: "Powerups + admin",
-          summary: "Players and bots collect bomb capacity, blast range, and speed upgrades, with capped loadouts and adjustable drop weights.",
-          owner: "Pure simulation rules + React settings + Phaser rendering",
-          code: ["src/game/simulation/powerups.ts", "src/components/game/GameShell.tsx"],
-          boundary: "Drop selection is deterministic and bounded before the scene renders the result."
+          title: "Powerups + perks",
+          summary: "Players and bots collect bomb, blast and speed upgrades, plus four perks: Shield absorbs a blast, Vision shows the blast zones that are otherwise hidden, Kick slides bombs, and Remote sets bombs off on command.",
+          owner: "Pure simulation rules + per-mode perk table + server duel + Phaser rendering",
+          code: ["src/game/simulation/powerups.ts", "src/game/simulation/perks.ts", "src/game/simulation/shield.ts", "src/game/simulation/vision.ts", "src/game/simulation/kick.ts", "src/game/simulation/remote.ts"],
+          boundary: "Perks drop only where the classic roll gives nothing, so classic drops never move; the server applies Shield, Kick and Remote, and Vision is presentation only."
         },
         touch: {
           status: "implemented",

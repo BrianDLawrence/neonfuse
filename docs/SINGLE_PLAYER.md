@@ -532,6 +532,7 @@ cannot shift par times or stars unnoticed.
 | Shield (`shield.ts`) | Absorbs one blast, then protects for a 1 s grace. One shield covers a whole chain. | Versus, Bot Skirmish, Party Brawl |
 | Vision (`vision.ts`) | Shows every bomb's blast zone. **Blast zones are hidden by default.** | Every mode |
 | Kick (`kick.ts`) | Walking into a bomb sends it sliding one tile per 100 ms until something blocks it; the kicker stays put. No damage or stun on impact. Bots never kick, but avoid a sliding bomb's stopping tile. | Versus, Bot Skirmish, Party Brawl |
+| Remote (`remote.ts`) | Bombs planted while holding it get a 4 s fuse and can be set off from 250 ms after planting with **E**, **Shift** or the **Detonate** touch button; each press sets off the oldest one. Bots set theirs off once they are clear and a rival is caught, or after their normal fuse. | Versus, Bot Skirmish, Party Brawl |
 
 ### Blast zones and Vision
 
@@ -541,6 +542,10 @@ bomb arrows still show. Spectators (Bot Skirmish, or a fighter who is out) see
 the overlay, and **Show blast zones** in the game menu turns it on for players
 who want it always (stored on the device). Bots read danger directly, so Vision
 never changes how they play.
+
+Local rounds still do not chain bombs (a blast never sets off another bomb), as
+before perks; the duel and Party Brawl do. Remote and Kick follow each mode's
+existing rule.
 
 Campaign stages 1-1 to 1-3 start the player with Vision
 (`playerStartingLoadout`, clamped like a bot's starting loadout) while the
