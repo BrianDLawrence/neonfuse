@@ -1,4 +1,5 @@
-import { advanceDuel, commandDuel, createDuel, eliminateSeats, type DuelState, type Seat } from "../src/game/simulation/duel";
+import { advanceDuel, commandDuel, createDuel, eliminateSeats, type DuelRules, type DuelState, type Seat } from "../src/game/simulation/duel";
+import { perkDropRatesFor } from "../src/game/simulation/perks";
 import { createPartyBot, PARTY_SEAT_PROFILES, partyRoundSeed, stepPartyBots, type PartyBot } from "../src/game/simulation/partyBots";
 import { createSeries, recordSeriesRound, seatSeriesOccupant, SERIES_TARGET_WINS, type SeriesState } from "../src/game/simulation/series";
 import type { BotProfileId } from "../src/game/simulation/bots";
@@ -145,7 +146,7 @@ export class Rooms {
   }
 
   private startRound(room: Room, now: number) {
-    room.duel = createDuel(room.mode === "party" ? PARTY_SEATS : 2);
+    room.duel = createDuel(room.mode === "party" ? PARTY_SEATS : 2, roundRules(room.mode));
     room.startedAt = now;
     room.roundId = this.newId();
     room.members.forEach((other) => { if (other) { other.sequence = -1; other.ready = false; } });
@@ -245,6 +246,12 @@ export class Rooms {
       duel: room.duel,
       reconnectSeconds: disconnected?.disconnectedAt != null ? Math.max(0, Math.ceil((RECONNECT_MS - now + disconnected.disconnectedAt) / 1000)) : null };
   }
+}
+
+/** A mode with no perks gets no rules, so its rounds play exactly as they did before perks. */
+export function roundRules(mode: RoomMode): DuelRules | undefined {
+  const specials = perkDropRatesFor(mode);
+  return specials ? { specials } : undefined;
 }
 
 /** Series wins follow whoever holds a seat: a person by account, an empty seat by its bot. */

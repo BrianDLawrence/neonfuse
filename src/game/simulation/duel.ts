@@ -1,5 +1,6 @@
 import { createInitialArena, directionToDelta, getSpawnPoints, isWalkable, type ArenaGrid, type Direction, type GridPoint } from "./arena";
 import { resolveBlast, tileListIncludes } from "./blast";
+import { resolveShieldHit } from "./shield";
 import { applyPowerup, choosePowerupDrop, createInitialLoadout, DEFAULT_POWERUP_DROP_RATES, type ActorLoadout, type PickupType, type SpecialDropRates } from "./powerups";
 
 export type Seat = 0 | 1 | 2 | 3;
@@ -17,7 +18,14 @@ export type DuelState = {
   time: number;
   startsAt: number;
   arena: ArenaGrid;
-  players: { tile: GridPoint; alive: boolean; loadout: ActorLoadout; nextMoveAt: number }[];
+  players: {
+    tile: GridPoint;
+    alive: boolean;
+    loadout: ActorLoadout;
+    nextMoveAt: number;
+    /** Set when a shield breaks: blasts can't hurt this fighter before this time. */
+    guardUntil?: number;
+  }[];
   bombs: { id: number; owner: Seat; tile: GridPoint; range: number; explodesAt: number }[];
   explosions: { id: number; tiles: GridPoint[]; clearedBlocks: GridPoint[]; expiresAt: number }[];
   powerups: { tile: GridPoint; type: PickupType }[];
@@ -114,8 +122,15 @@ export function advanceDuel(state: DuelState, time: number): DuelState {
       if (type) next.powerups.push({ tile, type });
     }
   }
+  // Every blast of this tick counts as one hit, so one shield covers a whole chain.
   for (const player of next.players) {
-    if (tileListIncludes(hitTiles, player.tile)) player.alive = false;
+    if (!tileListIncludes(hitTiles, player.tile)) continue;
+    const hit = resolveShieldHit({ alive: player.alive, shield: player.loadout.shield ?? 0, guardUntil: player.guardUntil ?? 0 }, time);
+    player.alive = hit.alive;
+    if (hit.absorbed) {
+      player.loadout.shield = hit.shield;
+      player.guardUntil = hit.guardUntil;
+    }
   }
   resolveSurvivors(next, "blast");
   if (next.winner === null && time >= 183000) {

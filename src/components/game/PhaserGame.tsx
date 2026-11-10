@@ -13,13 +13,9 @@ import type { GameMode } from "@/game/modes";
 import type { Direction } from "@/game/simulation/arena";
 import type { BotSelection } from "@/game/simulation/bots";
 import type { CampaignStageId } from "@/game/simulation/campaign";
-import type { PowerupDropRates } from "@/game/simulation/powerups";
+import type { PlayerLoadout, PowerupDropRates } from "@/game/simulation/powerups";
 
-type Loadout = {
-  bombs: number;
-  blast: number;
-  speed: number;
-};
+type Loadout = PlayerLoadout;
 
 // Imperative handle handed to the React HUD so its touch buttons can drive the
 // game without GameShell ever touching a Phaser instance (keeps the boundary).

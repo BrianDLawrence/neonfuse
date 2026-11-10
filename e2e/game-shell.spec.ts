@@ -100,6 +100,15 @@ test.describe("game shell", () => {
     await expect(page.locator(".key-chip", { hasText: "Goal" })).toContainText("Blast Volt Warden (Overclocked)");
   });
 
+  test("the HUD lists the player's perks, starting with none", async ({ page, isMobile }) => {
+    test.skip(isMobile, "phones show the chip only once a perk is held");
+    await openShell(page);
+
+    const perks = page.locator(".hud-chip-perks");
+    await expect(perks).toContainText("Perks");
+    await expect(perks).toContainText("None");
+  });
+
   test("Bot Skirmish swaps the player loadout for bot readouts", async ({ page }) => {
     await openShell(page);
 
@@ -350,5 +359,7 @@ test.describe("touch layout", () => {
     await expect(touch.getByRole("group", { name: "Move" })).toBeVisible();
     await expect(touch.getByRole("button", { name: "Plant bomb" })).toBeVisible();
     await expect(touch.getByRole("button", { name: "Reset round" })).toBeVisible();
+    // The Perks chip stays out of the crowded phone HUD until a perk is held.
+    await expect(page.locator(".hud-chip-perks")).toBeHidden();
   });
 });

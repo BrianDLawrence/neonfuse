@@ -75,9 +75,13 @@ import {
 } from "@/game/simulation/bots";
 import {
   DEFAULT_POWERUP_DROP_RATES,
+  heldPerks,
+  type PlayerLoadout,
   type PowerupDropRates,
-  type PowerupType
+  type PowerupType,
+  type SpecialPowerupType
 } from "@/game/simulation/powerups";
+import { PerkIcons, PerksChip } from "./PerksChip";
 
 const POWERUP_CONTROLS: Array<{
   type: PowerupType;
@@ -228,6 +232,7 @@ export function GameShell({
   const [bombs, setBombs] = useState(1);
   const [blast, setBlast] = useState(2);
   const [speed, setSpeed] = useState(1);
+  const [perks, setPerks] = useState<SpecialPowerupType[]>([]);
   const [wins, setWins] = useState(0);
   const [losses, setLosses] = useState(0);
   const [botHud, setBotHud] = useState<BotHudState[]>([]);
@@ -614,22 +619,15 @@ export function GameShell({
     [activityAuth, playerProfile?.progression.equippedTitle]
   );
 
-  const handleLoadoutChange = useCallback(
-    ({
-      bombs: nextBombs,
-      blast: nextBlast,
-      speed: nextSpeed
-    }: {
-      bombs: number;
-      blast: number;
-      speed: number;
-    }) => {
-      setBombs(nextBombs);
-      setBlast(nextBlast);
-      setSpeed(nextSpeed);
-    },
-    []
-  );
+  const handleLoadoutChange = useCallback((loadout: PlayerLoadout) => {
+    setBombs(loadout.bombs);
+    setBlast(loadout.blast);
+    setSpeed(loadout.speed);
+    setPerks((current) => {
+      const next = heldPerks(loadout);
+      return next.join() === current.join() ? current : next;
+    });
+  }, []);
   const handleMatchStatsChange = useCallback(
     ({ wins: nextWins, losses: nextLosses }: { wins: number; losses: number }) => {
       setWins(nextWins);
@@ -998,6 +996,7 @@ export function GameShell({
                   <span>{bot.alive ? bot.name : `${bot.name} Down`}</span>
                   <strong>
                     B{bot.bombs} / R{bot.blast} / S{bot.speed}
+                    {bot.perks.length > 0 ? <PerkIcons perks={bot.perks} /> : null}
                   </strong>
                 </div>
               ))
@@ -1024,6 +1023,7 @@ export function GameShell({
                   </span>
                   <strong>{speed}</strong>
                 </div>
+                <PerksChip perks={perks} />
                 {campaignStage || dailyChallenge ? (
                   <>
                     {campaignStage ? (

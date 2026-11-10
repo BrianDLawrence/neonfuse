@@ -57,9 +57,13 @@ import {
   choosePowerupDrop,
   createInitialLoadout,
   type ActorLoadout,
+  heldPerks,
   type PickupType,
-  type PowerupDropRates
+  type PowerupDropRates,
+  type SpecialDropRates
 } from "../simulation/powerups";
+import { perkDropRatesFor } from "../simulation/perks";
+import { resolveShieldHit } from "../simulation/shield";
 import { resolveRoundWinner } from "../simulation/round";
 import { resolveVersusOpponent } from "../simulation/versus";
 
@@ -96,6 +100,8 @@ type CombatActor = {
   profile?: BotProfile;
   nextMoveAt: number;
   turn: number;
+  /** A broken shield protects until this scene time. */
+  guardUntil: number;
 };
 
 type ActivePowerup = {
@@ -136,6 +142,7 @@ export class ArenaScene extends Phaser.Scene {
   private botFuseMs = DEFAULT_BOT_FUSE_MS;
   private botMoveScale = 1;
   private stageDropRates: PowerupDropRates | null = null;
+  private specialDropRates: SpecialDropRates | null = null;
   private roundOver = false;
   private roundActive = false;
   private matchStartedAt = 0;
@@ -273,6 +280,8 @@ export class ArenaScene extends Phaser.Scene {
     this.botFuseMs = modifiers?.botFuseMs ?? DEFAULT_BOT_FUSE_MS;
     this.botMoveScale = modifiers?.botMoveScale ?? 1;
     this.stageDropRates = modifiers?.powerupDropRates ?? null;
+    // A stage or day can set its own perks; otherwise the mode decides.
+    this.specialDropRates = modifiers?.specialDropRates ?? perkDropRatesFor(mode);
     this.roundOver = false;
     this.roundActive = false;
     this.blocksCleared = 0;
@@ -651,7 +660,8 @@ export class ArenaScene extends Phaser.Scene {
     blocks.forEach((blockTile) => {
       const powerup = choosePowerupDrop(
         blockTile,
-        this.stageDropRates ?? this.shellEvents?.getPowerupDropRates?.()
+        this.stageDropRates ?? this.shellEvents?.getPowerupDropRates?.(),
+        this.specialDropRates
       );
 
       if (!powerup) {
@@ -695,6 +705,7 @@ export class ArenaScene extends Phaser.Scene {
     }
 
     actor.loadout = applyPowerup(actor.loadout, powerup.type);
+    this.refreshShieldVisual(actor);
     powerup.sprite.destroy();
     this.activePowerups.delete(key);
     this.emitAudio("pickup.powerup");
@@ -707,9 +718,22 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
-    const hitActors = Array.from(this.actors.values()).filter(
-      (actor) => actor.alive && tileListIncludes(blast.tiles, actor.tile)
-    );
+    const now = this.time.now;
+    const hitActors: CombatActor[] = [];
+
+    this.actors.forEach((actor) => {
+      if (!actor.alive || !tileListIncludes(blast.tiles, actor.tile)) {
+        return;
+      }
+
+      const hit = resolveShieldHit({ alive: true, shield: actor.loadout.shield, guardUntil: actor.guardUntil }, now);
+
+      if (hit.absorbed) {
+        this.breakShield(actor, hit.guardUntil);
+      } else if (!hit.alive) {
+        hitActors.push(actor);
+      }
+    });
 
     hitActors.forEach((actor) => {
       actor.alive = false;
@@ -730,6 +754,29 @@ export class ArenaScene extends Phaser.Scene {
     if (outcome) {
       this.completeRound(outcome);
     }
+  }
+
+  private breakShield(actor: CombatActor, guardUntil: number) {
+    actor.loadout = { ...actor.loadout, shield: 0 };
+    actor.guardUntil = guardUntil;
+    this.refreshShieldVisual(actor);
+    this.emitAudio("player.shield.break");
+    this.time.delayedCall(Math.max(0, guardUntil - this.time.now), () => this.refreshShieldVisual(actor));
+
+    if (actor.kind === "player") {
+      this.shellEvents?.onRoundStatusChange?.("Shield broke");
+    }
+
+    this.emitLoadout();
+    this.emitBotHud();
+  }
+
+  private refreshShieldVisual(actor: CombatActor) {
+    if (!actor.alive) {
+      return;
+    }
+
+    actor.view.setShield(actor.loadout.shield >= 1 ? "up" : this.time.now < actor.guardUntil ? "grace" : "none");
   }
 
   private completeRound(winner: RoundWinner) {
@@ -801,7 +848,8 @@ export class ArenaScene extends Phaser.Scene {
       loadout,
       profile,
       nextMoveAt: this.time.now + 280,
-      turn: 0
+      turn: 0,
+      guardUntil: 0
     });
   }
 
@@ -1031,7 +1079,8 @@ export class ArenaScene extends Phaser.Scene {
         alive: bot.alive,
         bombs: bot.loadout.bombs,
         blast: bot.loadout.blast,
-        speed: bot.loadout.speed
+        speed: bot.loadout.speed,
+        perks: heldPerks(bot.loadout)
       }))
     );
   }

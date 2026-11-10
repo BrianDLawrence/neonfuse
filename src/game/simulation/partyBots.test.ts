@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOT_PROFILES, chooseBotTurn } from "./bots";
 import { isDangerTile } from "./danger";
 import { advanceDuel, createDuel, type DuelState, type Seat } from "./duel";
+import { perkDropRatesFor } from "./perks";
 import {
   choosePartyBotCommands,
   choosePressingTurn,
@@ -26,22 +27,28 @@ function allBots(state: DuelState) {
  */
 const WHOLE_ROUND_TIMEOUT_MS = 20_000;
 
-/** Runs a whole four-bot round on the server's 50 ms cadence. */
+/** Runs a whole four-bot round on the server's 50 ms cadence, with Party Brawl's perks. */
 function playRound(roundId: string) {
-  let state = createDuel(4);
+  const specials = perkDropRatesFor("party");
+  let state = createDuel(4, specials ? { specials } : undefined);
   let bots = allBots(state);
   const seed = partyRoundSeed(roundId);
   // Counted with plain checks and asserted once: an expect per tick dominated the run time.
   let overCap = 0;
+  let shieldsBroken = 0;
   for (let time = 0; state.winner === null && time <= 190_000; time += 50) {
+    const shieldsBefore = state.players.map((player) => player.loadout.shield);
     state = advanceDuel(state, time);
+    state.players.forEach((player, seat) => {
+      if (shieldsBefore[seat] === 1 && player.loadout.shield === 0) shieldsBroken += 1;
+    });
     ({ state, bots } = stepPartyBots(state, bots, seed));
     state.players.forEach((player, seat) => {
       if (state.bombs.filter((bomb) => bomb.owner === seat).length > player.loadout.bombs) overCap += 1;
     });
   }
   expect(overCap).toBe(0);
-  return { state, bots };
+  return { state, bots, shieldsBroken };
 }
 
 describe("party bots", () => {
@@ -156,10 +163,14 @@ describe("party bots", () => {
 
   it("ends most bot-only rounds with a winner well before the timer", () => {
     const roundIds = Array.from({ length: 20 }, (_, index) => `party-finish-${index}`);
+    let shieldsBroken = 0;
     const outcomes = roundIds.map((roundId) => {
-      const { state } = playRound(roundId);
-      return { winner: state.winner, reason: state.reason, time: state.time };
+      const round = playRound(roundId);
+      shieldsBroken += round.shieldsBroken;
+      return { winner: round.state.winner, reason: round.state.reason, time: round.state.time };
     });
+    // Bots pick up shields, and blasts break them, in real rounds.
+    expect(shieldsBroken).toBeGreaterThan(0);
     const decided = outcomes.filter((outcome) => typeof outcome.winner === "number");
     expect(decided.length).toBeGreaterThanOrEqual(15);
     expect(decided.every((outcome) => outcome.reason === "blast" && outcome.time < 183_000)).toBe(true);

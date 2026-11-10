@@ -68,6 +68,17 @@ function radial(ctx: Ctx, cx: number, cy: number, r: number, stops: Array<[numbe
 }
 
 /** Generates every texture the Overdrive look uses. Safe to call more than once. */
+/**
+ * Perk colours for canvas art, mirroring the --perk-* tokens in globals.css.
+ * Each perk also has its own glyph, so colour is never the only cue.
+ */
+export const PERK_COLORS = {
+  shield: "#e0f2fe",
+  vision: "#c084fc",
+  kick: "#f472b6",
+  remote: "#fb7185"
+} as const;
+
 export function createOverdriveTextures(scene: Phaser.Scene) {
   createCharacterTextures(scene);
   createArenaTextures(scene);
@@ -352,6 +363,51 @@ function createPowerupTextures(scene: Phaser.Scene) {
     ctx.closePath();
     ctx.fill();
   }));
+
+  createPerkTextures(scene, chip);
+}
+
+function createPerkTextures(scene: Phaser.Scene, chip: (color: string, glyph: (ctx: Ctx) => void) => (ctx: Ctx) => void) {
+  // Shield: a crest with a bright centre line.
+  paint(scene, "powerup-shield", 40, 40, chip(PERK_COLORS.shield, (ctx) => {
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(20, 11);
+    ctx.lineTo(27.5, 14);
+    ctx.lineTo(27, 21);
+    ctx.quadraticCurveTo(25.5, 26.5, 20, 29.5);
+    ctx.quadraticCurveTo(14.5, 26.5, 13, 21);
+    ctx.lineTo(12.5, 14);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillRect(19, 15, 2, 10);
+  }));
+
+  // The ring a raised shield draws around its fighter: a thin glowing hexagon.
+  paint(scene, "shield-ring", 72, 72, (ctx) => {
+    ctx.save();
+    ctx.strokeStyle = PERK_COLORS.shield;
+    ctx.shadowColor = PERK_COLORS.shield;
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i += 1) {
+      const angle = Math.PI / 6 + (i * Math.PI) / 3;
+      const px = 36 + Math.cos(angle) * 30;
+      const py = 36 + Math.sin(angle) * 30;
+      if (i === 0) {
+        ctx.moveTo(px, py);
+      } else {
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = PERK_COLORS.shield;
+    ctx.fill();
+    ctx.restore();
+  });
 }
 
 function createEffectTextures(scene: Phaser.Scene) {
