@@ -12,6 +12,12 @@
   --text: #f8fafc;
   --muted: #94a3b8;
   --danger: #fb7185;
+  /* Perks: each also has its own icon shape, so colour is never the only cue.
+     Mirrored for canvas art in PERK_COLORS (overdriveTextures.ts). */
+  --perk-shield: #e0f2fe;
+  --perk-vision: #c084fc;
+  --perk-kick: #f472b6;
+  --perk-remote: var(--danger);
   /* See-through surface for controls that sit on top of the arena (touch pad). */
   --panel-glass: rgba(8, 10, 18, 0.5);
   --font-display: var(--font-chakra), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -441,6 +447,62 @@ h5,
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
   filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.48));
+}
+
+.stat-icon-shield {
+  width: 14px;
+  background: var(--perk-shield);
+  clip-path: polygon(50% 0, 100% 16%, 94% 60%, 50% 100%, 6% 60%, 0 16%);
+}
+
+.stat-icon-shield::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  width: 2px;
+  height: 8px;
+  background: var(--background);
+}
+
+/* Perk icons in the HUD sit at full strength: holding one is the news. */
+.hud-chip-perks .stat-icon,
+.bot-hud-chip .stat-icon {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(224, 242, 254, 0.45));
+}
+
+.hud-chip-perks strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 21px;
+}
+
+.hud-chip .hud-perks-empty {
+  display: inline;
+  color: var(--muted);
+  font-size: 0.6em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bot-hud-chip strong .stat-icon {
+  margin-left: 6px;
+  vertical-align: -3px;
+}
+
+/* Text for screen readers only. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .stat-icon-music {
@@ -4148,6 +4210,11 @@ h5,
     display: none;
   }
 
+  /* An empty Perks chip is noise on a phone; it appears once a perk is held. */
+  .hud-chip.hud-chip-perks[data-empty="true"] {
+    display: none;
+  }
+
   /* Use the short labels in the compact pill. */
   .label-full {
     display: none;
@@ -4918,6 +4985,10 @@ h5,
   }
 
   .app-frame[data-touch-controls="true"] .hud-chip.hud-chip-record {
+    display: none;
+  }
+
+  .app-frame[data-touch-controls="true"] .hud-chip.hud-chip-perks[data-empty="true"] {
     display: none;
   }
 

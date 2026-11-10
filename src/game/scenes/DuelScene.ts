@@ -2,10 +2,12 @@ import * as Phaser from "phaser";
 import type { RoomSnapshot } from "../multiplayer/protocol";
 import { BombView, DangerOverlay, drawArenaBlocks, drawArenaFloor } from "../presentation/arenaViews";
 import { playExplosionEffect } from "../presentation/explosionEffect";
-import { FusebotView, rowDepth } from "../presentation/fusebotView";
+import { FusebotView, rowDepth, type ShieldVisual } from "../presentation/fusebotView";
 import { getDangerTiles } from "../simulation/danger";
 import type { DuelCommand } from "../simulation/duel";
 import { PARTY_SEAT_PROFILES } from "../simulation/partyBots";
+import { hasPerk } from "../simulation/powerups";
+import { isShieldGuarding } from "../simulation/shield";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, createInitialArena, type Direction, type GridPoint } from "../simulation/arena";
 import { computeArenaBoardFit } from "../simulation/layout";
 
@@ -104,8 +106,11 @@ export class DuelScene extends Phaser.Scene {
       sprite.setAlpha(alive ? 1 : 0.25);
     };
     const fighters = snapshot?.mode === "party" ? snapshot.fighters : null;
-    snapshot?.duel?.players.forEach((player, index) =>
-      this.renderFighter(index, player.tile, player.alive, index === snapshot.seat, fighters?.[index]?.kind === "bot"));
+    const duelTime = snapshot?.duel?.time ?? 0;
+    snapshot?.duel?.players.forEach((player, index) => {
+      const shield: ShieldVisual = hasPerk(player.loadout, "shield") ? "up" : isShieldGuarding(player, duelTime) ? "grace" : "none";
+      this.renderFighter(index, player.tile, player.alive, index === snapshot.seat, fighters?.[index]?.kind === "bot", shield);
+    });
     const liveBombs = new Set<number>();
     snapshot?.duel?.bombs.forEach((bomb) => {
       liveBombs.add(bomb.id);
@@ -145,7 +150,7 @@ export class DuelScene extends Phaser.Scene {
     if (bombPressed) this.view.input({ type: "bomb" });
   }
   private queueBomb(event: KeyboardEvent) { if (!event.repeat) this.bombQueued = true; }
-  private renderFighter(seat: number, tile: GridPoint, alive: boolean, isLocal: boolean, isBot: boolean) {
+  private renderFighter(seat: number, tile: GridPoint, alive: boolean, isLocal: boolean, isBot: boolean, shield: ShieldVisual) {
     const world = this.world(tile);
     const tileKey = `${tile.x},${tile.y}`;
     let fighter = this.fighters.get(seat);
@@ -164,6 +169,7 @@ export class DuelScene extends Phaser.Scene {
       fighter.tile = tileKey;
     }
     fighter.view.setAlive(alive);
+    fighter.view.setShield(shield);
   }
   private world(tile: GridPoint) { return { x: (tile.x + 0.5) * CELL_SIZE, y: (tile.y + 0.5) * CELL_SIZE }; }
 }

@@ -1,9 +1,11 @@
 import * as Phaser from "phaser";
 import type { Direction } from "../simulation/arena";
 import { FUSEBOT_SPARK_POINTS, fusebotAccent, type FusebotId } from "./fusebotArt";
+import { prefersReducedMotion } from "./motionPreference";
 import {
   FUSEBOT_ORIGIN_Y,
   FUSEBOT_SIZE,
+  PERK_COLORS,
   fusebotGroundKey,
   fusebotTextureKey
 } from "./overdriveTextures";
@@ -16,6 +18,9 @@ const ACTOR_DEPTH_BASE = 11;
 export function rowDepth(row: number, layer: "block" | "actor") {
   return (layer === "block" ? 10 : ACTOR_DEPTH_BASE) + row * 2;
 }
+
+/** What a fighter's shield looks like: none, raised, or broken and still protecting. */
+export type ShieldVisual = "none" | "up" | "grace";
 
 type FusebotViewOptions = {
   /** Shows the floating marker and the brighter ground ring. */
@@ -40,6 +45,10 @@ export class FusebotView {
   private readonly blinkEvent: Phaser.Time.TimerEvent;
   private facingLeft = false;
   private knockedOut = false;
+  private shieldRing?: Phaser.GameObjects.Image;
+  private shieldTween?: Phaser.Tweens.Tween;
+  private graceTween?: Phaser.Tweens.Tween;
+  private shieldVisual: ShieldVisual = "none";
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -218,6 +227,10 @@ export class FusebotView {
     }
 
     this.knockedOut = true;
+    this.shieldTween?.remove();
+    this.graceTween?.remove();
+    this.shieldRing?.setVisible(false);
+    this.body.setAlpha(1);
     const accent = fusebotAccent(this.id);
     this.scene.tweens.killTweensOf(this.rig);
     this.rig.setPosition(0, FEET_OFFSET_Y);
@@ -264,6 +277,71 @@ export class FusebotView {
     this.sparks.forEach((spark) => spark.setVisible(false));
   }
 
+  /**
+   * Raised: a slow-pulsing hex ring. Breaking it shatters the ring, and the fighter
+   * flickers for the grace (a steady dim with reduced motion). Cosmetic only.
+   */
+  setShield(visual: ShieldVisual) {
+    if (visual === this.shieldVisual || this.knockedOut) {
+      return;
+    }
+
+    const previous = this.shieldVisual;
+    this.shieldVisual = visual;
+    const reduced = prefersReducedMotion();
+
+    if (visual === "up") {
+      this.shieldRing ??= this.addShieldRing();
+      this.shieldRing.setVisible(true).setAlpha(0.9).setScale(1);
+      this.shieldTween?.remove();
+      this.shieldTween = reduced
+        ? undefined
+        : this.scene.tweens.add({ targets: this.shieldRing, alpha: 0.55, scale: 1.06, duration: 900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    } else {
+      this.shieldTween?.remove();
+      this.shieldTween = undefined;
+      this.shieldRing?.setVisible(false);
+      if (previous === "up") {
+        this.shatterShield();
+      }
+    }
+
+    this.graceTween?.remove();
+    this.graceTween = undefined;
+    this.body.setAlpha(1);
+
+    if (visual === "grace") {
+      if (reduced) {
+        this.body.setAlpha(0.6);
+      } else {
+        this.graceTween = this.scene.tweens.add({ targets: this.body, alpha: 0.35, duration: 60, yoyo: true, repeat: -1 });
+      }
+    }
+  }
+
+  private addShieldRing() {
+    const ring = this.scene.add
+      .image(0, FEET_OFFSET_Y - FUSEBOT_SIZE * 0.42, "shield-ring")
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.root.add(ring);
+    return ring;
+  }
+
+  private shatterShield() {
+    const burst = this.scene.add.particles(this.root.x, this.root.y - FUSEBOT_SIZE * 0.3, "spark", {
+      speed: { min: 80, max: 190 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.8, end: 0 },
+      lifespan: { min: 200, max: 420 },
+      tint: [Phaser.Display.Color.HexStringToColor(PERK_COLORS.shield).color, 0xffffff],
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false
+    });
+    burst.setDepth(this.root.depth + 1);
+    burst.explode(prefersReducedMotion() ? 8 : 18);
+    this.scene.time.delayedCall(500, () => burst.destroy());
+  }
+
   /** Duel snapshots can report a fighter as down without a local blast hit. */
   setAlive(alive: boolean) {
     if (!alive) {
@@ -273,7 +351,7 @@ export class FusebotView {
 
   destroy() {
     this.blinkEvent.remove(false);
-    [this.root, this.rig, this.body, this.marker, ...this.sparks].forEach((target) => {
+    [this.root, this.rig, this.body, this.marker, this.shieldRing, ...this.sparks].forEach((target) => {
       if (target) {
         this.scene.tweens.killTweensOf(target);
       }

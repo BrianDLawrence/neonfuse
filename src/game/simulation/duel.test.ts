@@ -138,3 +138,33 @@ describe("duel rules", () => {
     expect(picked.powerups).toHaveLength(0);
   });
 });
+
+describe("shield in the duel", () => {
+  it("lets a shielded fighter survive one blast, a whole chain included", () => {
+    const state = advanceDuel(createDuel(2, { specials: { shield: 3 } }), 3000);
+    state.players[0].loadout.shield = 1;
+    state.bombs = [
+      { id: 1, owner: 0, tile: { x: 1, y: 1 }, range: 2, explodesAt: 3100 },
+      { id: 2, owner: 1, tile: { x: 2, y: 1 }, range: 2, explodesAt: 4500 }
+    ];
+    const next = advanceDuel(state, 3100);
+    expect(next.players[0]).toMatchObject({ alive: true, guardUntil: 4100 });
+    expect(next.players[0].loadout.shield).toBe(0);
+    expect(next.winner).toBeNull();
+  });
+
+  it("protects during the grace and knocks out after it", () => {
+    let state = advanceDuel(createDuel(2, { specials: { shield: 3 } }), 3000);
+    state.players[0].loadout.shield = 1;
+    state = commandDuel(state, 0, { type: "bomb" });
+    state = advanceDuel(state, 4400);
+    expect(state.players[0].alive).toBe(true);
+    state.bombs.push({ id: 9, owner: 1, tile: { x: 1, y: 2 }, range: 1, explodesAt: 5000 });
+    state = advanceDuel(state, 5000);
+    expect(state.players[0].alive).toBe(true);
+    state.bombs.push({ id: 10, owner: 1, tile: { x: 1, y: 2 }, range: 1, explodesAt: 5400 });
+    state = advanceDuel(state, 5400);
+    expect(state.players[0].alive).toBe(false);
+    expect(state.winner).toBe(1);
+  });
+});

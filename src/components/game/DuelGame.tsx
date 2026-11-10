@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/game/simulation/arena";
+import { heldPerks } from "@/game/simulation/powerups";
 import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { PartyLobby, PartyScoreboard } from "./PartyBrawl";
+import { PERK_LABELS } from "./PerksChip";
 import { useDuelConnection } from "./useDuelConnection";
 
 const DIRECTIONS = [{ dir: "up", glyph: "▲" }, { dir: "left", glyph: "◀" }, { dir: "right", glyph: "▶" }, { dir: "down", glyph: "▼" }] as const;
@@ -19,6 +21,10 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
   const phase = snapshot?.phase ?? "waiting";
   const player = snapshot?.players[snapshot.seat];
   const loadout = snapshot?.duel?.players[snapshot.seat].loadout;
+  // Rounds with perks list them; a classic duel's help line reads as it always did.
+  const perkText = snapshot?.duel?.rules
+    ? ` · Perks ${heldPerks(loadout).map((perk) => PERK_LABELS[perk]).join(", ") || "none"}`
+    : "";
   const canPlay = status === "connected" && phase === "playing";
   const party = snapshot?.mode === "party" ? snapshot : null;
   const isParty = mode === "party";
@@ -122,7 +128,7 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
       {status === "reconnecting" && phase === "playing" ? <p className="duel-connection-banner" role="status">Reconnecting… The round continues.</p> :
         knockedOut && snapshot?.reconnectSeconds == null ? <p className="duel-connection-banner brawl-out-banner" role="status">You&apos;re out. Watching the rest of the round.</p> : snapshot?.reconnectSeconds != null && phase === "playing" ? <p className="duel-connection-banner" role="status">{isParty ? "A player is reconnecting" : "Opponent reconnecting"} · {snapshot.reconnectSeconds}s remaining</p> : null}
       <footer className="duel-controls">
-        <p className="duel-help">WASD / Arrows: Move · Space: Bomb{loadout ? ` · Bombs ${loadout.bombs} / Blast ${loadout.blast} / Speed ${loadout.speed}` : ""}</p>
+        <p className="duel-help">WASD / Arrows: Move · Space: Bomb{loadout ? ` · Bombs ${loadout.bombs} / Blast ${loadout.blast} / Speed ${loadout.speed}${perkText}` : ""}</p>
         {phase === "playing" ? <div className="duel-touch-row">
           <div className="duel-pad" role="group" aria-label="Move">
             {DIRECTIONS.map(({ dir, glyph }) => <button className="touch-pad-button" data-dir={dir} aria-label={`Move ${dir}`} disabled={!canPlay} key={dir} type="button"

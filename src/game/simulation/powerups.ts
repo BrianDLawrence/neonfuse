@@ -157,6 +157,11 @@ export function hasPerk(loadout: Partial<PlayerLoadout> | null | undefined, perk
   return (loadout?.[perk] ?? 0) >= 1;
 }
 
+/** The perks a loadout holds, in display order. */
+export function heldPerks(loadout: Partial<PlayerLoadout> | null | undefined): SpecialPowerupType[] {
+  return SPECIAL_POWERUP_TYPES.filter((perk) => hasPerk(loadout, perk));
+}
+
 export function applyPowerup(loadout: PlayerLoadout, powerup: PickupType): PlayerLoadout {
   if (powerup === "bomb") {
     return {

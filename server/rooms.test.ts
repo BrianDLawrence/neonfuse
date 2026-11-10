@@ -39,6 +39,12 @@ describe("two-player rooms", () => {
     rooms.tick(3000);
     expect(rooms.snapshot(a.room, 1, 3000).phase).toBe("playing");
   });
+
+  it("plays the two-seat duel without shield, kick or remote", () => {
+    const { rooms, a, ready } = setup(); ready(); rooms.tick(3000);
+    const specials = a.room.duel?.rules?.specials ?? {};
+    expect([specials.shield ?? 0, specials.kick ?? 0, specials.remote ?? 0]).toEqual([0, 0, 0]);
+  });
   it("rejects stale/duplicate inputs and inputs from the previous round", () => {
     const { rooms, a, ready } = setup(); ready(); rooms.tick(3000);
     const input = { type: "input", roundId: a.room.roundId, sequence: 1, command: { type: "move", direction: "right" } } as const;
@@ -130,6 +136,7 @@ describe("party rooms", () => {
       { kind: "bot", profileId: "glitch-bloom" }
     ]);
     expect(room.party?.bots.map((bot) => bot.seat)).toEqual([2, 3]);
+    expect(room.duel?.rules?.specials?.shield).toBeGreaterThan(0);
   });
 
   it("gives a newcomer the lowest open seat while the lobby waits, and refuses joins mid-round", () => {
