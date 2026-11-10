@@ -1,5 +1,6 @@
 import { createInitialArena, directionToDelta, getSpawnPoints, isWalkable, type ArenaGrid, type Direction, type GridPoint } from "./arena";
 import { resolveBlast, tileListIncludes } from "./blast";
+import { stepSlides, tryKick, type BombSlide } from "./kick";
 import { resolveShieldHit } from "./shield";
 import { applyPowerup, choosePowerupDrop, createInitialLoadout, DEFAULT_POWERUP_DROP_RATES, type ActorLoadout, type PickupType, type SpecialDropRates } from "./powerups";
 
@@ -26,7 +27,15 @@ export type DuelState = {
     /** Set when a shield breaks: blasts can't hurt this fighter before this time. */
     guardUntil?: number;
   }[];
-  bombs: { id: number; owner: Seat; tile: GridPoint; range: number; explodesAt: number }[];
+  bombs: {
+    id: number;
+    owner: Seat;
+    tile: GridPoint;
+    range: number;
+    explodesAt: number;
+    /** Set while a kicked bomb is sliding. */
+    slide?: BombSlide;
+  }[];
   explosions: { id: number; tiles: GridPoint[]; clearedBlocks: GridPoint[]; expiresAt: number }[];
   powerups: { tile: GridPoint; type: PickupType }[];
   nextBombId: number;
@@ -67,6 +76,10 @@ export function eliminateSeats(state: DuelState, seats: Seat[]): DuelState {
   return next;
 }
 
+function livingTiles(state: DuelState) {
+  return state.players.filter((player) => player.alive).map((player) => player.tile);
+}
+
 /** Pure authoritative commands: time is supplied by advanceDuel, never by clients. */
 export function commandDuel(state: DuelState, seat: Seat, command: DuelCommand): DuelState {
   if (state.winner !== null || state.time < state.startsAt || !state.players[seat].alive) return state;
@@ -82,12 +95,23 @@ export function commandDuel(state: DuelState, seat: Seat, command: DuelCommand):
   if (state.time < player.nextMoveAt) return state;
   const delta = directionToDelta(command.direction);
   const tile = { x: player.tile.x + delta.x, y: player.tile.y + delta.y };
+  const cooldown = 140 - (player.loadout.speed - 1) * 20;
+  // Walking into a bomb with Kick sends it sliding; the kicker stays put and spends the step.
+  const kick = (player.loadout.kick ?? 0) >= 1 && state.bombs.some((bomb) => tileListIncludes([bomb.tile], tile))
+    ? tryKick({ arena: state.arena, bombs: state.bombs, fighters: livingTiles(state) }, player.tile, command.direction, state.time)
+    : null;
+  if (kick) {
+    const next = structuredClone(state);
+    next.bombs.find((bomb) => bomb.id === kick.bombId)!.slide = kick.slide;
+    next.players[seat].nextMoveAt = next.time + cooldown;
+    return next;
+  }
   if (!isWalkable(state.arena, tile) || state.bombs.some((bomb) => tileListIncludes([bomb.tile], tile)) ||
     state.players.some((other, index) => index !== seat && other.alive && tileListIncludes([other.tile], tile))) return state;
   const next = structuredClone(state);
   const actor = next.players[seat];
   actor.tile = tile;
-  actor.nextMoveAt = next.time + 140 - (actor.loadout.speed - 1) * 20;
+  actor.nextMoveAt = next.time + cooldown;
   const pickup = next.powerups.find((powerup) => tileListIncludes([powerup.tile], tile));
   if (pickup) {
     actor.loadout = applyPowerup(actor.loadout, pickup.type);
@@ -102,6 +126,8 @@ export function advanceDuel(state: DuelState, time: number): DuelState {
   const next = structuredClone(state);
   next.time = time;
   next.explosions = next.explosions.filter((blast) => blast.expiresAt > time);
+  // Kicked bombs slide before anything explodes, so a bomb blows up where it has got to.
+  if (next.bombs.some((bomb) => bomb.slide)) next.bombs = stepSlides({ arena: next.arena, fighters: livingTiles(next) }, next.bombs, time);
   const queue = next.bombs.filter((bomb) => bomb.explodesAt <= time);
   const hitTiles: GridPoint[] = [];
   while (queue.length) {

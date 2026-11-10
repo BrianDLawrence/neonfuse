@@ -64,6 +64,7 @@ import {
   type SpecialDropRates
 } from "../simulation/powerups";
 import { perkDropRatesFor } from "../simulation/perks";
+import { KICK_STEP_MS, slideAwareThreats, slideOnce, tryKick, type BombSlide } from "../simulation/kick";
 import { resolveShieldHit } from "../simulation/shield";
 import { canSeeBlastZones, visibleDangerTiles } from "../simulation/vision";
 import { resolveRoundWinner } from "../simulation/round";
@@ -83,6 +84,7 @@ const FOLLOW_LERP = 0.14;
 type ActorId = "player" | BotId;
 
 type ActiveBomb = {
+  id: number;
   owner: ActorId;
   tile: GridPoint;
   range: number;
@@ -90,6 +92,9 @@ type ActiveBomb = {
   timer: Phaser.Time.TimerEvent;
   urgentTimer: Phaser.Time.TimerEvent;
   urgent: boolean;
+  /** Set while a kicked bomb slides, with the timer that steps it. */
+  slide?: BombSlide;
+  slideTimer?: Phaser.Time.TimerEvent;
 };
 
 type CombatActor = {
@@ -126,6 +131,7 @@ export class ArenaScene extends Phaser.Scene {
   private botMoveEvent?: Phaser.Time.TimerEvent;
   private countdownEvents: Phaser.Time.TimerEvent[] = [];
   private activeBombs: ActiveBomb[] = [];
+  private nextBombId = 1;
   private activePowerups = new Map<string, ActivePowerup>();
   private shellEvents?: GameEvents;
   private audio?: AudioDirector;
@@ -402,6 +408,10 @@ export class ArenaScene extends Phaser.Scene {
       y: player.tile.y + delta.y
     };
 
+    if (this.tryKickBomb(player, nextTile)) {
+      return;
+    }
+
     if (!this.canActorMoveTo(player, nextTile)) {
       player.view.bump(delta.x, delta.y);
       this.emitAudio("ui.error");
@@ -433,6 +443,7 @@ export class ArenaScene extends Phaser.Scene {
     const view = new BombView(this, world.x, world.y, tile.y, owner === "player");
 
     const bomb: ActiveBomb = {
+      id: this.nextBombId++,
       owner,
       tile,
       range,
@@ -463,6 +474,7 @@ export class ArenaScene extends Phaser.Scene {
     this.activeBombs = this.activeBombs.filter((activeBomb) => activeBomb !== bomb);
     bomb.view.destroy();
     bomb.timer.destroy();
+    bomb.slideTimer?.remove(false);
     bomb.urgentTimer.remove(false);
     this.shellEvents?.onRoundStatusChange?.("Blast");
 
@@ -983,6 +995,7 @@ export class ArenaScene extends Phaser.Scene {
     this.activeBombs.forEach((bomb) => {
       bomb.timer.destroy();
       bomb.urgentTimer.remove(false);
+      bomb.slideTimer?.remove(false);
       bomb.view.destroy();
     });
     this.activeBombs = [];
@@ -1017,11 +1030,62 @@ export class ArenaScene extends Phaser.Scene {
     return [...this.activeBombs.map((bomb) => bomb.tile), ...actorTiles];
   }
 
+  // A kicked bomb threatens where it will stop as well as where it is.
   private getBombThreats(): BombThreat[] {
-    return this.activeBombs.map((bomb) => ({
-      tile: bomb.tile,
-      range: bomb.range
-    }));
+    return slideAwareThreats({ arena: this.arena, fighters: this.getLivingTiles() }, this.activeBombs);
+  }
+
+  private getLivingTiles() {
+    return Array.from(this.actors.values()).filter((actor) => actor.alive).map((actor) => actor.tile);
+  }
+
+  private getSlideBoard() {
+    return { arena: this.arena, bombs: this.activeBombs, fighters: this.getLivingTiles() };
+  }
+
+  /** A player holding Kick who walks into a bomb sends it sliding and stays put. */
+  private tryKickBomb(actor: CombatActor, tile: GridPoint) {
+    if (actor.loadout.kick < 1 || !this.activeBombAt(tile)) {
+      return false;
+    }
+
+    const direction = directionBetween(actor.tile, tile);
+    const kick = direction ? tryKick(this.getSlideBoard(), actor.tile, direction, this.time.now) : null;
+    const bomb = kick ? this.activeBombs.find((candidate) => candidate.id === kick.bombId) : undefined;
+
+    if (!kick || !bomb) {
+      return false;
+    }
+
+    bomb.slide = kick.slide;
+    bomb.slideTimer = this.time.addEvent({ delay: KICK_STEP_MS, loop: true, callback: () => this.stepBombSlide(bomb) });
+    actor.view.bump(tile.x - actor.tile.x, tile.y - actor.tile.y);
+    this.emitAudio("weapon.player.fire");
+    return true;
+  }
+
+  private stepBombSlide(bomb: ActiveBomb) {
+    if (!bomb.slide || !this.activeBombs.includes(bomb)) {
+      bomb.slideTimer?.remove(false);
+      return;
+    }
+
+    const moved = slideOnce(this.getSlideBoard(), { ...bomb, slide: bomb.slide });
+    const from = bomb.tile;
+    bomb.tile = moved.tile;
+
+    if (from.x !== moved.tile.x || from.y !== moved.tile.y) {
+      const world = this.tileToWorld(moved.tile);
+      bomb.view.slideTo(world.x, world.y, moved.tile.y, KICK_STEP_MS);
+    }
+
+    if (moved.stopped) {
+      bomb.slide = undefined;
+      bomb.slideTimer?.remove(false);
+      bomb.slideTimer = undefined;
+    }
+
+    this.refreshDangerTiles();
   }
 
   // Blast zones are hidden by default; the Vision perk, the setting, or watching shows them.

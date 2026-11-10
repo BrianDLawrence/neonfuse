@@ -168,3 +168,47 @@ describe("shield in the duel", () => {
     expect(state.winner).toBe(1);
   });
 });
+
+describe("kick in the duel", () => {
+  function kickReady() {
+    const state = advanceDuel(createDuel(2, { specials: { kick: 2 } }), 3000);
+    state.players[0].loadout.kick = 1;
+    state.players[0].tile = { x: 1, y: 3 };
+    state.arena[3][1] = "floor";
+    state.arena[3][2] = "floor";
+    state.arena[3][3] = "floor";
+    state.arena[3][4] = "floor";
+    state.arena[3][5] = "soft";
+    state.bombs = [{ id: 1, owner: 1, tile: { x: 2, y: 3 }, range: 1, explodesAt: 9000 }];
+    return state;
+  }
+
+  it("sends a bomb sliding when a fighter with Kick walks into it", () => {
+    const kicked = commandDuel(kickReady(), 0, { type: "move", direction: "right" });
+    expect(kicked.players[0].tile).toEqual({ x: 1, y: 3 });
+    expect(kicked.bombs[0].slide).toEqual({ direction: "right", nextStepAt: 3100 });
+    expect(kicked.players[0].nextMoveAt).toBe(3140);
+  });
+
+  it("blocks the move as before for a fighter without Kick", () => {
+    const state = kickReady();
+    state.players[0].loadout.kick = 0;
+    expect(commandDuel(state, 0, { type: "move", direction: "right" })).toEqual(state);
+  });
+
+  it("slides one tile per step on the server clock and stops before a soft block", () => {
+    let state = commandDuel(kickReady(), 0, { type: "move", direction: "right" });
+    state = advanceDuel(state, 3100);
+    expect(state.bombs[0].tile).toEqual({ x: 3, y: 3 });
+    state = advanceDuel(state, 3200);
+    expect(state.bombs[0].tile).toEqual({ x: 4, y: 3 });
+    expect(state.bombs[0].slide).toBeUndefined();
+  });
+
+  it("explodes where the bomb has got to when its fuse runs out mid-slide", () => {
+    const state = kickReady();
+    state.bombs[0].explodesAt = 3100;
+    const exploded = advanceDuel(commandDuel(state, 0, { type: "move", direction: "right" }), 3100);
+    expect(exploded.explosions[0].tiles[0]).toEqual({ x: 3, y: 3 });
+  });
+});

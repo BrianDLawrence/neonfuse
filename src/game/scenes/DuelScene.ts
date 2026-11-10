@@ -5,6 +5,7 @@ import { playExplosionEffect } from "../presentation/explosionEffect";
 import { FusebotView, rowDepth, type ShieldVisual } from "../presentation/fusebotView";
 import type { DuelCommand } from "../simulation/duel";
 import { PARTY_SEAT_PROFILES } from "../simulation/partyBots";
+import { slideAwareThreats } from "../simulation/kick";
 import { hasPerk } from "../simulation/powerups";
 import { isShieldGuarding } from "../simulation/shield";
 import { visibleDangerTiles } from "../simulation/vision";
@@ -28,6 +29,7 @@ export class DuelScene extends Phaser.Scene {
   private sprites = new Map<string, Phaser.GameObjects.Image>();
   private fighters = new Map<number, { view: FusebotView; tile: string }>();
   private bombs = new Map<number, BombView>();
+  private bombTiles = new Map<number, string>();
   private danger?: DangerOverlay;
   private dangerKey = "";
   private hadVision = false;
@@ -89,7 +91,7 @@ export class DuelScene extends Phaser.Scene {
     if (snapshot?.roundId !== this.roundId) {
       this.sprites.forEach((sprite) => sprite.destroy()); this.sprites.clear();
       this.fighters.forEach((fighter) => fighter.view.destroy()); this.fighters.clear();
-      this.bombs.forEach((bomb) => bomb.destroy()); this.bombs.clear();
+      this.bombs.forEach((bomb) => bomb.destroy()); this.bombs.clear(); this.bombTiles.clear();
       this.seenExplosions.clear();
       this.roundId = snapshot?.roundId ?? "";
     }
@@ -117,13 +119,20 @@ export class DuelScene extends Phaser.Scene {
     const liveBombs = new Set<number>();
     snapshot?.duel?.bombs.forEach((bomb) => {
       liveBombs.add(bomb.id);
-      if (!this.bombs.has(bomb.id)) {
-        const world = this.world(bomb.tile);
+      const world = this.world(bomb.tile);
+      const tileKey = `${bomb.tile.x},${bomb.tile.y}`;
+      const view = this.bombs.get(bomb.id);
+      if (!view) {
         this.bombs.set(bomb.id, new BombView(this, world.x, world.y, bomb.tile.y, bomb.owner === snapshot.seat));
+      } else if (this.bombTiles.get(bomb.id) !== tileKey) {
+        // A kicked bomb moved since the last snapshot.
+        view.slideTo(world.x, world.y, bomb.tile.y, 90);
       }
+      this.bombTiles.set(bomb.id, tileKey);
     });
-    for (const [id, bomb] of this.bombs) if (!liveBombs.has(id)) { bomb.destroy(); this.bombs.delete(id); }
-    const threats = snapshot?.duel?.bombs.map((bomb) => ({ tile: bomb.tile, range: bomb.range })) ?? [];
+    for (const [id, bomb] of this.bombs) if (!liveBombs.has(id)) { bomb.destroy(); this.bombs.delete(id); this.bombTiles.delete(id); }
+    const livingTiles = snapshot?.duel?.players.filter((player) => player.alive).map((player) => player.tile) ?? [];
+    const threats = slideAwareThreats({ arena, fighters: livingTiles }, snapshot?.duel?.bombs ?? []);
     // Blast zones need Vision. A fighter who is out watches with them shown, and a server
     // that predates perks sends no rules, so its rounds keep the classic overlay.
     const me = snapshot?.duel?.players[snapshot.seat];
