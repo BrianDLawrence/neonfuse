@@ -76,9 +76,11 @@ rejects tickets that carry `mode`, which only affects Party Brawl.
 Each round's `DuelState` carries `rules` from `roundRules(mode)` in
 `server/rooms.ts`, which reads the per-mode table in
 `src/game/simulation/perks.ts`. The friend duel drops only Vision; Party Brawl
-also drops Shield. Shield is part of the authoritative simulation
-(`advanceDuel` applies `resolveShieldHit` to each tick's hits); Vision is
-presentation only, so the server just carries the loadout field.
+also drops Shield and Kick. Shield and Kick are part of the authoritative
+simulation: `advanceDuel` applies `resolveShieldHit` to each tick's hits, a
+move into a bomb with Kick starts a slide in `commandDuel` (no new command),
+and `advanceDuel` steps slides on the server clock before resolving blasts.
+Vision is presentation only, so the server just carries the loadout field.
 
 Blast zones are hidden unless your fighter holds Vision. A snapshot with no
 `rules` comes from a server that predates perks, so the client keeps the

@@ -2,7 +2,7 @@ import * as Phaser from "phaser";
 import { prefersReducedMotion } from "./motionPreference";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, type ArenaGrid, type GridPoint } from "../simulation/arena";
 import { rowDepth } from "./fusebotView";
-import { BLOCK_ORIGIN_Y, FLOOR_FRAME, ensureArenaFloorTexture } from "./overdriveTextures";
+import { BLOCK_ORIGIN_Y, FLOOR_FRAME, PERK_COLORS, ensureArenaFloorTexture } from "./overdriveTextures";
 
 type ToWorld = (tile: GridPoint) => GridPoint;
 
@@ -124,6 +124,29 @@ export class BombView {
 
   setPosition(x: number, y: number) {
     this.root.setPosition(x, y);
+  }
+
+  /** A kicked bomb gliding one tile, with a short streak left behind. */
+  slideTo(x: number, y: number, row: number, durationMs: number) {
+    const fromX = this.root.x;
+    const fromY = this.root.y;
+    this.scene.tweens.killTweensOf(this.root);
+    this.root.setScale(1);
+    this.root.setDepth(rowDepth(row, "actor") - 0.5);
+    this.scene.tweens.add({ targets: this.root, x, y, duration: durationMs, ease: "Linear" });
+
+    if (prefersReducedMotion()) {
+      return;
+    }
+
+    const streak = this.scene.add
+      .image(fromX, fromY + 6, "glow")
+      .setTint(Phaser.Display.Color.HexStringToColor(PERK_COLORS.kick).color)
+      .setAlpha(0.45)
+      .setScale(0.5, 0.3)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(this.root.depth - 0.1);
+    this.scene.tweens.add({ targets: streak, alpha: 0, scale: 0.2, duration: 220, onComplete: () => streak.destroy() });
   }
 
   /** The last stretch of the fuse: pulse faster so the danger is felt. */

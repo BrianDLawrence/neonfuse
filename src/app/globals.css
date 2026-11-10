@@ -484,6 +484,32 @@ h5,
   background: var(--perk-vision);
 }
 
+.stat-icon-kick {
+  width: 16px;
+}
+
+.stat-icon-kick::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--perk-kick);
+}
+
+/* Motion lines trailing the kicked bomb. */
+.stat-icon-kick::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 6px;
+  height: 7px;
+  background: repeating-linear-gradient(to bottom, var(--perk-kick) 0 1.5px, transparent 1.5px 3px);
+}
+
 /* Perk icons in the HUD sit at full strength: holding one is the news. */
 .hud-chip-perks .stat-icon,
 .bot-hud-chip .stat-icon {

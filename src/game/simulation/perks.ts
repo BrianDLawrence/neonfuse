@@ -10,13 +10,13 @@ export type PerkMode = GameMode | "duel" | "party";
  * shield, kick and remote off so its physics stay as they were; it drops only Vision.
  */
 export const MODE_PERK_DROP_RATES: Record<PerkMode, SpecialDropRates | null> = {
-  "player-vs-bot": { shield: 3, vision: 3 },
-  "bot-skirmish": { shield: 3, vision: 3 },
+  "player-vs-bot": { shield: 3, vision: 3, kick: 2 },
+  "bot-skirmish": { shield: 3, vision: 3, kick: 2 },
   // Blast zones are hidden by default, so Vision drops everywhere a person plays.
   campaign: { vision: 3 },
   daily: { vision: 3 },
   duel: { vision: 3 },
-  party: { shield: 3, vision: 3 }
+  party: { shield: 3, vision: 3, kick: 2 }
 };
 
 /** The mode's perk rates, clamped, or null when the mode drops none. */

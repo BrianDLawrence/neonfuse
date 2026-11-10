@@ -15,6 +15,12 @@ describe("perk drop rates by mode", () => {
     }
   });
 
+  it("drops Kick in Versus, Bot Skirmish and Party Brawl", () => {
+    for (const mode of ["player-vs-bot", "bot-skirmish", "party"] as PerkMode[]) {
+      expect(perkDropRatesFor(mode)?.kick).toBeGreaterThan(0);
+    }
+  });
+
   it("drops Vision in every mode, since blast zones are hidden without it", () => {
     for (const mode of Object.keys(MODE_PERK_DROP_RATES) as PerkMode[]) {
       expect(perkDropRatesFor(mode)?.vision).toBeGreaterThan(0);

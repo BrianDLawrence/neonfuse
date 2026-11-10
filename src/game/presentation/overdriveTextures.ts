@@ -397,6 +397,21 @@ function createPerkTextures(scene: Phaser.Scene, chip: (color: string, glyph: (c
     ctx.fill();
   }));
 
+  // Kick: a bomb with motion lines trailing behind it.
+  paint(scene, "powerup-kick", 40, 40, chip(PERK_COLORS.kick, (ctx) => {
+    ctx.beginPath();
+    ctx.arc(24, 21, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    for (const [y, from] of [[16, 13], [21, 11], [26, 13]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(from, y);
+      ctx.lineTo(16.5, y);
+      ctx.stroke();
+    }
+  }));
+
   // The ring a raised shield draws around its fighter: a thin glowing hexagon.
   paint(scene, "shield-ring", 72, 72, (ctx) => {
     ctx.save();

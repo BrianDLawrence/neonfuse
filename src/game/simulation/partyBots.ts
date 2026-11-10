@@ -2,6 +2,7 @@ import type { GridPoint } from "./arena";
 import { BOT_PROFILES, chooseBotTurn, type BotProfileId, type BotTurnContext, type BotTurnIntent } from "./bots";
 import { isDangerTile, manhattanDistance } from "./danger";
 import { commandDuel, type DuelCommand, type DuelState, type Seat } from "./duel";
+import { slideAwareThreats } from "./kick";
 import { hashString } from "./seed";
 
 /** Each party seat has a fixed Fusebot; a bot filling that seat plays this profile. */
@@ -68,7 +69,8 @@ export function choosePartyBotCommands(state: DuelState, bot: PartyBot, seed: nu
     arena: state.arena,
     actor: { id: "bot-a", tile: actor.tile, alive: true, loadout: actor.loadout, profile: BOT_PROFILES[bot.profileId], turn: bot.turn },
     opponentTile: state.players[target].tile,
-    bombs: state.bombs.map((bomb) => ({ tile: bomb.tile, range: bomb.range })),
+    // A kicked bomb is a threat where it will stop as well as where it is.
+    bombs: slideAwareThreats({ arena: state.arena, fighters: state.players.filter((player) => player.alive).map((player) => player.tile) }, state.bombs),
     activeBombCount: state.bombs.filter((bomb) => bomb.owner === bot.seat).length,
     blockedTiles: [
       ...state.bombs.map((bomb) => bomb.tile),

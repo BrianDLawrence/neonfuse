@@ -531,6 +531,7 @@ cannot shift par times or stars unnoticed.
 | --- | --- | --- |
 | Shield (`shield.ts`) | Absorbs one blast, then protects for a 1 s grace. One shield covers a whole chain. | Versus, Bot Skirmish, Party Brawl |
 | Vision (`vision.ts`) | Shows every bomb's blast zone. **Blast zones are hidden by default.** | Every mode |
+| Kick (`kick.ts`) | Walking into a bomb sends it sliding one tile per 100 ms until something blocks it; the kicker stays put. No damage or stun on impact. Bots never kick, but avoid a sliding bomb's stopping tile. | Versus, Bot Skirmish, Party Brawl |
 
 ### Blast zones and Vision
 
