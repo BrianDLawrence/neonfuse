@@ -73,6 +73,8 @@ export type CampaignStage = {
   /** One or two bots; a second bot makes the stage a gauntlet. */
   bots: StageBotSpec[];
   modifiers: StageModifiers;
+  /** What the player starts with beyond the default loadout, clamped like a bot's. */
+  playerStartingLoadout?: Partial<PlayerLoadout>;
   objective: "knockout";
   roundsToWin: number;
   parTimeMs: number;
@@ -116,6 +118,7 @@ export const CAMPAIGN_STAGES: readonly CampaignStage[] = [
     arena: STANDARD_ARENA,
     bots: [{ profileId: "fuse-rush" }],
     modifiers: {},
+    playerStartingLoadout: { vision: 1 },
     objective: "knockout",
     roundsToWin: 1,
     parTimeMs: 60_000,
@@ -129,6 +132,7 @@ export const CAMPAIGN_STAGES: readonly CampaignStage[] = [
     arena: STANDARD_ARENA,
     bots: [{ profileId: "circuit-shade" }],
     modifiers: {},
+    playerStartingLoadout: { vision: 1 },
     objective: "knockout",
     roundsToWin: 1,
     parTimeMs: 75_000,
@@ -142,6 +146,7 @@ export const CAMPAIGN_STAGES: readonly CampaignStage[] = [
     arena: STANDARD_ARENA,
     bots: [{ profileId: "volt-warden" }],
     modifiers: {},
+    playerStartingLoadout: { vision: 1 },
     objective: "knockout",
     roundsToWin: 1,
     parTimeMs: 90_000,
@@ -325,15 +330,27 @@ export function resolveStageBot(spec: StageBotSpec): { profile: BotProfile; load
     traits[key] = clamp(Math.round(base.traits[key] + delta), 0, 10);
   }
 
+  return { profile: { ...base, traits }, loadout: clampStartingLoadout(spec.startingLoadout) };
+}
+
+/**
+ * The player's opening loadout for a stage. Act 1 starts the player with Vision, so the
+ * blast zones they are learning to read stay visible while the ladder teaches them.
+ */
+export function resolveStagePlayer(stage: CampaignStage): ActorLoadout {
+  return clampStartingLoadout(stage.playerStartingLoadout);
+}
+
+/** A requested loadout clamped between the default loadout and MAX_LOADOUT. */
+function clampStartingLoadout(requested: Partial<PlayerLoadout> | undefined): ActorLoadout {
   const initial = createInitialLoadout();
   const loadout = { ...initial };
 
   for (const key of Object.keys(loadout) as (keyof PlayerLoadout)[]) {
-    const requested = spec.startingLoadout?.[key] ?? initial[key];
-    loadout[key] = clamp(Math.round(requested), initial[key], MAX_LOADOUT[key]);
+    loadout[key] = clamp(Math.round(requested?.[key] ?? initial[key]), initial[key], MAX_LOADOUT[key]);
   }
 
-  return { profile: { ...base, traits }, loadout };
+  return loadout;
 }
 
 export type ResolvedModifiers = {

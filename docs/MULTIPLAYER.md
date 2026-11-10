@@ -71,6 +71,21 @@ party screens live in `src/components/game/PartyBrawl.tsx`.
 Deploy the realtime server before the Next.js app: an older realtime server
 rejects tickets that carry `mode`, which only affects Party Brawl.
 
+## Perks
+
+Each round's `DuelState` carries `rules` from `roundRules(mode)` in
+`server/rooms.ts`, which reads the per-mode table in
+`src/game/simulation/perks.ts`. The friend duel drops only Vision; Party Brawl
+also drops Shield. Shield is part of the authoritative simulation
+(`advanceDuel` applies `resolveShieldHit` to each tick's hits); Vision is
+presentation only, so the server just carries the loadout field.
+
+Blast zones are hidden unless your fighter holds Vision. A snapshot with no
+`rules` comes from a server that predates perks, so the client keeps the
+classic always-on overlay for it. Deploy the Next.js app before the realtime
+server for perk changes: a new client copes with an old server, but an old
+client against a new server would draw perk pickups without their art.
+
 ## Configuration
 
 Use Node 22.13+ (or a supported newer LTS). Install dependencies with `npm ci`.

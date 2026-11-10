@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Direction } from "@/game/simulation/arena";
 import { heldPerks } from "@/game/simulation/powerups";
+import { readShowBlastZones } from "@/lib/client-storage";
 import type { ActivityAuth } from "@/lib/activity-session-renewal";
 import { PartyLobby, PartyScoreboard } from "./PartyBrawl";
 import { PERK_LABELS } from "./PerksChip";
@@ -35,6 +36,8 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
   useEffect(() => {
     let disposed = false;
     let game: import("phaser").Game | undefined;
+    // Set from the local game's menu; read once when the arena opens.
+    const showBlastZones = readShowBlastZones();
     let observer: ResizeObserver | undefined;
     const blur = () => { direction.current = null; };
     window.addEventListener("blur", blur);
@@ -47,6 +50,7 @@ export function DuelGame({ activityAuth, mode = "duel", onLeave }: DuelGameProps
         input: (command) => { if (liveRef.current) input(command); },
         touchControlsVisible: () =>
           window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false,
+        showBlastZones: () => showBlastZones,
         loaded: () => { if (!disposed) setLoaded(true); }
       });
       observer = new ResizeObserver(() => {

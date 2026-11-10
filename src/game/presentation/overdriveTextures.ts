@@ -383,6 +383,20 @@ function createPerkTextures(scene: Phaser.Scene, chip: (color: string, glyph: (c
     ctx.fillRect(19, 15, 2, 10);
   }));
 
+  // Vision: an open eye with a bright pupil.
+  paint(scene, "powerup-vision", 40, 40, chip(PERK_COLORS.vision, (ctx) => {
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(11, 20);
+    ctx.quadraticCurveTo(20, 11, 29, 20);
+    ctx.quadraticCurveTo(20, 29, 11, 20);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(20, 20, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+  }));
+
   // The ring a raised shield draws around its fighter: a thin glowing hexagon.
   paint(scene, "shield-ring", 72, 72, (ctx) => {
     ctx.save();

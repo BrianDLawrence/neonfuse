@@ -15,6 +15,7 @@ import {
   isStageUnlocked,
   resolveStageBot,
   resolveStageModifiers,
+  resolveStagePlayer,
   sanitizeCampaignProgress,
   scoreStageResult,
   type CampaignProgress,
@@ -250,6 +251,21 @@ describe("resolveStageBot", () => {
     const overclocked = getCampaignStage("2-1") as CampaignStage;
 
     expect(resolveStageBot(overclocked.bots[0]).loadout.bombs).toBe(2);
+  });
+});
+
+describe("resolveStagePlayer", () => {
+  it("starts the player with Vision through the first three stages only", () => {
+    for (const stage of CAMPAIGN_STAGES) {
+      const loadout = resolveStagePlayer(stage);
+      expect(loadout.vision).toBe(["1-1", "1-2", "1-3"].includes(stage.id) ? 1 : 0);
+      expect({ ...loadout, vision: 0 }).toEqual(createInitialLoadout());
+    }
+  });
+
+  it("clamps the player's starting loadout like a bot's", () => {
+    const stage = { ...(getCampaignStage("1-1") as CampaignStage), playerStartingLoadout: { bombs: 99, shield: 5, blast: 0 } };
+    expect(resolveStagePlayer(stage)).toEqual({ ...createInitialLoadout(), bombs: MAX_LOADOUT.bombs, shield: 1 });
   });
 });
 

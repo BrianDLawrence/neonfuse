@@ -515,3 +515,34 @@ tracker. Streaks are not called verified, are not leaderboard material, and
 must not gate anything scarce. Making them competitive would need the
 authoritative-server path that duels use.
 
+
+## 10. Perks
+
+Perks are one-of-a-kind pickups a fighter either holds or does not. They drop
+from their own table (`choosePowerupDrop` in `src/game/simulation/powerups.ts`)
+only on blocks where the classic roll gave nothing, so switching perks on never
+moves a classic upgrade. `src/game/simulation/perks.ts` lists which perks each
+mode drops; a stage or Daily Fuse modifier can override it with
+`specialDropRates` (0–10). Perks last for the round. `classicBaseline.test.ts`
+pins the classic drops, campaign bot loadouts and bot decisions so perk work
+cannot shift par times or stars unnoticed.
+
+| Perk | Rule | Where it drops |
+| --- | --- | --- |
+| Shield (`shield.ts`) | Absorbs one blast, then protects for a 1 s grace. One shield covers a whole chain. | Versus, Bot Skirmish, Party Brawl |
+| Vision (`vision.ts`) | Shows every bomb's blast zone. **Blast zones are hidden by default.** | Every mode |
+
+### Blast zones and Vision
+
+The danger overlay that lights up the tiles a bomb will hit is hidden unless
+the player holds Vision. Bombs, fuse sparks, the urgent pulse and the off-screen
+bomb arrows still show. Spectators (Bot Skirmish, or a fighter who is out) see
+the overlay, and **Show blast zones** in the game menu turns it on for players
+who want it always (stored on the device). Bots read danger directly, so Vision
+never changes how they play.
+
+Campaign stages 1-1 to 1-3 start the player with Vision
+(`playerStartingLoadout`, clamped like a bot's starting loadout) while the
+ladder teaches blast reading. Vision is the only perk that drops in campaign and
+Daily Fuse, so stage bots, modifiers and drops are otherwise unchanged; par
+times were set with the overlay on, so Act 1 and later pars need a play-test.

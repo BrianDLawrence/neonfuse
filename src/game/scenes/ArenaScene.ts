@@ -48,10 +48,11 @@ import {
   getCampaignStage,
   resolveStageBot,
   resolveStageModifiers,
+  resolveStagePlayer,
   type CampaignStage
 } from "../simulation/campaign";
 import { getDailyChallenge, resolveDailyModifiers, type DailyChallenge } from "../simulation/daily";
-import { getDangerTiles, type BombThreat } from "../simulation/danger";
+import type { BombThreat } from "../simulation/danger";
 import {
   applyPowerup,
   choosePowerupDrop,
@@ -64,6 +65,7 @@ import {
 } from "../simulation/powerups";
 import { perkDropRatesFor } from "../simulation/perks";
 import { resolveShieldHit } from "../simulation/shield";
+import { canSeeBlastZones, visibleDangerTiles } from "../simulation/vision";
 import { resolveRoundWinner } from "../simulation/round";
 import { resolveVersusOpponent } from "../simulation/versus";
 
@@ -150,6 +152,8 @@ export class ArenaScene extends Phaser.Scene {
   private losses = 0;
   private blocksCleared = 0;
   private roundSeed = 0;
+  /** Whether the blast-zone overlay was drawn at the last refresh. */
+  private blastZonesVisible = false;
 
   constructor() {
     super("ArenaScene");
@@ -198,6 +202,11 @@ export class ArenaScene extends Phaser.Scene {
 
   update(time: number) {
     this.updateCameraAids(time);
+
+    // The "Show blast zones" setting can change mid-round; redraw when it does.
+    if (canSeeBlastZones(this.getBlastZoneViewer()) !== this.blastZonesVisible) {
+      this.refreshDangerTiles();
+    }
 
     if (!this.cursors || !this.wasd) {
       return;
@@ -300,7 +309,7 @@ export class ArenaScene extends Phaser.Scene {
 
     if (scriptedBots) {
       // The stage or day picks the opponents (two for a gauntlet) and their tuning.
-      this.spawnActor("player", spawns[0]);
+      this.spawnActor("player", spawns[0], undefined, stage ? resolveStagePlayer(stage) : undefined);
       scriptedBots.forEach((spec, index) => {
         const { profile, loadout } = resolveStageBot(spec);
         this.spawnActor(index === 0 ? "bot-a" : "bot-b", spawns[index + 1], profile, loadout);
@@ -704,8 +713,15 @@ export class ArenaScene extends Phaser.Scene {
       return;
     }
 
+    const hadVision = actor.loadout.vision >= 1;
     actor.loadout = applyPowerup(actor.loadout, powerup.type);
     this.refreshShieldVisual(actor);
+
+    if (actor.kind === "player" && powerup.type === "vision" && !hadVision) {
+      this.refreshDangerTiles();
+      this.dangerOverlay?.reveal();
+      this.shellEvents?.onRoundStatusChange?.("Vision on");
+    }
     powerup.sprite.destroy();
     this.activePowerups.delete(key);
     this.emitAudio("pickup.powerup");
@@ -1008,10 +1024,24 @@ export class ArenaScene extends Phaser.Scene {
     }));
   }
 
+  // Blast zones are hidden by default; the Vision perk, the setting, or watching shows them.
   private refreshDangerTiles() {
-    this.dangerOverlay?.update(getDangerTiles(this.arena, this.getBombThreats()), (tile) =>
-      this.tileToWorld(tile)
+    const viewer = this.getBlastZoneViewer();
+    this.blastZonesVisible = canSeeBlastZones(viewer);
+    this.dangerOverlay?.update(
+      visibleDangerTiles({ arena: this.arena, bombs: this.getBombThreats(), ...viewer }),
+      (tile) => this.tileToWorld(tile)
     );
+  }
+
+  private getBlastZoneViewer() {
+    const player = this.actors.get("player");
+    const watching = !hasHumanPlayer(this.currentMode) || !player?.alive;
+
+    return {
+      viewer: watching ? null : player.loadout,
+      alwaysShow: this.shellEvents?.getShowBlastZones?.() ?? false
+    };
   }
 
   // Subtle lens vignette; WebGL only, the Canvas renderer simply skips it.

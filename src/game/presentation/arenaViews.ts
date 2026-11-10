@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { prefersReducedMotion } from "./motionPreference";
 import { ARENA_COLS, ARENA_ROWS, CELL_SIZE, type ArenaGrid, type GridPoint } from "../simulation/arena";
 import { rowDepth } from "./fusebotView";
 import { BLOCK_ORIGIN_Y, FLOOR_FRAME, ensureArenaFloorTexture } from "./overdriveTextures";
@@ -184,6 +185,20 @@ export class DangerOverlay {
 
   clear() {
     this.update([], () => ({ x: 0, y: 0 }));
+  }
+
+  /** The moment Vision is picked up: the zones already on the board fade in one after another. */
+  reveal() {
+    if (prefersReducedMotion()) {
+      return;
+    }
+
+    this.tiles
+      .filter((image) => image.visible)
+      .forEach((image, index) => {
+        image.setAlpha(0);
+        this.layer.scene.tweens.add({ targets: image, alpha: 1, duration: 220, delay: index * 22, ease: "Sine.easeOut" });
+      });
   }
 
   destroy() {
