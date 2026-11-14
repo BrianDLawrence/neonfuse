@@ -83,6 +83,8 @@ h5,
 .current-score-readout strong,
 .dialog-close-button,
 .dialog-icon-button,
+.how-to-play-body h4,
+.how-to-play-list strong,
 .hud-chip span,
 .hud-chip strong,
 .key-chip,
@@ -2410,6 +2412,107 @@ h5,
   background: rgba(34, 211, 238, 0.14);
 }
 
+/* How to play: the rules on one screen, in the shared dialog frame. */
+.how-to-play-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.how-to-play-body {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.how-to-play-lead {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.how-to-play-body h4 {
+  margin: 0 0 8px;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.how-to-play-note {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.how-to-play-controls {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.how-to-play-controls > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.how-to-play-controls dt {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.how-to-play-controls dd {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0;
+}
+
+.how-to-play-controls .key-chip {
+  color: var(--text);
+  padding: 5px 8px;
+}
+
+.how-to-play-controls .how-to-play-touch {
+  color: var(--muted);
+}
+
+.how-to-play-list {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.how-to-play-list li {
+  display: grid;
+  grid-template-columns: 16px 68px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.how-to-play-list strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.how-to-play-list span {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .control-strip {
   pointer-events: none;
   position: absolute;
@@ -4253,6 +4356,15 @@ h5,
 
   .admin-panel-header span {
     display: none;
+  }
+
+  .how-to-play-controls > div {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .how-to-play-controls dd {
+    justify-content: flex-start;
   }
 
   .hud-top {

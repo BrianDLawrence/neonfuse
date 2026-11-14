@@ -11,6 +11,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       activePath="/privacy"
+      effectiveDate="November 14, 2026"
       intro="This policy explains what Neon Fuse receives from Discord, what the game stores, why we use it, and how you can remove it."
       kicker="Neon Fuse // Data Protocol"
       title="Privacy Policy"
@@ -45,8 +46,10 @@ export default function PrivacyPage() {
             achievements, and audio or bot preferences.
           </li>
           <li>
-            Match results, scores, leaderboard entries, duel participants, match
-            duration, and gameplay statistics.
+            Match results, scores, leaderboard entries, match duration, and gameplay
+            statistics. This covers campaign stages, Daily Fuse runs, friend duels,
+            and Party Brawl rounds and series, including which signed-in players
+            took part in a duel or Party Brawl.
           </li>
           <li>
             A random visitor ID stored in your browser and a cookie so a saved match
@@ -59,7 +62,9 @@ export default function PrivacyPage() {
           Our authentication, hosting, and security providers may process standard
           connection data such as IP address, browser or device information,
           timestamps, and error or security logs. Your browser also stores your
-          selected music track and visitor ID locally.
+          visitor ID, selected music track, campaign and Daily Fuse progress, your
+          blast-zone display setting, and whether you have seen the How to play
+          guide.
         </p>
       </LegalSection>
 
@@ -111,8 +116,8 @@ export default function PrivacyPage() {
             remains until you clear it or use the deletion control described below.
           </li>
           <li>
-            Profiles, matches, duels, scores, and account records remain while you use
-            the service, unless you delete them.
+            Profiles, matches, duels, Party Brawl rounds and series, scores, and
+            account records remain while you use the service, unless you delete them.
           </li>
           <li>
             Security logs and provider backups may remain for a limited period under
@@ -123,9 +128,10 @@ export default function PrivacyPage() {
           To delete your Neon Fuse account data, open <strong>Fighter Profile</strong>,
           find <strong>Data Controls</strong>, and choose <strong>Delete account data</strong>.
           After you type the confirmation phrase, Neon Fuse deletes the linked profile,
-          match history, leaderboard entries, visitor record, duel records, Activity
-          sessions, and authentication records from active storage. The game also
-          clears its visitor and music choices from that browser.
+          match history, leaderboard entries, visitor record, duel and Party Brawl
+          records, Activity sessions, and authentication records from active storage.
+          The game also clears the visitor ID, saved choices, and locally stored
+          progress it keeps in that browser.
         </p>
         <p>
           If you cannot access the in-game control, use the options on our{" "}

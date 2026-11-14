@@ -5,12 +5,28 @@ const now = new Date().toISOString();
 
 export const TEST_PILOT = "Test Pilot";
 
+export async function markHowToPlaySeen(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem("neon-fuse:how-to-play-seen", "1");
+    } catch {
+      // A frame without storage already reads as a returning player.
+    }
+  });
+}
+
 /**
  * Stands in for a signed-in Discord web session. The browser tests run without
  * MongoDB or Discord credentials, so Better Auth's session lookup is answered here
  * and every other API keeps its real, unconfigured (offline) behaviour.
  */
-export async function signIn(page: Page) {
+export async function signIn(page: Page, { firstVisit = false }: { firstVisit?: boolean } = {}) {
+  // How to play opens by itself on a device's first visit and covers the arena,
+  // so tests start as a returning player unless they ask for the first visit.
+  if (!firstVisit) {
+    await markHowToPlaySeen(page);
+  }
+
   await page.route("**/api/auth/get-session*", (route) =>
     route.fulfill({
       json: {

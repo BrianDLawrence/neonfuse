@@ -10,6 +10,7 @@ import {
   E2E_MULTIPLAYER_SECRET,
   E2E_MULTIPLAYER_URL
 } from "./environment";
+import { markHowToPlaySeen } from "./fixtures";
 
 /**
  * A synthetic Discord account. The IDs exist only in the fake Discord host and in
@@ -306,6 +307,7 @@ export async function openActivity(page: Page, options: ActivityOptions): Promis
     });
   });
   await page.addInitScript(recordDuelTransitions);
+  await markHowToPlaySeen(page);
 
   await page.goto(`${DISCORD_HOST_ORIGIN}/`);
   const app = page.frameLocator("iframe[title='Neon Fuse Activity']");
