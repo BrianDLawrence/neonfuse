@@ -17,6 +17,7 @@ import { ShellMenu } from "./ShellMenu";
 import { DiscordPartyScreen } from "./DiscordPartyScreen";
 import { PhaserGame, type TouchControlsApi } from "./PhaserGame";
 import { HighScoresScreen, type RoundScoreResult } from "./HighScoresScreen";
+import { HowToPlayScreen } from "./HowToPlayScreen";
 import { MusicScreen } from "./MusicScreen";
 import {
   ProfileAvatar,
@@ -56,7 +57,9 @@ import {
   DAILY_PROGRESS_STORAGE_KEY,
   MUSIC_TRACK_STORAGE_KEY,
   VISITOR_STORAGE_KEY,
+  readHowToPlaySeen,
   readShowBlastZones,
+  writeHowToPlaySeen,
   writeShowBlastZones
 } from "@/lib/client-storage";
 import type { HighScoreEntry } from "@/lib/leaderboard";
@@ -251,6 +254,8 @@ export function GameShell({
   const [botSelection, setBotSelection] = useState<BotSelection>(DEFAULT_BOT_SELECTION);
   const [selectedBotInfo, setSelectedBotInfo] = useState<BotProfileId>(DEFAULT_BOT_SELECTION["bot-a"]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  // "first-visit" opens by itself and starts the round over when it closes.
+  const [howToPlay, setHowToPlay] = useState<"closed" | "first-visit" | "menu">("closed");
   const [isBotLabOpen, setIsBotLabOpen] = useState(false);
   const [isMusicOpen, setIsMusicOpen] = useState(false);
   const [isHighScoresOpen, setIsHighScoresOpen] = useState(false);
@@ -330,6 +335,10 @@ export function GameShell({
 
     setShowBlastZones(readShowBlastZones());
 
+    if (!readHowToPlaySeen()) {
+      setHowToPlay("first-visit");
+    }
+
     const stored = readStoredMusicTrack();
 
     if (stored) {
@@ -338,8 +347,21 @@ export function GameShell({
     }
   }, []);
 
+  const closeHowToPlay = useCallback(() => {
+    writeHowToPlaySeen();
+
+    if (howToPlay === "first-visit") {
+      // The round ran on behind the guide, so give a new player a fresh one.
+      setModeCommand((command) => ({ ...command, sequence: command.sequence + 1 }));
+      setRoundStatus("Warmup");
+    }
+
+    setHowToPlay("closed");
+  }, [howToPlay]);
+
   useEffect(() => {
     if (
+      howToPlay === "closed" &&
       !isAdminOpen &&
       !isBotLabOpen &&
       !isHighScoresOpen &&
@@ -368,6 +390,10 @@ export function GameShell({
         setIsHighScoresOpen(false);
         setIsProfileOpen(false);
         setIsPartyOpen(false);
+
+        if (howToPlay !== "closed") {
+          closeHowToPlay();
+        }
       }
     };
 
@@ -375,7 +401,9 @@ export function GameShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     campaignResult,
+    closeHowToPlay,
     dailyResult,
+    howToPlay,
     isAdminOpen,
     isBotLabOpen,
     isCampaignOpen,
@@ -1173,6 +1201,7 @@ export function GameShell({
             </button>
             <ShellMenu
               items={[
+                { label: "How to play", onSelect: () => setHowToPlay("menu") },
                 { label: "Daily Fuse", onSelect: handleOpenDaily, status: dailyMenuStatus },
                 { label: "Profile", onSelect: () => setIsProfileOpen(true) },
                 { label: "Play with a friend", onSelect: () => setFriendMatch("duel") },
@@ -1185,7 +1214,7 @@ export function GameShell({
                 { label: "Tracks", onSelect: () => setIsMusicOpen(true) },
                 { label: "High Scores", onSelect: () => setIsHighScoresOpen(true) },
                 { label: "Bots", onSelect: () => setIsBotLabOpen(true) },
-                { label: "Admin", onSelect: () => setIsAdminOpen(true) }
+                { label: "Settings", onSelect: () => setIsAdminOpen(true) }
               ]}
               onSignOut={() => void onSignOut()}
             />
@@ -1399,10 +1428,10 @@ export function GameShell({
               onClick={(event) => event.stopPropagation()}
               role="dialog"
             >
-              <div className="admin-panel" aria-label="Powerup admin controls">
+              <div className="admin-panel">
                 <div className="admin-panel-header">
-                  <h3 id="admin-settings-title">Admin</h3>
-                  <span>Audio + powerups</span>
+                  <h3 id="admin-settings-title">Settings</h3>
+                  <span>Sound and pickup drops</span>
                 </div>
                 {AUDIO_CONTROLS.map((control) => {
                   const value = control.type === "music" ? musicVolume : sfxVolume;
@@ -1459,6 +1488,10 @@ export function GameShell({
               </div>
             </section>
           </div>
+        ) : null}
+
+        {howToPlay !== "closed" ? (
+          <HowToPlayScreen firstVisit={howToPlay === "first-visit"} onClose={closeHowToPlay} />
         ) : null}
 
         {isMusicOpen ? (

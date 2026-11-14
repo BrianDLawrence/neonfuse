@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getMongoDb } from "@/lib/mongodb";
+import { isMusicTrackEditor } from "@/lib/music-track-editors";
 import { getAuthenticatedPlayer } from "@/lib/player-identity";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { musicTrackSchema } from "@/lib/schemas/music";
 
 // Custom tracks live in the "music-tracks" collection. The built-in tracks are
 // served from code (src/audio/musicTracks.ts), so this endpoint only carries the
-// user-added ones; the Music screen merges them on top of the built-ins.
+// added ones; the Music screen merges them on top of the built-ins.
 export async function GET() {
   if (!process.env.MONGODB_URI) {
     return NextResponse.json({ ok: true, tracks: [] });
@@ -15,7 +16,7 @@ export async function GET() {
   const db = await getMongoDb();
   const tracks = await db
     .collection("music-tracks")
-    .find({}, { projection: { _id: 0, createdAt: 0 } })
+    .find({}, { projection: { _id: 0, createdAt: 0, createdBy: 0 } })
     .toArray();
 
   return NextResponse.json({ ok: true, tracks });
@@ -32,6 +33,15 @@ export async function POST(request: Request) {
 
   if (!player) {
     return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+  }
+
+  // Every player's Music screen loads these tracks, so adding one is limited to
+  // an allowlist of accounts rather than open to any signed-in player.
+  if (!isMusicTrackEditor(player)) {
+    return NextResponse.json(
+      { ok: false, error: "Not allowed to add music tracks" },
+      { status: 403 }
+    );
   }
 
   let body: unknown;
@@ -63,6 +73,7 @@ export async function POST(request: Request) {
   const track = {
     ...parsed.data,
     source: "custom" as const,
+    createdBy: player.id,
     createdAt: new Date()
   };
 

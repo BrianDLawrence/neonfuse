@@ -35,12 +35,15 @@ export function LegalLinks({
 export function LegalPage({
   activePath,
   children,
+  effectiveDate = "September 17, 2026",
   intro,
   kicker,
   title
 }: Readonly<{
   activePath: (typeof LEGAL_LINKS)[number]["href"];
   children: ReactNode;
+  /** The date this page's current wording took effect. */
+  effectiveDate?: string;
   intro: string;
   kicker: string;
   title: string;
@@ -60,7 +63,7 @@ export function LegalPage({
           <p className="legal-kicker">{kicker}</p>
           <h1>{title}</h1>
           <p className="legal-intro">{intro}</p>
-          <p className="legal-effective">Effective September 17, 2026</p>
+          <p className="legal-effective">Effective {effectiveDate}</p>
           <div className="legal-content">{children}</div>
         </article>
 

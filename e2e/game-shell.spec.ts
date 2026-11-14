@@ -361,6 +361,44 @@ test.describe("game shell", () => {
     await botLab.getByRole("button", { name: "Close Bot Lab" }).click();
     await expect(botLab).toBeHidden();
   });
+
+  test("a first visit opens How to play once", async ({ page }) => {
+    await signIn(page, { firstVisit: true });
+    await page.goto("/");
+
+    const guide = page.getByRole("dialog", { name: "How to play" });
+    await expect(guide).toBeVisible();
+    await expect(guide.getByText("Arrow keys or WASD")).toBeVisible();
+    await expect(guide.getByText("Touch: D-pad")).toBeVisible();
+    await guide.getByRole("button", { name: "Start the round" }).click();
+    await expect(guide).toBeHidden();
+
+    // The device now counts as a returning player.
+    await page.reload();
+    await expect(page.getByRole("region", { name: "Neon Fuse arena" }).locator("canvas")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
+    await expect(guide).toBeHidden();
+  });
+
+  test("How to play and Settings open from the menu", async ({ page }) => {
+    await openShell(page);
+    await expect(page.getByRole("dialog", { name: "How to play" })).toBeHidden();
+
+    await openMenuItem(page, "How to play");
+    const guide = page.getByRole("dialog", { name: "How to play" });
+    await expect(guide).toBeVisible();
+    await expect(guide.getByRole("heading", { name: "Perks" })).toBeVisible();
+    await expect(guide.getByRole("button", { name: "Close" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(guide).toBeHidden();
+
+    await openMenuItem(page, "Settings");
+    const settings = page.getByRole("dialog", { name: "Settings" });
+    await expect(settings).toBeVisible();
+    await expect(settings.getByRole("slider", { name: "Music" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(settings).toBeHidden();
+  });
 });
 
 test.describe("touch layout", () => {

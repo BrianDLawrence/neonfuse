@@ -58,8 +58,8 @@ export default function SupportPage() {
           <li>Type the displayed confirmation phrase and confirm.</li>
         </ol>
         <p>
-          This deletes account-linked data from active Neon Fuse storage and clears Neon
-          Fuse&apos;s visitor and music choices from that browser. You can also revoke the
+          This deletes account-linked data from active Neon Fuse storage and clears the
+          visitor ID, saved choices, and local progress Neon Fuse keeps in that browser. You can also revoke the
           application from Discord&apos;s Authorized Apps settings. If you need a correction
           instead, contact support and explain what is inaccurate without sending tokens
           or passwords.
@@ -86,7 +86,7 @@ export default function SupportPage() {
           </li>
           <li>
             <strong>Audio is missing:</strong> interact with the game once, then check the
-            Music and SFX controls in Admin or Fighter Profile.
+            Music and SFX controls in Settings or Fighter Profile.
           </li>
         </ul>
       </LegalSection>
