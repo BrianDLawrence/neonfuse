@@ -11,6 +11,7 @@ import { POST } from "./route";
 
 const player = {
   id: "player-a",
+  discordUserId: "1001",
   displayName: "Alice",
   source: "web" as const
 };
@@ -44,6 +45,7 @@ function request() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("MONGODB_URI", "mongodb://test");
+  vi.stubEnv("MUSIC_TRACK_EDITOR_DISCORD_IDS", "1001");
   vi.mocked(enforceRateLimit).mockResolvedValue(null);
   vi.mocked(getAuthenticatedPlayer).mockResolvedValue(player);
 });
@@ -73,7 +75,25 @@ describe("custom music track writes", () => {
     expect(getMongoDb).not.toHaveBeenCalled();
   });
 
-  it("stores a valid submission only after authentication", async () => {
+  it("rejects a signed-in player who is not on the editor allowlist", async () => {
+    vi.stubEnv("MUSIC_TRACK_EDITOR_DISCORD_IDS", "2002");
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(403);
+    expect(getMongoDb).not.toHaveBeenCalled();
+  });
+
+  it("rejects every submission when no allowlist is configured", async () => {
+    vi.stubEnv("MUSIC_TRACK_EDITOR_DISCORD_IDS", "");
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(403);
+    expect(getMongoDb).not.toHaveBeenCalled();
+  });
+
+  it("stores a valid submission from an allowlisted editor", async () => {
     const insertOne = vi.fn().mockResolvedValue({ insertedId: { toString: () => "track-id" } });
     const db = { collection: vi.fn(() => ({ insertOne })) };
     vi.mocked(getMongoDb).mockResolvedValue(db as never);
@@ -82,7 +102,9 @@ describe("custom music track writes", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(insertOne).toHaveBeenCalledWith(expect.objectContaining({ id: "custom-track" }));
+    expect(insertOne).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "custom-track", createdBy: "player-a" })
+    );
     expect(payload).toMatchObject({ ok: true, stored: true, id: "track-id" });
   });
 });
