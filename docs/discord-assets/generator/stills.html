@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Neon Fuse Discord stills</title>
+    <!-- generate.mjs replaces this comment's style body with the :root block from src/app/globals.css. -->
+    <style>
+      /*ROOT_TOKENS*/
+    </style>
+    <style>
+      /* The same self-hosted display font the app loads in src/app/layout.tsx. */
+      @font-face {
+        font-family: "Chakra Petch";
+        font-weight: 500;
+        src: url("/fonts/chakra-petch-latin-500-normal.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Chakra Petch";
+        font-weight: 600;
+        src: url("/fonts/chakra-petch-latin-600-normal.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Chakra Petch";
+        font-weight: 700;
+        src: url("/fonts/chakra-petch-latin-700-normal.woff2") format("woff2");
+      }
+
+      :root {
+        --font-chakra: "Chakra Petch";
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: var(--background-deep);
+      }
+
+      #stage {
+        position: relative;
+        overflow: hidden;
+        background: var(--background-deep);
+      }
+
+      #stage canvas {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* The in-game wordmark (.brand-lockup h1 in globals.css), scaled up for the shelf. */
+      .wordmark {
+        position: absolute;
+        left: 0;
+        right: 0;
+        margin: 0;
+        color: var(--text);
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        line-height: 0.9;
+        text-align: center;
+        text-transform: uppercase;
+        white-space: nowrap;
+        text-shadow:
+          0 0 10px rgba(34, 211, 238, 0.55),
+          0 0 46px rgba(34, 211, 238, 0.62),
+          0 6px 0 rgba(7, 8, 13, 0.55);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script type="module" src="/stills.js"></script>
+  </body>
+</html>
