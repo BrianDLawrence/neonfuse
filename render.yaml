@@ -1,14 +1,21 @@
 services:
+  # Render can't move a service between regions, so the US host is a new
+  # service. Point Discord's /multiplayer URL mapping at it once it is live,
+  # then delete the old Frankfurt service (neon-fuse-realtime) by hand.
   - type: web
-    name: neon-fuse-realtime
+    name: neon-fuse-realtime-us
     runtime: node
-    plan: free
-    region: frankfurt
+    plan: starter
+    region: virginia
     buildCommand: npm ci && npm run build:server
     startCommand: npm run start:server
     healthCheckPath: /health
     envVars:
       - key: MULTIPLAYER_SECRET
+        sync: false
+      # Match results and Party Brawl series are saved here. MONGODB_DB is
+      # optional and defaults to "neon-fuse", the same as the Next.js app.
+      - key: MONGODB_URI
         sync: false
       - key: MAX_REALTIME_CONNECTIONS
         value: 200

@@ -62,6 +62,26 @@ describe("realtime transport", () => {
     });
   });
 
+  it("compresses snapshots for clients that offer it and still serves clients that don't", async () => {
+    const url = await start();
+    const compressed = await connect(url);
+    const plain = new WebSocket(url, { perMessageDeflate: false });
+    await new Promise<void>((resolve, reject) => { plain.once("open", resolve); plain.once("error", reject); });
+
+    expect(compressed.extensions).toBe("permessage-deflate");
+    expect(plain.extensions).toBe("");
+
+    compressed.send(JSON.stringify({ type: "join", ticket: signJoinTicket({ playerId: "a", name: "Alice", roomId: "party" }, secret, Date.now()) }));
+    plain.send(JSON.stringify({ type: "join", ticket: signJoinTicket({ playerId: "b", name: "Bob", roomId: "party" }, secret, Date.now()) }));
+    const [one, two] = await Promise.all([
+      nextState(compressed, (s) => s.players.every((player) => player !== null)),
+      nextState(plain, (s) => s.players.every((player) => player !== null))
+    ]);
+    expect(one.players.map((player) => player?.name)).toEqual(["Alice", "Bob"]);
+    expect(two.players.map((player) => player?.name)).toEqual(["Alice", "Bob"]);
+    compressed.close(); plain.close();
+  });
+
   it("rejects excess WebSocket connections with a retryable 503", async () => {
     const url = await startWithCapacity(1, 1);
     const first = await connect(url);

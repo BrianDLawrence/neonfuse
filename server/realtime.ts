@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { WebSocket, WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer, type PerMessageDeflateOptions } from "ws";
 import { clientMessageSchema, type ServerMessage } from "../src/game/multiplayer/protocol";
 import { verifyJoinTicket } from "../src/lib/multiplayer-ticket";
 import type { Seat } from "../src/game/simulation/duel";
@@ -18,6 +18,18 @@ type RealtimeServerOptions = {
     persistence: PersistenceState;
     pendingResults: number;
   };
+};
+
+// Every seated player gets a JSON snapshot 20 times a second, and outbound
+// bandwidth is what the host bills for, so snapshots are compressed (about 4x
+// smaller). Each message is compressed on its own, without a per-connection
+// dictionary, to keep memory flat on a small instance. Small messages such as
+// errors skip compression, and clients that don't offer it still connect.
+// maxPayload still caps the decompressed size of anything a client sends.
+export const SNAPSHOT_COMPRESSION: PerMessageDeflateOptions = {
+  serverNoContextTakeover: true,
+  clientNoContextTakeover: true,
+  threshold: 512
 };
 
 function positiveInteger(value: number, name: string) {
@@ -41,7 +53,7 @@ export function createRealtimeServer({
   const startedAt = Date.now();
   let draining = false;
   let closePromise: Promise<void> | undefined;
-  const sockets = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
+  const sockets = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: SNAPSHOT_COMPRESSION });
   const rooms = new Rooms(randomUUID(), randomUUID, onResult, maxRooms, onPartyResult);
   const usedTickets = new Map<string, number>();
   type Connection = { id: string; room?: Room; seat?: Seat; alive: boolean; messages: number; window: number };
