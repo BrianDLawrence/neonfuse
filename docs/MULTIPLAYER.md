@@ -159,14 +159,25 @@ Keep Next.js on its existing deployment. Deploy the compiled realtime process to
 a host that runs a persistent Node service, terminates TLS, and supports WebSocket
 upgrades. Configure an HTTP health check at `/health`.
 
-The repository includes a Render Blueprint for the initial single-instance host.
-Create a Blueprint from the repository's `render.yaml`, enter the same
-`MULTIPLAYER_SECRET` used by Next.js when prompted, and keep the Free plan for a
-hobby deployment. Render builds only the realtime server, starts it on the
-platform-provided port, and checks `/health`. Free instances can take about a
-minute to wake after 15 minutes without inbound traffic; the client reconnects
-automatically while the instance starts. Use an always-on plan if that delay is
-not acceptable.
+The repository includes a Render Blueprint for the single-instance host. It
+runs `neon-fuse-realtime-us` on the always-on Starter plan in Render's Virginia
+region. Create a Blueprint from the repository's `render.yaml` and, when
+prompted, enter the same `MULTIPLAYER_SECRET` used by Next.js and the production
+`MONGODB_URI` (results and Party Brawl series are saved through it; `/health`
+reports `not-configured` without it). Render builds only the realtime server,
+starts it on the platform-provided port, and checks `/health`. Avoid the Free
+plan for public play: it sleeps after 15 minutes without traffic, takes about a
+minute to wake, and can restart at any time, which ends live rounds.
+
+Render can't move a service between regions. To change region, create a new
+service, point the Discord URL mapping (below) at it, check it from inside
+Discord, then delete the old service.
+
+Snapshots go to every seated player 20 times a second, so outbound bandwidth is
+the cost that grows with play. The server compresses each message on its own
+(`SNAPSHOT_COMPRESSION` in `server/realtime.ts`), which makes a Party Brawl
+snapshot about four times smaller. Clients that don't offer compression still
+connect uncompressed.
 
 **Run one realtime process/replica for this version.** Rooms and nonce replay
 protection live in that process. Do not enable horizontal scaling without shared
